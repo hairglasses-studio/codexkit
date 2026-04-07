@@ -1,7 +1,8 @@
 // Package baselineguard validates Codex repo baseline requirements.
 //
 // It checks for canonical instruction patterns, required files, Codex profiles,
-// skill surface validity, and agent naming conventions.
+// skill surface validity, agent naming conventions, skill sync drift,
+// MCP config drift, and protocol compliance (A2A, MCP discovery).
 package baselineguard
 
 import (
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/hairglasses-studio/codexkit"
 )
 
 // Finding represents a single validation result.
@@ -46,12 +49,8 @@ var RequiredProfiles = []string{
 	"ci_json",
 }
 
-// PortableFrontmatterKeys are the only keys allowed in skill frontmatter.
-var PortableFrontmatterKeys = map[string]bool{
-	"name":          true,
-	"description":   true,
-	"allowed-tools": true,
-}
+// PortableFrontmatterKeys re-exports the canonical set from the top-level package.
+var PortableFrontmatterKeys = codexkit.PortableFrontmatterKeys
 
 var (
 	canonicalAgentsRe = regexp.MustCompile(`(?m)^> Canonical instructions: AGENTS\.md`)
@@ -70,6 +69,11 @@ func Check(repoPath string) Report {
 	report.addProfiles(repoPath)
 	report.addAgentNaming(repoPath)
 	report.addSkillSurface(repoPath)
+	report.addSkillSyncCheck(repoPath)
+	report.addMCPSyncCheck(repoPath)
+	report.addMCPDiscovery(repoPath)
+	report.addA2AAwareness(repoPath)
+	report.addSkillPortability(repoPath)
 
 	report.Total = len(report.Findings)
 	for _, f := range report.Findings {
@@ -172,6 +176,175 @@ func (r *Report) addAgentNaming(repoPath string) {
 	}
 }
 
+func (r *Report) addSkillSyncCheck(repoPath string) {
+	agentsDir := filepath.Join(repoPath, ".agents/skills")
+	entries, err := os.ReadDir(agentsDir)
+	if err != nil {
+		return // no .agents/skills is fine
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		srcPath := filepath.Join(agentsDir, entry.Name(), "SKILL.md")
+		dstPath := filepath.Join(repoPath, ".claude/skills", entry.Name(), "SKILL.md")
+		srcData, err := os.ReadFile(srcPath)
+		if err != nil {
+			continue
+		}
+		dstData, err := os.ReadFile(dstPath)
+		if err != nil {
+			r.add("skill_sync", false, fmt.Sprintf("missing mirror: .claude/skills/%s/SKILL.md", entry.Name()))
+			continue
+		}
+		if string(srcData) != string(dstData) {
+			r.add("skill_sync", false, fmt.Sprintf("stale mirror: .claude/skills/%s/SKILL.md", entry.Name()))
+		} else {
+			r.add("skill_sync", true, entry.Name())
+		}
+	}
+}
+
+func (r *Report) addMCPSyncCheck(repoPath string) {
+	mcpPath := filepath.Join(repoPath, ".mcp.json")
+	data, err := os.ReadFile(mcpPath)
+	if err != nil {
+		return // no .mcp.json is fine
+	}
+	var mcpFile struct {
+		MCPServers map[string]any `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(data, &mcpFile); err != nil {
+		r.add("mcp_sync", false, fmt.Sprintf("invalid .mcp.json: %v", err))
+		return
+	}
+	if len(mcpFile.MCPServers) == 0 {
+		r.add("mcp_sync", true, "no MCP servers defined")
+		return
+	}
+	configPath := filepath.Join(repoPath, ".codex/config.toml")
+	configData, err := os.ReadFile(configPath)
+	if err != nil {
+		r.add("mcp_sync", false, "MCP servers defined but .codex/config.toml missing")
+		return
+	}
+	configStr := string(configData)
+	mcpServerRe := regexp.MustCompile(`(?m)^\[mcp_servers\.([\w-]+)\]`)
+	found := make(map[string]bool)
+	for _, match := range mcpServerRe.FindAllStringSubmatch(configStr, -1) {
+		found[match[1]] = true
+	}
+	for name := range mcpFile.MCPServers {
+		if found[name] {
+			r.add("mcp_sync", true, name)
+		} else {
+			r.add("mcp_sync", false, fmt.Sprintf("missing in config.toml: [mcp_servers.%s]", name))
+		}
+	}
+}
+
+func (r *Report) addMCPDiscovery(repoPath string) {
+	// Check if HTTP MCP servers are defined and .well-known/mcp.json exists
+	mcpPath := filepath.Join(repoPath, ".mcp.json")
+	data, err := os.ReadFile(mcpPath)
+	if err != nil {
+		return
+	}
+	var mcpFile struct {
+		MCPServers map[string]json.RawMessage `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(data, &mcpFile); err != nil {
+		return
+	}
+	hasHTTP := false
+	for _, raw := range mcpFile.MCPServers {
+		var server struct {
+			Transport string `json:"transport"`
+			URL       string `json:"url"`
+		}
+		if json.Unmarshal(raw, &server) == nil && (server.Transport == "http" || server.Transport == "sse" || server.URL != "") {
+			hasHTTP = true
+			break
+		}
+	}
+	if !hasHTTP {
+		return // only relevant for HTTP servers
+	}
+	wellKnown := filepath.Join(repoPath, ".well-known/mcp.json")
+	if _, err := os.Stat(wellKnown); err != nil {
+		r.add("mcp_discovery", false, "HTTP MCP servers defined but .well-known/mcp.json missing")
+	} else {
+		r.add("mcp_discovery", true, ".well-known/mcp.json present")
+	}
+}
+
+func (r *Report) addA2AAwareness(repoPath string) {
+	agentJSON := filepath.Join(repoPath, ".well-known/agent.json")
+	if _, err := os.Stat(agentJSON); err != nil {
+		r.add("a2a_awareness", true, "no .well-known/agent.json (optional)")
+	} else {
+		// Validate it's parseable JSON
+		data, err := os.ReadFile(agentJSON)
+		if err != nil {
+			r.add("a2a_awareness", false, "cannot read .well-known/agent.json")
+			return
+		}
+		var obj map[string]any
+		if err := json.Unmarshal(data, &obj); err != nil {
+			r.add("a2a_awareness", false, fmt.Sprintf("invalid .well-known/agent.json: %v", err))
+		} else {
+			r.add("a2a_awareness", true, ".well-known/agent.json valid")
+		}
+	}
+}
+
+func (r *Report) addSkillPortability(repoPath string) {
+	skillsDir := filepath.Join(repoPath, ".agents/skills")
+	entries, err := os.ReadDir(skillsDir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		skillPath := filepath.Join(skillsDir, entry.Name(), "SKILL.md")
+		data, err := os.ReadFile(skillPath)
+		if err != nil {
+			continue
+		}
+		content := string(data)
+		if !strings.HasPrefix(content, "---\n") {
+			continue // no frontmatter
+		}
+		endIdx := strings.Index(content[4:], "\n---")
+		if endIdx < 0 {
+			continue
+		}
+		frontmatter := content[4 : 4+endIdx]
+		nonPortable := []string{}
+		for _, line := range strings.Split(frontmatter, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) < 2 {
+				continue
+			}
+			key := strings.TrimSpace(parts[0])
+			if !codexkit.PortableFrontmatterKeys[key] {
+				nonPortable = append(nonPortable, key)
+			}
+		}
+		if len(nonPortable) > 0 {
+			r.add("skill_portability", false, fmt.Sprintf("%s: non-portable keys: %s", entry.Name(), strings.Join(nonPortable, ", ")))
+		} else {
+			r.add("skill_portability", true, entry.Name())
+		}
+	}
+}
+
 func (r *Report) addSkillSurface(repoPath string) {
 	surfacePath := filepath.Join(repoPath, ".agents/skills/surface.yaml")
 	data, err := os.ReadFile(surfacePath)
@@ -197,6 +370,7 @@ func (r *Report) addSkillSurface(repoPath string) {
 				trimmed := strings.TrimSpace(line)
 				if strings.HasPrefix(trimmed, "- name:") {
 					name := strings.TrimSpace(strings.TrimPrefix(trimmed, "- name:"))
+					name = strings.Trim(name, "\"'")
 					surface.Skills = append(surface.Skills, struct {
 						Name string `json:"name"`
 					}{Name: name})
@@ -221,5 +395,70 @@ func (r *Report) addSkillSurface(repoPath string) {
 		} else {
 			r.add("skill_file", true, skill.Name)
 		}
+	}
+}
+
+// --- ToolModule implementation ---
+
+type module struct{}
+
+// Module returns a ToolModule that exposes baseline validation tools.
+func Module() codexkit.ToolModule { return &module{} }
+
+func (m *module) Name() string { return "baselineguard" }
+func (m *module) Init() error  { return nil }
+
+func (m *module) Tools() []codexkit.ToolDef {
+	return []codexkit.ToolDef{
+		{
+			Name:        "baseline_check",
+			Description: "Run baseline-guard validation on a single repo",
+			Schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"repo_path": map[string]any{"type": "string", "description": "Path to the repository"},
+				},
+				"required": []string{"repo_path"},
+			},
+			Handler: func(params map[string]any) (any, error) {
+				repoPath, _ := params["repo_path"].(string)
+				if repoPath == "" {
+					return nil, fmt.Errorf("repo_path is required")
+				}
+				return Check(repoPath), nil
+			},
+		},
+		{
+			Name:        "baseline_check_all",
+			Description: "Run baseline-guard validation on all repos in ~/hairglasses-studio",
+			Schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"scan_path": map[string]any{"type": "string", "description": "Directory to scan (default ~/hairglasses-studio)"},
+				},
+			},
+			Handler: func(params map[string]any) (any, error) {
+				scanPath, _ := params["scan_path"].(string)
+				if scanPath == "" {
+					home, _ := os.UserHomeDir()
+					scanPath = filepath.Join(home, "hairglasses-studio")
+				}
+				entries, err := os.ReadDir(scanPath)
+				if err != nil {
+					return nil, fmt.Errorf("reading %s: %w", scanPath, err)
+				}
+				var reports []Report
+				for _, entry := range entries {
+					if !entry.IsDir() {
+						continue
+					}
+					repoPath := filepath.Join(scanPath, entry.Name())
+					if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
+						reports = append(reports, Check(repoPath))
+					}
+				}
+				return reports, nil
+			},
+		},
 	}
 }

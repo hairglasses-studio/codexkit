@@ -41,6 +41,9 @@ approval_policy = "never"
 	writeFile(t, dir, ".agents/skills/surface.yaml", string(surface))
 	writeFile(t, dir, ".agents/skills/test_skill/SKILL.md", "---\nname: test_skill\n---\n# Test\n")
 
+	// Skill sync mirror
+	writeFile(t, dir, ".claude/skills/test_skill/SKILL.md", "---\nname: test_skill\n---\n# Test\n")
+
 	return dir
 }
 
