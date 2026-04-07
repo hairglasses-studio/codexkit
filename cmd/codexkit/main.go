@@ -5,10 +5,30 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
+	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
+	"github.com/hairglasses-studio/codexkit/fleetaudit"
+	"github.com/hairglasses-studio/codexkit/mcpsync"
+	"github.com/hairglasses-studio/codexkit/skillsync"
 )
+
+var registry *codexkit.Registry
+
+func init() {
+	registry = codexkit.NewRegistry()
+	for _, m := range []codexkit.ToolModule{
+		baselineguard.Module(),
+		skillsync.Module(),
+		mcpsync.Module(),
+		fleetaudit.Module(),
+	} {
+		if err := registry.Register(m); err != nil {
+			fmt.Fprintf(os.Stderr, "init error: %v\n", err)
+			os.Exit(1)
+		}
+	}
+}
 
 func main() {
 	if len(os.Args) < 2 {
@@ -18,11 +38,15 @@ func main() {
 
 	switch os.Args[1] {
 	case "baseline":
-		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "usage: codexkit baseline check <repo_path>")
-			os.Exit(1)
-		}
 		runBaseline(os.Args[2:])
+	case "skills":
+		runSkills(os.Args[2:])
+	case "mcp":
+		runMCP(os.Args[2:])
+	case "fleet":
+		runFleet(os.Args[2:])
+	case "tools":
+		runTools()
 	case "help", "--help", "-h":
 		printUsage()
 	default:
@@ -36,9 +60,26 @@ func printUsage() {
 	fmt.Println(`codexkit — Codex fleet management toolkit
 
 Commands:
-  baseline check <repo>   Run baseline-guard validation on a repo
-  baseline check --all    Run on all repos in ~/hairglasses-studio
-  help                    Show this help`)
+  baseline check <repo|--all>   Run baseline-guard validation
+  skills sync <repo>            Sync skills to .claude/skills/ and plugins/
+  skills diff <repo>            Show what skill sync would change
+  skills list <repo>            List skills from surface.yaml
+  mcp sync <repo>               Sync .mcp.json to .codex/config.toml
+  mcp diff <repo>               Show what MCP sync would change
+  mcp list <repo>               List MCP servers from .mcp.json
+  fleet audit [scan_path]       Run full audit on all repos
+  fleet report [scan_path]      Summary report of fleet health
+  tools                         List all registered tools
+  help                          Show this help`)
+}
+
+func hasFlag(args []string, flag string) bool {
+	for _, a := range args {
+		if a == flag {
+			return true
+		}
+	}
+	return false
 }
 
 func runBaseline(args []string) {
@@ -47,7 +88,9 @@ func runBaseline(args []string) {
 		os.Exit(1)
 	}
 
+	jsonOut := hasFlag(args, "--json")
 	var paths []string
+
 	if len(args) > 1 && args[1] == "--all" {
 		home, _ := os.UserHomeDir()
 		studioDir := filepath.Join(home, "hairglasses-studio")
@@ -65,7 +108,7 @@ func runBaseline(args []string) {
 				paths = append(paths, repoPath)
 			}
 		}
-	} else if len(args) > 1 {
+	} else if len(args) > 1 && args[1] != "--json" {
 		paths = append(paths, args[1])
 	} else {
 		fmt.Fprintln(os.Stderr, "usage: codexkit baseline check <repo_path|--all>")
@@ -73,15 +116,17 @@ func runBaseline(args []string) {
 	}
 
 	allPassed := true
+	var reports []baselineguard.Report
 	for _, repoPath := range paths {
 		report := baselineguard.Check(repoPath)
+		reports = append(reports, report)
 		repoName := filepath.Base(repoPath)
 
 		if report.Passed {
-			fmt.Printf("  %-16s ✅ PASS (%d checks)\n", repoName, report.Total)
+			fmt.Printf("  %-20s PASS (%d checks)\n", repoName, report.Total)
 		} else {
 			allPassed = false
-			fmt.Printf("  %-16s ❌ FAIL (%d/%d)\n", repoName, report.Failed, report.Total)
+			fmt.Printf("  %-20s FAIL (%d/%d)\n", repoName, report.Failed, report.Total)
 			for _, f := range report.Findings {
 				if !f.Passed {
 					fmt.Printf("    - %s: %s\n", f.Check, f.Message)
@@ -90,18 +135,10 @@ func runBaseline(args []string) {
 		}
 	}
 
-	// JSON output if --json flag
-	for _, arg := range args {
-		if arg == "--json" {
-			reports := make([]baselineguard.Report, 0, len(paths))
-			for _, p := range paths {
-				reports = append(reports, baselineguard.Check(p))
-			}
-			enc := json.NewEncoder(os.Stdout)
-			enc.SetIndent("", "  ")
-			_ = enc.Encode(reports)
-			break
-		}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(reports)
 	}
 
 	if !allPassed {
@@ -109,7 +146,109 @@ func runBaseline(args []string) {
 	}
 }
 
-func init() {
-	// Suppress unused import warning
-	_ = strings.TrimSpace
+func runSkills(args []string) {
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit skills <sync|diff|list> <repo_path>")
+		os.Exit(1)
+	}
+
+	cmd, repoPath := args[0], args[1]
+	switch cmd {
+	case "sync":
+		report := skillsync.Sync(repoPath, false)
+		printJSON(report)
+	case "diff":
+		report := skillsync.Diff(repoPath)
+		printJSON(report)
+	case "list":
+		names, err := skillsync.List(repoPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		for _, name := range names {
+			fmt.Println(name)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "unknown skills command: %s\n", cmd)
+		os.Exit(1)
+	}
+}
+
+func runMCP(args []string) {
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit mcp <sync|diff|list> <repo_path>")
+		os.Exit(1)
+	}
+
+	cmd, repoPath := args[0], args[1]
+	switch cmd {
+	case "sync":
+		report := mcpsync.Sync(repoPath, false)
+		printJSON(report)
+	case "diff":
+		report := mcpsync.Diff(repoPath)
+		printJSON(report)
+	case "list":
+		names, err := mcpsync.List(repoPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		for _, name := range names {
+			fmt.Println(name)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "unknown mcp command: %s\n", cmd)
+		os.Exit(1)
+	}
+}
+
+func runFleet(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit fleet <audit|report> [scan_path]")
+		os.Exit(1)
+	}
+
+	scanPath := ""
+	if len(args) > 1 {
+		scanPath = args[1]
+	}
+	if scanPath == "" {
+		home, _ := os.UserHomeDir()
+		scanPath = filepath.Join(home, "hairglasses-studio")
+	}
+
+	switch args[0] {
+	case "audit":
+		report := fleetaudit.Audit(scanPath)
+		printJSON(report)
+	case "report":
+		report := fleetaudit.Audit(scanPath)
+		fmt.Printf("Fleet: %d repos, %d passed, %d failed\n",
+			report.TotalRepos, report.Passed, report.Failed)
+		for _, repo := range report.Repos {
+			status := "PASS"
+			if !repo.Passed {
+				status = "FAIL"
+			}
+			fmt.Printf("  %-20s %s\n", repo.RepoName, status)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "unknown fleet command: %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+func runTools() {
+	tools := registry.ListTools()
+	for _, t := range tools {
+		fmt.Printf("  %-24s %s\n", t.Name, t.Description)
+	}
+}
+
+func printJSON(v any) {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(v)
 }
