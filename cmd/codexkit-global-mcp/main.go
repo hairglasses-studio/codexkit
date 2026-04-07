@@ -15,10 +15,11 @@ func main() {
 
 	workspaceRoot := flag.String("workspace-root", defaultWorkspaceRoot(home), "Path to the workspace root")
 	configPath := flag.String("config", defaultConfig, "Target Codex config.toml path")
+	policyPath := flag.String("policy", "", "Optional global MCP policy path")
 	dryRun := flag.Bool("dry-run", false, "Preview changes without writing")
 	flag.Parse()
 
-	report := mcpsync.SyncGlobal(*workspaceRoot, *configPath, *dryRun)
+	report := mcpsync.SyncGlobal(*workspaceRoot, *configPath, *policyPath, *dryRun)
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	_ = encoder.Encode(report)

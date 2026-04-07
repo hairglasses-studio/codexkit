@@ -91,7 +91,7 @@ func setupGlobalWorkspace(t *testing.T) (string, string, string) {
 func TestSyncGlobal_WritesNormalizedWorkspaceServers(t *testing.T) {
 	workspaceRoot, configPath, home := setupGlobalWorkspace(t)
 
-	report := SyncGlobal(workspaceRoot, configPath, false)
+	report := SyncGlobal(workspaceRoot, configPath, "", false)
 	if len(report.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", report.Errors)
 	}
@@ -146,7 +146,7 @@ func TestSyncGlobal_WritesNormalizedWorkspaceServers(t *testing.T) {
 func TestSyncGlobal_DryRunDoesNotWrite(t *testing.T) {
 	workspaceRoot, configPath, _ := setupGlobalWorkspace(t)
 
-	report := SyncGlobal(workspaceRoot, configPath, true)
+	report := SyncGlobal(workspaceRoot, configPath, "", true)
 	if len(report.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", report.Errors)
 	}
@@ -157,5 +157,79 @@ func TestSyncGlobal_DryRunDoesNotWrite(t *testing.T) {
 	}
 	if strings.Contains(string(data), GlobalStartMarker) {
 		t.Fatal("dry-run should not write generated block")
+	}
+}
+
+func TestSyncGlobal_RespectsPolicyAndManifest(t *testing.T) {
+	workspaceRoot, configPath, _ := setupGlobalWorkspace(t)
+	writeWorkspaceFile(t, workspaceRoot, "prompt-improver/.mcp.json", `{
+  "mcpServers": {
+    "prompt-improver": {
+      "command": "bash",
+      "args": ["./scripts/mcp/prompt-improver-mcp.sh"]
+    }
+  }
+}`)
+	writeWorkspaceFile(t, workspaceRoot, "workspace/manifest.json", `{
+  "version": 1,
+  "repos": [
+    {"name": "chromecast4k-libre", "category": "device", "scope": "active_first_party"},
+    {"name": "hg-android", "category": "device", "scope": "active_first_party"},
+    {"name": "jobb", "category": "application", "scope": "active_operator"},
+    {"name": "ralphglasses", "category": "hub", "scope": "active_operator"},
+    {"name": "prompt-improver", "category": "tooling", "scope": "compatibility_only"}
+  ]
+}`)
+	writeWorkspaceFile(t, workspaceRoot, "workspace/mcp-global-policy.json", `{
+  "version": 1,
+  "defaults": {
+    "include_root": true,
+    "ready_only": true
+  },
+  "manifest": {
+    "use_workspace_manifest": true,
+    "allow_unlisted_repos": false,
+    "exclude_scopes": ["compatibility_only"]
+  },
+  "servers": [
+    {"repo": "chromecast4k-libre", "server": "kirkwood", "alias": "cast-kirkwood"},
+    {"repo": "hg-android", "server": "kirkwood", "enabled": false}
+  ]
+}`)
+
+	report := SyncGlobal(workspaceRoot, configPath, "", true)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	if !report.PolicyLoaded {
+		t.Fatal("expected policy to load")
+	}
+	if !report.ManifestLoaded {
+		t.Fatal("expected manifest to load")
+	}
+
+	names := make(map[string]bool)
+	for _, server := range report.Servers {
+		names[server.Name] = true
+	}
+	if !names["cast-kirkwood"] {
+		t.Fatal("expected explicit alias from policy")
+	}
+	if names["hg-android-kirkwood"] {
+		t.Fatal("expected disabled server to be skipped")
+	}
+	if names["prompt-improver"] {
+		t.Fatal("expected compatibility_only repo to be skipped")
+	}
+
+	reasons := map[string]string{}
+	for _, skipped := range report.Skipped {
+		reasons[skipped.SourceRepo+":"+skipped.SourceServer] = skipped.Reason
+	}
+	if reasons["hg-android:kirkwood"] != "server disabled by policy" {
+		t.Fatalf("unexpected disabled-server reason: %q", reasons["hg-android:kirkwood"])
+	}
+	if reasons["prompt-improver:prompt-improver"] != `repo scope "compatibility_only" excluded by policy` {
+		t.Fatalf("unexpected manifest-skip reason: %q", reasons["prompt-improver:prompt-improver"])
 	}
 }
