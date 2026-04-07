@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stash Safe Intake"
+  short_description: "Operate Stash ingest and safe forum matching"
+  default_prompt: "Use $stash-safe-intake to check Stash health, run library ingest, or reconcile SexyForums thread matches without extracting download links."
