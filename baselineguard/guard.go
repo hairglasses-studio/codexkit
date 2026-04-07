@@ -180,7 +180,7 @@ func (r *Report) addSkillSurface(repoPath string) {
 		return
 	}
 
-	// Must be valid JSON (the convention uses JSON despite .yaml extension)
+	// Accept both JSON and simple YAML formats
 	var surface struct {
 		Version int `json:"version"`
 		Skills  []struct {
@@ -188,8 +188,24 @@ func (r *Report) addSkillSurface(repoPath string) {
 		} `json:"skills"`
 	}
 	if err := json.Unmarshal(data, &surface); err != nil {
-		r.add("skill_surface", false, fmt.Sprintf("invalid JSON: %v", err))
-		return
+		// Try YAML-style: grep for version and skill names
+		content := string(data)
+		if strings.Contains(content, "version: 1") || strings.Contains(content, "\"version\": 1") {
+			surface.Version = 1
+			// Extract skill names from "- name: <value>" lines
+			for _, line := range strings.Split(content, "\n") {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmed, "- name:") {
+					name := strings.TrimSpace(strings.TrimPrefix(trimmed, "- name:"))
+					surface.Skills = append(surface.Skills, struct {
+						Name string `json:"name"`
+					}{Name: name})
+				}
+			}
+		} else {
+			r.add("skill_surface", false, fmt.Sprintf("invalid format: %v", err))
+			return
+		}
 	}
 	if surface.Version != 1 {
 		r.add("skill_surface", false, fmt.Sprintf("version=%d, want 1", surface.Version))
