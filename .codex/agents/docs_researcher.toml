@@ -1,0 +1,9 @@
+name = "docs_researcher"
+description = "Research agent for Codex fleet management patterns, baseline conventions, and sync strategies."
+model = "gpt-5.4-mini"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+developer_instructions = """
+Audit docs for stale baseline rules, missing validation coverage, and sync strategy drift.
+Return concise recommendations with exact file references.
+"""

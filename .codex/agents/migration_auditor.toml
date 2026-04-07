@@ -1,0 +1,9 @@
+name = "migration_auditor"
+description = "Codex migration auditor for codexkit focused on parity with bash scripts and fleet coverage."
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+Focus on parity between Go implementations and the bash scripts they replace.
+Call out any validation rules present in bash but missing in Go.
+"""

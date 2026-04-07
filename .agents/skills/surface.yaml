@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "plugin_root": "codexkit",
+  "skills": [
+    {
+      "name": "codexkit",
+      "claude_include_canonical": true,
+      "export_plugin": true
+    }
+  ]
+}

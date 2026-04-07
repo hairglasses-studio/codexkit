@@ -1,0 +1,26 @@
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[agents]
+max_threads = 4
+max_depth = 1
+
+[profiles.readonly_quiet]
+approval_policy = "never"
+sandbox_mode = "read-only"
+model_reasoning_effort = "medium"
+
+[profiles.review]
+approval_policy = "on-request"
+sandbox_mode = "read-only"
+model_reasoning_effort = "high"
+
+[profiles.workspace_auto]
+approval_policy = "on-failure"
+sandbox_mode = "workspace-write"
+model_reasoning_effort = "high"
+
+[profiles.ci_json]
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+model_reasoning_effort = "medium"
