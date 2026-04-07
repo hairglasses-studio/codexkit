@@ -46,7 +46,7 @@ type SyncReport struct {
 	Errors   []string     `json:"errors,omitempty"`
 }
 
-var mcpServerBlockRe = regexp.MustCompile(`(?m)^\[mcp_servers\.(\w+)\]`)
+var mcpServerBlockRe = regexp.MustCompile(`(?m)^\[mcp_servers\.([\w-]+)\]`)
 
 // Parse reads and parses the .mcp.json file.
 func Parse(repoPath string) (*MCPFile, error) {

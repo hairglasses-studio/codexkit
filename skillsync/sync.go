@@ -60,6 +60,7 @@ func ParseSurface(repoPath string) (*Surface, error) {
 				trimmed := strings.TrimSpace(line)
 				if strings.HasPrefix(trimmed, "- name:") {
 					name := strings.TrimSpace(strings.TrimPrefix(trimmed, "- name:"))
+					name = strings.Trim(name, "\"'")
 					surface.Skills = append(surface.Skills, SkillEntry{Name: name})
 				}
 			}

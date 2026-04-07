@@ -229,7 +229,7 @@ func (r *Report) addMCPSyncCheck(repoPath string) {
 		return
 	}
 	configStr := string(configData)
-	mcpServerRe := regexp.MustCompile(`(?m)^\[mcp_servers\.(\w+)\]`)
+	mcpServerRe := regexp.MustCompile(`(?m)^\[mcp_servers\.([\w-]+)\]`)
 	found := make(map[string]bool)
 	for _, match := range mcpServerRe.FindAllStringSubmatch(configStr, -1) {
 		found[match[1]] = true
@@ -370,6 +370,7 @@ func (r *Report) addSkillSurface(repoPath string) {
 				trimmed := strings.TrimSpace(line)
 				if strings.HasPrefix(trimmed, "- name:") {
 					name := strings.TrimSpace(strings.TrimPrefix(trimmed, "- name:"))
+					name = strings.Trim(name, "\"'")
 					surface.Skills = append(surface.Skills, struct {
 						Name string `json:"name"`
 					}{Name: name})

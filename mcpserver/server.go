@@ -93,7 +93,9 @@ func (s *Server) Serve(r io.Reader, w io.Writer) error {
 		}
 
 		resp := s.handleRequest(req)
-		s.writeResponse(w, resp)
+		if req.ID != nil {
+			s.writeResponse(w, resp)
+		}
 	}
 
 	return scanner.Err()
@@ -195,7 +197,14 @@ func (s *Server) handleToolsCall(req JSONRPCRequest) JSONRPCResponse {
 	}
 
 	// Marshal result to JSON content block per MCP spec
-	resultJSON, _ := json.Marshal(result)
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error:   &JSONRPCError{Code: -32603, Message: fmt.Sprintf("internal error marshaling result: %v", err)},
+		}
+	}
 	return JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
