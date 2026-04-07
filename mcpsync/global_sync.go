@@ -2,8 +2,10 @@ package mcpsync
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -27,11 +29,13 @@ type GlobalSyncReport struct {
 }
 
 type GlobalServerInfo struct {
-	Name              string `json:"name"`
-	SourceRepo        string `json:"source_repo"`
-	SourceServer      string `json:"source_server"`
-	SourceFile        string `json:"source_file"`
-	CapabilitySummary string `json:"capability_summary,omitempty"`
+	Name              string   `json:"name"`
+	SourceRepo        string   `json:"source_repo"`
+	SourceServer      string   `json:"source_server"`
+	SourceFile        string   `json:"source_file"`
+	CapabilitySummary string   `json:"capability_summary,omitempty"`
+	Validation        string   `json:"validation,omitempty"`
+	ValidationNotes   []string `json:"validation_notes,omitempty"`
 }
 
 type globalMCPFile struct {
@@ -73,6 +77,11 @@ type globalCandidate struct {
 	Server            globalMCPServer
 }
 
+type validationResult struct {
+	Status string
+	Notes  []string
+}
+
 func SyncGlobal(workspaceRoot, configPath string, dryRun bool) GlobalSyncReport {
 	report := GlobalSyncReport{
 		WorkspaceRoot: workspaceRoot,
@@ -110,12 +119,15 @@ func SyncGlobal(workspaceRoot, configPath string, dryRun bool) GlobalSyncReport 
 	report.Servers = make([]GlobalServerInfo, 0, len(candidates))
 	newSet := make(map[string]struct{}, len(candidates))
 	for _, candidate := range candidates {
+		validation := validateGlobalServer(candidate.Server)
 		report.Servers = append(report.Servers, GlobalServerInfo{
 			Name:              candidate.Alias,
 			SourceRepo:        candidate.SourceRepo,
 			SourceServer:      candidate.SourceServer,
 			SourceFile:        candidate.SourceFile,
 			CapabilitySummary: candidate.CapabilitySummary,
+			Validation:        validation.Status,
+			ValidationNotes:   validation.Notes,
 		})
 		action := "create"
 		if _, ok := managedSet[candidate.Alias]; ok {
@@ -523,4 +535,68 @@ func makeNameSet(names []string) map[string]struct{} {
 		set[name] = struct{}{}
 	}
 	return set
+}
+
+func validateGlobalServer(server globalMCPServer) validationResult {
+	if server.CWD != "" {
+		info, err := os.Stat(server.CWD)
+		if err != nil {
+			return validationResult{
+				Status: "invalid",
+				Notes:  []string{fmt.Sprintf("cwd missing: %s", server.CWD)},
+			}
+		}
+		if !info.IsDir() {
+			return validationResult{
+				Status: "invalid",
+				Notes:  []string{fmt.Sprintf("cwd is not a directory: %s", server.CWD)},
+			}
+		}
+	}
+	if server.Command == "" {
+		if isRemoteTransport(server) {
+			return validationResult{Status: "remote", Notes: []string{"remote transport; command not validated"}}
+		}
+		return validationResult{Status: "invalid", Notes: []string{"command missing"}}
+	}
+
+	resolved, err := resolveCommandPath(server)
+	if err != nil {
+		return validationResult{Status: "invalid", Notes: []string{err.Error()}}
+	}
+	return validationResult{Status: "ready", Notes: []string{fmt.Sprintf("command: %s", resolved)}}
+}
+
+func resolveCommandPath(server globalMCPServer) (string, error) {
+	command := server.Command
+	switch {
+	case filepath.IsAbs(command):
+		if !isExecutableFile(command) {
+			return "", fmt.Errorf("command not executable: %s", command)
+		}
+		return filepath.Clean(command), nil
+	case strings.HasPrefix(command, "./") || strings.HasPrefix(command, "../"):
+		if server.CWD == "" {
+			return "", errors.New("relative command without cwd")
+		}
+		resolved := filepath.Clean(filepath.Join(server.CWD, command))
+		if !isExecutableFile(resolved) {
+			return "", fmt.Errorf("command not executable: %s", resolved)
+		}
+		return resolved, nil
+	default:
+		resolved, err := exec.LookPath(command)
+		if err != nil {
+			return "", fmt.Errorf("command not found in PATH: %s", command)
+		}
+		return resolved, nil
+	}
+}
+
+func isExecutableFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	return info.Mode()&0111 != 0
 }

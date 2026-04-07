@@ -18,12 +18,24 @@ func writeWorkspaceFile(t *testing.T, base, name, content string) {
 	}
 }
 
+func writeExecutableWorkspaceFile(t *testing.T, base, name, content string) {
+	t.Helper()
+	writeWorkspaceFile(t, base, name, content)
+	path := filepath.Join(base, name)
+	if err := os.Chmod(path, 0755); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func setupGlobalWorkspace(t *testing.T) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
 	workspaceRoot := filepath.Join(root, "studio")
 	t.Setenv("HOME", home)
+
+	writeExecutableWorkspaceFile(t, home, "hairglasses-studio/dotfiles/mcp/systemd-mcp/systemd-mcp", "#!/bin/sh\nexit 0\n")
+	writeExecutableWorkspaceFile(t, workspaceRoot, "jobb/bin/jobb-mcp", "#!/bin/sh\nexit 0\n")
 
 	writeWorkspaceFile(t, workspaceRoot, ".mcp.json", `{
   "mcpServers": {
@@ -85,6 +97,16 @@ func TestSyncGlobal_WritesNormalizedWorkspaceServers(t *testing.T) {
 	}
 	if len(report.Servers) != 5 {
 		t.Fatalf("expected 5 servers, got %d", len(report.Servers))
+	}
+	validations := map[string]string{}
+	for _, server := range report.Servers {
+		validations[server.Name] = server.Validation
+	}
+	if validations["systemd"] != "ready" {
+		t.Fatalf("expected systemd validation ready, got %q", validations["systemd"])
+	}
+	if validations["jobb"] != "ready" {
+		t.Fatalf("expected jobb validation ready, got %q", validations["jobb"])
 	}
 
 	data, err := os.ReadFile(configPath)
