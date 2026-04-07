@@ -11,10 +11,11 @@ func setupCompliantRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 
-	// Required files
 	writeFile(t, dir, "AGENTS.md", "# Test\n\n> Canonical instructions: AGENTS.md\n")
 	writeFile(t, dir, "CLAUDE.md", "# Test\n\nThis repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file.\n")
 	writeFile(t, dir, "GEMINI.md", "# Test\n\nThis repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file.\n")
+	writeFile(t, dir, ".claude/settings.json", "{}\n")
+	writeFile(t, dir, ".gemini/settings.json", "{\n  \"context\": {\n    \"fileName\": [\"AGENTS.md\", \"GEMINI.md\"]\n  }\n}\n")
 	writeFile(t, dir, ".github/copilot-instructions.md", "See AGENTS.md in the repository root.\n")
 	writeFile(t, dir, ".codex/config.toml", `
 approval_policy = "on-request"
@@ -40,8 +41,6 @@ approval_policy = "never"
 	})
 	writeFile(t, dir, ".agents/skills/surface.yaml", string(surface))
 	writeFile(t, dir, ".agents/skills/test_skill/SKILL.md", "---\nname: test_skill\n---\n# Test\n")
-
-	// Skill sync mirror
 	writeFile(t, dir, ".claude/skills/test_skill/SKILL.md", "---\nname: test_skill\n---\n# Test\n")
 
 	return dir
@@ -123,6 +122,92 @@ func TestCheck_MissingProfile(t *testing.T) {
 	}
 }
 
+func TestCheck_MissingGeminiContextBridge(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, ".gemini/settings.json", "{}\n")
+
+	report := Check(dir)
+	found := false
+	for _, f := range report.Findings {
+		if f.Check == "gemini_context_bridge" && !f.Passed {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected gemini_context_bridge failure when AGENTS.md is not in context.fileName")
+	}
+}
+
+func TestCheck_IgnoresExampleOnlyMCPServers(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, ".mcp.json", "{\n  \"mcpServers\": {\n    \"_example_stdio_server\": {\n      \"command\": \"go\"\n    }\n  }\n}\n")
+
+	report := Check(dir)
+	for _, f := range report.Findings {
+		if f.Check == "gemini_mcp_bridge" && !f.Passed {
+			t.Fatalf("did not expect gemini_mcp_bridge failure for example-only MCP config: %s", f.Message)
+		}
+	}
+}
+
+func TestCheck_MCPPortabilityFlagsRelativeCWD(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, ".mcp.json", `{
+  "mcpServers": {
+    "demo": {
+      "command": "bash",
+      "args": ["./scripts/run-demo.sh"],
+      "cwd": "."
+    }
+  }
+}
+`)
+
+	report := Check(dir)
+	found := false
+	for _, f := range report.Findings {
+		if f.Check == "mcp_portability" && !f.Passed {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected mcp_portability failure for repo-relative MCP launch")
+	}
+}
+
+func TestCheck_MCPPortabilityFlagsGeneratedConfigCWD(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, ".mcp.json", `{
+  "mcpServers": {
+    "demo": {
+      "command": "bash",
+      "args": ["-c", "exec bash \"$HOME/demo.sh\""]
+    }
+  }
+}
+`)
+	writeFile(t, dir, ".codex/config.toml", `
+[profiles.readonly_quiet]
+[profiles.review]
+[profiles.workspace_auto]
+[profiles.ci_json]
+
+[mcp_servers.demo]
+cwd = "."
+`)
+
+	report := Check(dir)
+	found := false
+	for _, f := range report.Findings {
+		if f.Check == "mcp_portability" && !f.Passed {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected mcp_portability failure for generated config cwd")
+	}
+}
+
 func TestCheck_DashCaseAgent(t *testing.T) {
 	dir := setupCompliantRepo(t)
 	writeFile(t, dir, ".codex/agents/my-agent.toml", `name = "my-agent"`)
@@ -176,7 +261,6 @@ func TestCheck_NoSurface(t *testing.T) {
 	os.Remove(filepath.Join(dir, ".agents/skills/surface.yaml"))
 
 	report := Check(dir)
-	// Should still pass — surface is optional
 	for _, f := range report.Findings {
 		if f.Check == "skill_surface" && !f.Passed {
 			t.Error("missing surface.yaml should not cause failure")

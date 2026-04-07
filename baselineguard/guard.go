@@ -37,6 +37,8 @@ var RequiredFiles = []string{
 	"AGENTS.md",
 	"CLAUDE.md",
 	"GEMINI.md",
+	".claude/settings.json",
+	".gemini/settings.json",
 	".github/copilot-instructions.md",
 	".codex/config.toml",
 }
@@ -58,6 +60,7 @@ var (
 	canonicalCopilot  = "AGENTS.md"
 	profileRe         = regexp.MustCompile(`(?m)^\[profiles\.(\w+)\]`)
 	dashInFilename    = regexp.MustCompile(`-`)
+	kebabNameRe       = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 )
 
 // Check runs all baseline-guard validations on the given repo path.
@@ -66,11 +69,13 @@ func Check(repoPath string) Report {
 
 	report.addRequiredFiles(repoPath)
 	report.addCanonicalPatterns(repoPath)
+	report.addProviderSettings(repoPath)
 	report.addProfiles(repoPath)
 	report.addAgentNaming(repoPath)
 	report.addSkillSurface(repoPath)
 	report.addSkillSyncCheck(repoPath)
 	report.addMCPSyncCheck(repoPath)
+	report.addMCPLauncherPortability(repoPath)
 	report.addMCPDiscovery(repoPath)
 	report.addA2AAwareness(repoPath)
 	report.addSkillPortability(repoPath)
@@ -136,6 +141,84 @@ func (r *Report) addCanonicalPatterns(repoPath string) {
 			r.add("canonical_copilot", false, "copilot-instructions.md missing AGENTS.md reference")
 		}
 	}
+}
+
+func (r *Report) addProviderSettings(repoPath string) {
+	if data, err := os.ReadFile(filepath.Join(repoPath, ".claude/settings.json")); err == nil {
+		var parsed map[string]any
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			r.add("claude_settings_json", false, ".claude/settings.json must be valid JSON")
+		} else {
+			r.add("claude_settings_json", true, "")
+		}
+	}
+
+	if data, err := os.ReadFile(filepath.Join(repoPath, ".gemini/settings.json")); err == nil {
+		var parsed map[string]any
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			r.add("gemini_settings_json", false, ".gemini/settings.json must be valid JSON")
+			return
+		}
+		r.add("gemini_settings_json", true, "")
+
+		context, _ := parsed["context"].(map[string]any)
+		fileNames, _ := context["fileName"].([]any)
+		hasAgents := false
+		for _, entry := range fileNames {
+			if name, ok := entry.(string); ok && name == "AGENTS.md" {
+				hasAgents = true
+				break
+			}
+		}
+		if hasAgents {
+			r.add("gemini_context_bridge", true, "")
+		} else {
+			r.add("gemini_context_bridge", false, ".gemini/settings.json missing AGENTS.md context bridge")
+		}
+
+		if activeServers, ok := activeMCPServers(repoPath); ok && len(activeServers) > 0 {
+			mcpServers, _ := parsed["mcpServers"].(map[string]any)
+			if len(mcpServers) == 0 {
+				r.add("gemini_mcp_bridge", false, ".gemini/settings.json missing mcpServers bridge")
+			} else {
+				kebabOK := true
+				for name := range mcpServers {
+					if !kebabNameRe.MatchString(name) {
+						kebabOK = false
+						break
+					}
+				}
+				if kebabOK {
+					r.add("gemini_mcp_bridge", true, "")
+				} else {
+					r.add("gemini_mcp_bridge", false, ".gemini/settings.json mcpServers keys must use kebab-case")
+				}
+			}
+		}
+	}
+}
+
+func activeMCPServers(repoPath string) (map[string]json.RawMessage, bool) {
+	data, err := os.ReadFile(filepath.Join(repoPath, ".mcp.json"))
+	if err != nil {
+		return nil, false
+	}
+
+	var rootMCP struct {
+		MCPServers map[string]json.RawMessage `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(data, &rootMCP); err != nil {
+		return nil, false
+	}
+
+	active := make(map[string]json.RawMessage)
+	for name, payload := range rootMCP.MCPServers {
+		if strings.HasPrefix(name, "_") {
+			continue
+		}
+		active[name] = payload
+	}
+	return active, true
 }
 
 func (r *Report) addProfiles(repoPath string) {
@@ -241,6 +324,87 @@ func (r *Report) addMCPSyncCheck(repoPath string) {
 			r.add("mcp_sync", false, fmt.Sprintf("missing in config.toml: [mcp_servers.%s]", name))
 		}
 	}
+}
+
+func (r *Report) addMCPLauncherPortability(repoPath string) {
+	mcpPath := filepath.Join(repoPath, ".mcp.json")
+	data, err := os.ReadFile(mcpPath)
+	if err != nil {
+		return
+	}
+	var mcpFile struct {
+		MCPServers map[string]struct {
+			Command string   `json:"command"`
+			Args    []string `json:"args"`
+			CWD     string   `json:"cwd"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(data, &mcpFile); err != nil {
+		return
+	}
+	if len(mcpFile.MCPServers) == 0 {
+		r.add("mcp_portability", true, "no MCP servers defined")
+	} else {
+		for name, server := range mcpFile.MCPServers {
+			if msg := validateMCPServerPortability(server.Command, server.Args, server.CWD); msg != "" {
+				r.add("mcp_portability", false, fmt.Sprintf("%s: %s", name, msg))
+			} else {
+				r.add("mcp_portability", true, name)
+			}
+		}
+	}
+
+	configData, err := os.ReadFile(filepath.Join(repoPath, ".codex/config.toml"))
+	if err != nil {
+		return
+	}
+	configStr := string(configData)
+	switch {
+	case strings.Contains(configStr, `cwd = "."`) || strings.Contains(configStr, `cwd = "./"`):
+		r.add("mcp_portability", false, ".codex/config.toml contains repo-relative cwd in generated MCP blocks")
+	case strings.Contains(configStr, "go run ./cmd/"):
+		r.add("mcp_portability", false, ".codex/config.toml contains direct go run ./cmd/... launch strings")
+	case strings.Contains(configStr, "cd ") && strings.Contains(configStr, "&& go run ./cmd/"):
+		r.add("mcp_portability", false, ".codex/config.toml contains inline cd && go run MCP launch strings")
+	}
+}
+
+func validateMCPServerPortability(command string, args []string, cwd string) string {
+	if cwd == "." || cwd == "./" {
+		return "uses cwd = .; use a portable launcher instead"
+	}
+	if strings.HasPrefix(command, "./") || strings.HasPrefix(command, "../") {
+		return fmt.Sprintf("uses repo-relative command %s", command)
+	}
+	if (command == "go" || strings.HasSuffix(command, "/go")) && len(args) > 1 && args[0] == "run" && strings.HasPrefix(args[1], "./cmd/") {
+		return "uses direct go run ./cmd/...; use a portable launcher script"
+	}
+	switch command {
+	case "bash", "sh", "zsh":
+		if len(args) > 0 && (strings.HasPrefix(args[0], "./") || strings.HasPrefix(args[0], "../")) {
+			return fmt.Sprintf("uses repo-relative shell script path %s", args[0])
+		}
+	case "/bin/bash", "/bin/sh", "/bin/zsh":
+		if len(args) > 0 && (strings.HasPrefix(args[0], "./") || strings.HasPrefix(args[0], "../")) {
+			return fmt.Sprintf("uses repo-relative shell script path %s", args[0])
+		}
+	}
+	for _, arg := range args {
+		if msg := validateMCPShellSnippet(arg); msg != "" {
+			return msg
+		}
+	}
+	return ""
+}
+
+func validateMCPShellSnippet(snippet string) string {
+	if strings.Contains(snippet, "go run ./cmd/") {
+		return "uses inline go run ./cmd/...; move the launch into a portable wrapper script"
+	}
+	if strings.Contains(snippet, "cd ") && strings.Contains(snippet, "&&") {
+		return "uses inline cd ... && ...; move repo-root resolution into a wrapper script"
+	}
+	return ""
 }
 
 func (r *Report) addMCPDiscovery(repoPath string) {

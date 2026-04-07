@@ -1,0 +1,10 @@
+{
+  "context": {
+    "fileName": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "GEMINI.md"
+    ]
+  },
+  "mcpServers": {}
+}
