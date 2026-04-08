@@ -23,7 +23,7 @@ jobs:
     if: |
       github.event_name == 'pull_request' ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
-    runs-on: [self-hosted, archglasses]
+    runs-on: [self-hosted, archglasses, optimized]
     steps:
       - uses: actions/checkout@v6
         with:

@@ -19,7 +19,7 @@ concurrency:
 jobs:
   claude:
     if: contains(github.event.comment.body, '@claude')
-    runs-on: [self-hosted, archglasses]
+    runs-on: [self-hosted, archglasses, optimized]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -32,7 +32,7 @@ jobs:
 
   codex:
     if: contains(github.event.comment.body, '@codex')
-    runs-on: [self-hosted, archglasses]
+    runs-on: [self-hosted, archglasses, optimized]
     steps:
       - uses: actions/checkout@v6
         with:

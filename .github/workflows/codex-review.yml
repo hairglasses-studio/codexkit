@@ -23,7 +23,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@codex')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@codex'))
-    runs-on: [self-hosted, archglasses]
+    runs-on: [self-hosted, archglasses, optimized]
     env:
       PR_NUMBER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number || github.event_name == 'issue_comment' && github.event.issue.number || github.event.pull_request.number }}
     outputs:
@@ -62,7 +62,7 @@ jobs:
             ${{ github.event_name }}
 
   post-feedback:
-    runs-on: [self-hosted, archglasses]
+    runs-on: [self-hosted, archglasses, optimized]
     needs: codex-review
     if: needs.codex-review.outputs.final_message != ''
     permissions:

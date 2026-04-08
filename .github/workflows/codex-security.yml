@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   security-review:
-    runs-on: [self-hosted, archglasses]
+    runs-on: [self-hosted, archglasses, optimized]
     outputs:
       final_message: ${{ steps.run_codex.outputs.final-message }}
     steps:
@@ -51,7 +51,7 @@ jobs:
             Return an empty response if you do not find a concrete security issue.
 
   post-feedback:
-    runs-on: [self-hosted, archglasses]
+    runs-on: [self-hosted, archglasses, optimized]
     needs: security-review
     if: needs.security-review.outputs.final_message != ''
     permissions:
