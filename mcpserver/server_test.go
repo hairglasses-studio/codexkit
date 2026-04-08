@@ -87,6 +87,10 @@ func TestInitialize(t *testing.T) {
 	if result["protocolVersion"] != "2025-11-25" {
 		t.Errorf("expected protocol version 2025-11-25, got %v", result["protocolVersion"])
 	}
+	caps := result["capabilities"].(map[string]any)
+	if caps["resources"] == nil || caps["prompts"] == nil {
+		t.Fatalf("expected resources and prompts capabilities, got %+v", caps)
+	}
 }
 
 func TestToolsList(t *testing.T) {
@@ -170,5 +174,80 @@ func TestUnknownMethod(t *testing.T) {
 	}
 	if resp.Error.Code != -32601 {
 		t.Errorf("expected -32601, got %d", resp.Error.Code)
+	}
+}
+
+func TestResourcesListAndRead(t *testing.T) {
+	s := setupTestServer(t)
+
+	listResp := sendRequest(t, s, "resources/list", 7, nil)
+	if listResp.Error != nil {
+		t.Fatalf("unexpected error: %v", listResp.Error.Message)
+	}
+	listResult := listResp.Result.(map[string]any)
+	resources := listResult["resources"].([]any)
+	if len(resources) < 2 {
+		t.Fatalf("expected resource catalog, got %+v", listResult)
+	}
+
+	readResp := sendRequest(t, s, "resources/read", 8, map[string]any{"uri": "codexkit://catalog/overview"})
+	if readResp.Error != nil {
+		t.Fatalf("unexpected error: %v", readResp.Error.Message)
+	}
+	readResult := readResp.Result.(map[string]any)
+	contents := readResult["contents"].([]any)
+	block := contents[0].(map[string]any)
+	if !strings.Contains(block["text"].(string), "\"tool_count\"") {
+		t.Fatalf("expected overview JSON, got %+v", block)
+	}
+}
+
+func TestPromptsListAndGet(t *testing.T) {
+	s := setupTestServer(t)
+
+	listResp := sendRequest(t, s, "prompts/list", 9, nil)
+	if listResp.Error != nil {
+		t.Fatalf("unexpected error: %v", listResp.Error.Message)
+	}
+	listResult := listResp.Result.(map[string]any)
+	prompts := listResult["prompts"].([]any)
+	if len(prompts) != 1 {
+		t.Fatalf("expected one prompt, got %+v", listResult)
+	}
+
+	getResp := sendRequest(t, s, "prompts/get", 10, map[string]any{
+		"name":      "codexkit-rollout",
+		"arguments": map[string]any{"repo": "demo"},
+	})
+	if getResp.Error != nil {
+		t.Fatalf("unexpected error: %v", getResp.Error.Message)
+	}
+	getResult := getResp.Result.(map[string]any)
+	messages := getResult["messages"].([]any)
+	message := messages[0].(map[string]any)
+	content := message["content"].(map[string]any)
+	if !strings.Contains(content["text"].(string), "demo") {
+		t.Fatalf("expected repo-specific prompt text, got %+v", getResult)
+	}
+}
+
+func TestMetaModuleAddsHealthTool(t *testing.T) {
+	reg := codexkit.NewRegistry()
+	if err := reg.Register(&testModule{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Register(Module(reg, ServerInfo{Name: "test", Version: "0.1.0"})); err != nil {
+		t.Fatal(err)
+	}
+	if !reg.HasTool("codexkit_server_health") {
+		t.Fatal("expected codexkit_server_health to be registered")
+	}
+	result, err := reg.Call("codexkit_server_health", map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := result.(map[string]any)
+	if payload["resource_count"] != 2 || payload["prompt_count"] != 1 {
+		t.Fatalf("unexpected health payload %+v", payload)
 	}
 }

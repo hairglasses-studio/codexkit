@@ -33,10 +33,16 @@ func main() {
 		}
 	}
 
-	server := mcpserver.New(reg, mcpserver.ServerInfo{
+	info := mcpserver.ServerInfo{
 		Name:    "codexkit",
 		Version: "0.2.0",
-	})
+	}
+	if err := reg.Register(mcpserver.Module(reg, info)); err != nil {
+		fmt.Fprintf(os.Stderr, "error registering server meta module: %v\n", err)
+		os.Exit(1)
+	}
+
+	server := mcpserver.New(reg, info)
 
 	if err := server.ServeStdio(); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)

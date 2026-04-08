@@ -6,5 +6,18 @@
       "GEMINI.md"
     ]
   },
-  "mcpServers": {}
+  "mcp": {
+    "allowed": [
+      "codexkit"
+    ]
+  },
+  "mcpServers": {
+    "codexkit": {
+      "args": [
+        "./scripts/run-codexkit-mcp.sh"
+      ],
+      "command": "bash",
+      "cwd": "."
+    }
+  }
 }
