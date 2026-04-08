@@ -6,6 +6,61 @@
       "name": "codexkit",
       "claude_include_canonical": true,
       "export_plugin": true
+    },
+    {
+      "name": "codex_rollout",
+      "claude_include_canonical": true,
+      "export_plugin": true
+    },
+    {
+      "name": "fleet-manage",
+      "claude_include_canonical": true,
+      "export_plugin": true
+    },
+    {
+      "name": "fleet-ops",
+      "claude_include_canonical": true,
+      "export_plugin": true
+    },
+    {
+      "name": "fleet-health",
+      "claude_include_canonical": false,
+      "export_plugin": true
+    },
+    {
+      "name": "go-check",
+      "claude_include_canonical": false,
+      "export_plugin": true
+    },
+    {
+      "name": "go-conventions",
+      "claude_include_canonical": true,
+      "export_plugin": true
+    },
+    {
+      "name": "mcpkit-go",
+      "claude_include_canonical": true,
+      "export_plugin": true
+    },
+    {
+      "name": "pipeline",
+      "claude_include_canonical": false,
+      "export_plugin": true
+    },
+    {
+      "name": "reconnect",
+      "claude_include_canonical": true,
+      "export_plugin": true
+    },
+    {
+      "name": "research",
+      "claude_include_canonical": true,
+      "export_plugin": true
+    },
+    {
+      "name": "session-recovery",
+      "claude_include_canonical": true,
+      "export_plugin": true
     }
   ]
 }

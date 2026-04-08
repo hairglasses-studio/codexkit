@@ -1,3 +1,9 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "codexkit": {
+      "command": "go",
+      "args": ["run", "./cmd/codexkit-mcp"],
+      "cwd": "."
+    }
+  }
 }

@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "name": "codexkit_review",
+      "from": "codexkit",
+      "mode": "review",
+      "comment": "Discovery-first codexkit profile for fleet baseline and sync inspection.",
+      "read_only": true,
+      "enabled_tools": [
+        "baseline_check",
+        "baseline_check_all",
+        "skill_list",
+        "skill_diff",
+        "mcp_list",
+        "mcp_diff",
+        "fleet_audit",
+        "fleet_report"
+      ]
+    },
+    {
+      "name": "codexkit_workspace",
+      "from": "codexkit",
+      "mode": "workspace",
+      "comment": "Curated codexkit workspace for skill sync, MCP sync, and fleet validation.",
+      "enabled_tools": [
+        "baseline_check",
+        "baseline_check_all",
+        "skill_sync",
+        "skill_list",
+        "skill_diff",
+        "mcp_sync",
+        "mcp_list",
+        "mcp_diff",
+        "fleet_audit",
+        "fleet_report"
+      ]
+    }
+  ]
+}
