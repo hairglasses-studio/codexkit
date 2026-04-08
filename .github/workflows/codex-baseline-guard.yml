@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   codex-baseline-guard:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, archglasses]
     steps:
       - uses: actions/checkout@v6
 
@@ -108,6 +108,10 @@ jobs:
                 fail ".gemini/settings.json must expose repo MCP servers"
               jq -e '(.mcpServers // {}) | keys | all(test("^[a-z0-9]+(-[a-z0-9]+)*$"))' .gemini/settings.json >/dev/null || \
                 fail ".gemini/settings.json MCP server names must use kebab-case"
+
+              codex_cwd_count="$(awk '$0 == "cwd = \".\"" { count++ } END { print count + 0 }' .codex/config.toml)"
+              [[ "$codex_cwd_count" -ge "$active_mcp_servers" ]] || \
+                fail ".codex/config.toml must keep cwd=. for all repo MCP servers (found ${codex_cwd_count}, expected ${active_mcp_servers})"
             fi
           fi
 

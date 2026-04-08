@@ -2,4 +2,9 @@
 
 This repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file.
 
-Codex fleet management toolkit for hairglasses-studio repos.
+- Read [AGENTS.md](AGENTS.md) first for build, test, architecture, and repo conventions.
+- Treat [GEMINI.md](GEMINI.md) as a compatibility mirror, not the primary source of truth.
+
+## Summary
+
+> Canonical instructions: AGENTS.md
