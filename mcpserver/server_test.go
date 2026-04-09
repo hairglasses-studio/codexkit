@@ -1,8 +1,10 @@
 package mcpserver
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -65,9 +67,57 @@ func sendRequest(t *testing.T, s *Server, method string, id any, params any) JSO
 		t.Fatal(err)
 	}
 
+	return decodeLegacyResponse(t, out.Bytes())
+}
+
+func sendFramedRequest(t *testing.T, s *Server, method string, id any, params any) JSONRPCResponse {
+	t.Helper()
+
+	req := JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      id,
+		Method:  method,
+	}
+	if params != nil {
+		p, _ := json.Marshal(params)
+		req.Params = p
+	}
+
+	reqBytes, _ := json.Marshal(req)
+	input := fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(reqBytes), reqBytes)
+
+	var out bytes.Buffer
+	if err := s.Serve(strings.NewReader(input), &out); err != nil {
+		t.Fatal(err)
+	}
+
+	return decodeFramedResponse(t, &out)
+}
+
+func decodeLegacyResponse(t *testing.T, data []byte) JSONRPCResponse {
+	t.Helper()
+
 	var resp JSONRPCResponse
-	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
-		t.Fatalf("parsing response: %v\nraw: %s", err, out.String())
+	if err := json.Unmarshal(data, &resp); err != nil {
+		t.Fatalf("parsing response: %v\nraw: %s", err, string(data))
+	}
+	return resp
+}
+
+func decodeFramedResponse(t *testing.T, out *bytes.Buffer) JSONRPCResponse {
+	t.Helper()
+
+	payload, mode, err := readMessage(bufio.NewReader(bytes.NewReader(out.Bytes())))
+	if err != nil {
+		t.Fatalf("reading framed response: %v\nraw: %s", err, out.String())
+	}
+	if mode != transportModeFramed {
+		t.Fatalf("expected framed response mode, got %v\nraw: %s", mode, out.String())
+	}
+
+	var resp JSONRPCResponse
+	if err := json.Unmarshal(payload, &resp); err != nil {
+		t.Fatalf("parsing framed response: %v\nraw: %s", err, out.String())
 	}
 	return resp
 }
@@ -93,6 +143,20 @@ func TestInitialize(t *testing.T) {
 	}
 }
 
+func TestInitialize_FramedTransport(t *testing.T) {
+	s := setupTestServer(t)
+	resp := sendFramedRequest(t, s, "initialize", 1, nil)
+
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error.Message)
+	}
+
+	result := resp.Result.(map[string]any)
+	if result["protocolVersion"] != "2025-11-25" {
+		t.Errorf("expected protocol version 2025-11-25, got %v", result["protocolVersion"])
+	}
+}
+
 func TestToolsList(t *testing.T) {
 	s := setupTestServer(t)
 	resp := sendRequest(t, s, "tools/list", 2, nil)
@@ -111,6 +175,14 @@ func TestToolsList(t *testing.T) {
 	}
 	if len(tools) != 1 {
 		t.Errorf("expected 1 tool, got %d", len(tools))
+	}
+	tool := tools[0].(map[string]any)
+	schema, ok := tool["inputSchema"].(map[string]any)
+	if !ok {
+		t.Fatal("expected inputSchema object")
+	}
+	if schema["type"] != "object" {
+		t.Fatalf("expected minimal object schema, got %+v", schema)
 	}
 }
 
