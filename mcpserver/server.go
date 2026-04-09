@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/hairglasses-studio/codexkit"
@@ -31,6 +33,13 @@ type ServerInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 }
+
+type transportMode int
+
+const (
+	transportModeLegacy transportMode = iota
+	transportModeFramed
+)
 
 // JSONRPCRequest is a JSON-RPC 2.0 request.
 type JSONRPCRequest struct {
@@ -92,19 +101,19 @@ func New(registry *codexkit.Registry, info ServerInfo) *Server {
 
 // Serve runs the MCP server reading from r and writing to w.
 func (s *Server) Serve(r io.Reader, w io.Writer) error {
-	scanner := bufio.NewScanner(r)
-	// Increase buffer for large requests
-	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
-
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
+	reader := bufio.NewReader(r)
+	for {
+		payload, mode, err := readMessage(reader)
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
 		}
 
 		var req JSONRPCRequest
-		if err := json.Unmarshal(line, &req); err != nil {
-			s.writeResponse(w, JSONRPCResponse{
+		if err := json.Unmarshal(payload, &req); err != nil {
+			s.writeResponse(w, mode, JSONRPCResponse{
 				JSONRPC: "2.0",
 				Error:   &JSONRPCError{Code: -32700, Message: "parse error"},
 			})
@@ -113,11 +122,9 @@ func (s *Server) Serve(r io.Reader, w io.Writer) error {
 
 		resp := s.handleRequest(req)
 		if req.ID != nil {
-			s.writeResponse(w, resp)
+			s.writeResponse(w, mode, resp)
 		}
 	}
-
-	return scanner.Err()
 }
 
 // ServeStdio runs the server on stdin/stdout.
@@ -191,6 +198,10 @@ func (s *Server) handleToolsList(req JSONRPCRequest) JSONRPCResponse {
 		info := MCPToolInfo{
 			Name:        t.Name,
 			Description: t.Description,
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
 		}
 		if params.IncludeSchemas {
 			info.InputSchema = t.Schema
@@ -436,9 +447,88 @@ func (s *Server) promptPayload(name string, arguments map[string]any) (map[strin
 	}
 }
 
-func (s *Server) writeResponse(w io.Writer, resp JSONRPCResponse) {
+func readMessage(r *bufio.Reader) ([]byte, transportMode, error) {
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				trimmed := strings.TrimSpace(line)
+				if trimmed == "" {
+					return nil, transportModeLegacy, io.EOF
+				}
+				if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+					return []byte(trimmed), transportModeLegacy, nil
+				}
+			}
+			return nil, transportModeLegacy, err
+		}
+
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+			return []byte(trimmed), transportModeLegacy, nil
+		}
+
+		contentLength, err := readContentLength(r, trimmed)
+		if err != nil {
+			return nil, transportModeFramed, err
+		}
+
+		payload := make([]byte, contentLength)
+		if _, err := io.ReadFull(r, payload); err != nil {
+			return nil, transportModeFramed, err
+		}
+		return payload, transportModeFramed, nil
+	}
+}
+
+func readContentLength(r *bufio.Reader, firstHeader string) (int, error) {
+	headers := []string{firstHeader}
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return 0, err
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			break
+		}
+		headers = append(headers, trimmed)
+	}
+
+	contentLength := -1
+	for _, header := range headers {
+		name, value, ok := strings.Cut(header, ":")
+		if !ok {
+			return 0, fmt.Errorf("invalid MCP header: %q", header)
+		}
+		if !strings.EqualFold(strings.TrimSpace(name), "Content-Length") {
+			continue
+		}
+
+		n, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil {
+			return 0, fmt.Errorf("invalid Content-Length %q: %w", value, err)
+		}
+		contentLength = n
+	}
+
+	if contentLength < 0 {
+		return 0, fmt.Errorf("missing Content-Length header")
+	}
+	return contentLength, nil
+}
+
+func (s *Server) writeResponse(w io.Writer, mode transportMode, resp JSONRPCResponse) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	data, _ := json.Marshal(resp)
+	if mode == transportModeFramed {
+		fmt.Fprintf(w, "Content-Length: %d\r\n\r\n", len(data))
+		_, _ = w.Write(data)
+		return
+	}
 	fmt.Fprintf(w, "%s\n", data)
 }
