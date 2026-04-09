@@ -323,3 +323,37 @@ func TestMetaModuleAddsHealthTool(t *testing.T) {
 		t.Fatalf("unexpected health payload %+v", payload)
 	}
 }
+
+func TestPing(t *testing.T) {
+	s := setupTestServer(t)
+	resp := sendRequest(t, s, "ping", 8, nil)
+
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error.Message)
+	}
+
+	result, ok := resp.Result.(map[string]any)
+	if !ok {
+		t.Fatal("expected map result")
+	}
+	if len(result) != 0 {
+		t.Fatalf("expected empty ping result, got %+v", result)
+	}
+}
+
+func TestPing_FramedTransport(t *testing.T) {
+	s := setupTestServer(t)
+	resp := sendFramedRequest(t, s, "ping", 9, nil)
+
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error.Message)
+	}
+
+	result, ok := resp.Result.(map[string]any)
+	if !ok {
+		t.Fatal("expected map result")
+	}
+	if len(result) != 0 {
+		t.Fatalf("expected empty ping result, got %+v", result)
+	}
+}

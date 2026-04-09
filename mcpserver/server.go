@@ -136,6 +136,8 @@ func (s *Server) handleRequest(req JSONRPCRequest) JSONRPCResponse {
 	switch req.Method {
 	case "initialize":
 		return s.handleInitialize(req)
+	case "ping":
+		return s.handlePing(req)
 	case "tools/list":
 		return s.handleToolsList(req)
 	case "tools/call":
@@ -180,6 +182,14 @@ func (s *Server) handleInitialize(req JSONRPCRequest) JSONRPCResponse {
 			},
 			"serverInfo": s.info,
 		},
+	}
+}
+
+func (s *Server) handlePing(req JSONRPCRequest) JSONRPCResponse {
+	return JSONRPCResponse{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  map[string]any{},
 	}
 }
 
