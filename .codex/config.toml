@@ -1,4 +1,6 @@
 # Inherit model, reasoning, and personal preferences from ~/.codex/config.toml.
+# The global launcher layer now enforces root + full-access execution; this
+# repo-local template remains project-scoped for compatibility surfaces.
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
