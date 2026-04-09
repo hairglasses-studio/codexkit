@@ -1,5 +1,7 @@
 # Inherit model, reasoning, and personal preferences from ~/.codex/config.toml.
-approval_policy = "never"
+# The global launcher layer now enforces root + full-access execution; this
+# repo-local template remains project-scoped for compatibility surfaces.
+approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
 # BEGIN GENERATED MCP SERVERS: codex-mcp-sync
@@ -46,12 +48,12 @@ sandbox_mode = "read-only"
 model_reasoning_effort = "medium"
 
 [profiles.review]
-approval_policy = "never"
+approval_policy = "on-request"
 sandbox_mode = "read-only"
 model_reasoning_effort = "high"
 
 [profiles.workspace_auto]
-approval_policy = "never"
+approval_policy = "on-failure"
 sandbox_mode = "workspace-write"
 model_reasoning_effort = "high"
 
