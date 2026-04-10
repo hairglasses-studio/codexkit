@@ -160,6 +160,40 @@ func TestCheck_MissingGeminiContextBridge(t *testing.T) {
 	}
 }
 
+func TestCheck_SyncWrapperPortabilityFlagsCallerCWDAndGoWorkDependence(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, "scripts/hg-skill-surface-sync.sh", "#!/usr/bin/env bash\nset -euo pipefail\nrepo_root=\"$(git rev-parse --show-toplevel)\"\ncd \"$repo_root\"\ngo run ./cmd/demo-sync --skills\n")
+	writeFile(t, dir, "scripts/codex-mcp-sync.sh", "#!/usr/bin/env bash\nset -euo pipefail\nrepo_root=\"$(git rev-parse --show-toplevel)\"\ncd \"$repo_root\"\ngo run ./cmd/demo-sync --codex\n")
+
+	report := Check(dir)
+	failCount := 0
+	for _, f := range report.Findings {
+		if f.Check == "sync_wrapper_portability" && !f.Passed {
+			failCount++
+		}
+	}
+	if failCount != 2 {
+		t.Fatalf("expected 2 sync_wrapper_portability failures, got %d", failCount)
+	}
+}
+
+func TestCheck_SyncWrapperPortabilityAcceptsPortableWrappers(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, "scripts/hg-skill-surface-sync.sh", "#!/usr/bin/env bash\nset -euo pipefail\nscript_dir=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nrepo_root=\"$(cd \"$script_dir/..\" && pwd)\"\ncd \"$repo_root\"\nGOWORK=off go run ./cmd/demo-sync --skills\n")
+	writeFile(t, dir, "scripts/codex-mcp-sync.sh", "#!/usr/bin/env bash\nset -euo pipefail\nscript_dir=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nrepo_root=\"$(cd \"$script_dir/..\" && pwd)\"\ncd \"$repo_root\"\nGOWORK=off go run ./cmd/demo-sync --codex\n")
+
+	report := Check(dir)
+	passCount := 0
+	for _, f := range report.Findings {
+		if f.Check == "sync_wrapper_portability" && f.Passed {
+			passCount++
+		}
+	}
+	if passCount != 2 {
+		t.Fatalf("expected 2 passing sync_wrapper_portability findings, got %d", passCount)
+	}
+}
+
 func TestCheck_IgnoresExampleOnlyMCPServers(t *testing.T) {
 	dir := setupCompliantRepo(t)
 	writeFile(t, dir, ".mcp.json", "{\n  \"mcpServers\": {\n    \"_example_stdio_server\": {\n      \"command\": \"go\"\n    }\n  }\n}\n")

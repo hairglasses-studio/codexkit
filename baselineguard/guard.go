@@ -77,6 +77,7 @@ func Check(repoPath string) Report {
 	report.addAgentNaming(repoPath)
 	report.addSkillSurface(repoPath)
 	report.addSkillSyncCheck(repoPath)
+	report.addSyncWrapperPortability(repoPath)
 	report.addMCPSyncCheck(repoPath)
 	report.addMCPLauncherPortability(repoPath)
 	report.addMCPDiscovery(repoPath)
@@ -286,6 +287,29 @@ func (r *Report) addSkillSyncCheck(repoPath string) {
 			r.add("skill_sync", false, action.Message)
 		case "unchanged":
 			r.add("skill_sync", true, action.Message)
+		}
+	}
+}
+
+func (r *Report) addSyncWrapperPortability(repoPath string) {
+	for _, relPath := range []string{
+		filepath.Join("scripts", "hg-skill-surface-sync.sh"),
+		filepath.Join("scripts", "codex-mcp-sync.sh"),
+	} {
+		path := filepath.Join(repoPath, relPath)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		content := string(data)
+		switch {
+		case strings.Contains(content, "git rev-parse --show-toplevel"):
+			r.add("sync_wrapper_portability", false, fmt.Sprintf("%s depends on caller cwd via git rev-parse --show-toplevel", relPath))
+		case strings.Contains(content, "go run ./cmd/") && !strings.Contains(content, "GOWORK=off"):
+			r.add("sync_wrapper_portability", false, fmt.Sprintf("%s runs go run ./cmd/... without GOWORK=off", relPath))
+		default:
+			r.add("sync_wrapper_portability", true, relPath)
 		}
 	}
 }
