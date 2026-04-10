@@ -87,6 +87,76 @@ hg_parity_repo_objective_bool() {
     ' "$objectives"
 }
 
+hg_parity_repo_objective_string() {
+  local repo_name="$1"
+  local field="$2"
+  local default_value="${3:-}"
+  local objectives
+  objectives="$(hg_parity_objectives_path)"
+  if [[ ! -f "$objectives" ]]; then
+    printf '%s\n' "$default_value"
+    return 0
+  fi
+
+  local repo_scope
+  repo_scope="$(hg_parity_repo_scope "$repo_name")"
+
+  local value
+  value="$(
+    jq -r \
+      --arg repo "$repo_name" \
+      --arg scope "$repo_scope" \
+      --arg field "$field" \
+      --arg default "$default_value" '
+        if ((.repo_overrides[$repo] // {}) | has($field)) then
+          .repo_overrides[$repo][$field]
+        elif ((.scope_defaults[$scope] // {}) | has($field)) then
+          .scope_defaults[$scope][$field]
+        elif ((.defaults // {}) | has($field)) then
+          .defaults[$field]
+        else
+          $default
+        end
+      ' "$objectives"
+  )"
+  if [[ -z "$value" || "$value" == "null" ]]; then
+    printf '%s\n' "$default_value"
+    return 0
+  fi
+  printf '%s\n' "$value"
+}
+
+hg_parity_repo_objective_int() {
+  local repo_name="$1"
+  local field="$2"
+  local default_value="${3:-0}"
+  local objectives
+  objectives="$(hg_parity_objectives_path)"
+  if [[ ! -f "$objectives" ]]; then
+    printf '%s\n' "$default_value"
+    return 0
+  fi
+
+  local repo_scope
+  repo_scope="$(hg_parity_repo_scope "$repo_name")"
+
+  jq -r \
+    --arg repo "$repo_name" \
+    --arg scope "$repo_scope" \
+    --arg field "$field" \
+    --argjson default "$default_value" '
+      if ((.repo_overrides[$repo] // {}) | has($field)) then
+        .repo_overrides[$repo][$field]
+      elif ((.scope_defaults[$scope] // {}) | has($field)) then
+        .scope_defaults[$scope][$field]
+      elif ((.defaults // {}) | has($field)) then
+        .defaults[$field]
+      else
+        $default
+      end
+    ' "$objectives"
+}
+
 hg_parity_object_json() {
   local file="$1"
   if [[ ! -f "$file" ]]; then
@@ -501,6 +571,107 @@ hg_parity_load_local_llm_defaults() {
   export OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-nomic-embed-text:v1.5}"
   export OLLAMA_API_KEY="${OLLAMA_API_KEY:-ollama}"
   export OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-15m}"
+}
+
+hg_parity_default_ollama_support_mode() {
+  local repo_name="$1"
+  case "$repo_name" in
+    docs)
+      printf 'docs_only\n'
+      ;;
+    ralphglasses)
+      printf 'session_provider\n'
+      ;;
+    dotfiles|jobb|mcpkit|surfacekit)
+      printf 'consumer\n'
+      ;;
+    *)
+      printf 'none\n'
+      ;;
+  esac
+}
+
+hg_parity_ollama_support_mode() {
+  local repo_path="$1"
+  local repo_name="$2"
+  local configured mode
+
+  configured="$(hg_parity_repo_objective_string "$repo_name" "ollama_support_mode" "$(hg_parity_default_ollama_support_mode "$repo_name")")"
+  case "$configured" in
+    none|docs_only|consumer|native_consumer|session_provider)
+      mode="$configured"
+      ;;
+    *)
+      mode="none"
+      ;;
+  esac
+
+  if [[ "$mode" != "none" ]]; then
+    printf '%s\n' "$mode"
+    return 0
+  fi
+
+  if [[ -f "$repo_path/internal/session/provider_ollama.go" ]]; then
+    printf 'session_provider\n'
+    return 0
+  fi
+  if rg -q 'OLLAMA_BASE_URL|OLLAMA_CODE_MODEL|OLLAMA_EMBED_MODEL|RDLOOP_BASE_URL|ollama_local|aftrs_ollama_' \
+      "$repo_path" \
+      --glob '!**/.git/**' 2>/dev/null; then
+    printf 'consumer\n'
+    return 0
+  fi
+  printf 'none\n'
+}
+
+hg_parity_ollama_profile_source() {
+  local repo_path="$1"
+  local repo_name="$2"
+  local mode configured
+
+  mode="$(hg_parity_ollama_support_mode "$repo_path" "$repo_name")"
+  configured="$(hg_parity_repo_objective_string "$repo_name" "ollama_profile_source" "")"
+  if [[ -n "$configured" && "$configured" != "null" ]]; then
+    printf '%s\n' "$configured"
+    return 0
+  fi
+  if [[ "$mode" == "none" ]]; then
+    printf 'none\n'
+    return 0
+  fi
+  printf 'dotfiles\n'
+}
+
+hg_parity_provider_runtime_drift_count() {
+  local repo_path="$1"
+  local repo_name="$2"
+  local support_mode count
+
+  support_mode="$(hg_parity_ollama_support_mode "$repo_path" "$repo_name")"
+  count=0
+
+  case "$support_mode" in
+    none)
+      printf '0\n'
+      return 0
+      ;;
+    docs_only)
+      [[ -f "$repo_path/projects/agent-parity/2026-04-09-ollama-support-rollout.md" ]] || count=$((count + 1))
+      ;;
+    session_provider)
+      [[ -f "$repo_path/internal/session/provider_ollama.go" ]] || count=$((count + 1))
+      rg -q 'ProviderOllama|ollama_inventory' "$repo_path/internal/session" "$repo_path/internal/mcpserver" 2>/dev/null || count=$((count + 1))
+      ;;
+    consumer|native_consumer)
+      rg -q 'OLLAMA_BASE_URL|OLLAMA_CODE_MODEL|OLLAMA_EMBED_MODEL|RDLOOP_BASE_URL|ollama_local|provider-settings-sync|aftrs_ollama_' \
+        "$repo_path" \
+        --glob '!**/.git/**' 2>/dev/null || count=$((count + 1))
+      ;;
+  esac
+
+  local objective_override
+  objective_override="$(hg_parity_repo_objective_int "$repo_name" "provider_runtime_drift_count" "$count")"
+  printf '%s\n' "$objective_override"
 }
 
 hg_parity_render_codex_standard_profiles() {
