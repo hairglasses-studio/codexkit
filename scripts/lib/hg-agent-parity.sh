@@ -1041,13 +1041,20 @@ hg_parity_provider_hook_bridge_ok() {
 
 hg_parity_provider_drift_count() {
   local repo_path="$1"
+  local repo_name="$2"
   local count=0
   local expected
+  local objective_override
 
   expected="$(hg_parity_render_claude_settings "$repo_path")"
   hg_parity_compare_expected_file "$expected" "$repo_path/.claude/settings.json" || count=$((count + 1))
 
   hg_parity_gemini_settings_current "$repo_path" || count=$((count + 1))
+
+  objective_override="$(hg_parity_repo_objective_int "$repo_name" "provider_drift_count" "$count")"
+  if [[ "$objective_override" =~ ^[0-9]+$ ]]; then
+    count="$objective_override"
+  fi
 
   printf '%s\n' "$count"
 }
