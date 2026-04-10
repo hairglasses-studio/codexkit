@@ -213,7 +213,7 @@ count_files() {
   local repo="$1"
   local path_pattern="$2"
   local count
-  count=$(find_repo "$repo" -path "$path_pattern" -print 2>/dev/null | wc -l | tr -d ' ')
+  count=$(find_repo "$repo" -type f -path "$path_pattern" -print 2>/dev/null | wc -l | tr -d ' ')
   printf '%s' "$count"
 }
 
