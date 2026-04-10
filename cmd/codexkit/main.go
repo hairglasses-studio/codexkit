@@ -11,6 +11,7 @@ import (
 	"github.com/hairglasses-studio/codexkit/fleetaudit"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 	"github.com/hairglasses-studio/codexkit/skillsync"
+	"github.com/hairglasses-studio/codexkit/workspace"
 )
 
 var registry *codexkit.Registry
@@ -45,6 +46,8 @@ func main() {
 		runMCP(os.Args[2:])
 	case "fleet":
 		runFleet(os.Args[2:])
+	case "workspace":
+		runWorkspace(os.Args[2:])
 	case "tools":
 		runTools()
 	case "help", "--help", "-h":
@@ -69,6 +72,7 @@ Commands:
   mcp list <repo>               List MCP servers from .mcp.json
   fleet audit [scan_path]       Run full audit on all repos
   fleet report [scan_path]      Summary report of fleet health
+  workspace check [root]        Validate workspace/manifest.json and go.work
   tools                         List all registered tools
   help                          Show this help`)
 }
@@ -236,6 +240,57 @@ func runFleet(args []string) {
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "unknown fleet command: %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+func runWorkspace(args []string) {
+	if len(args) == 0 || args[0] != "check" {
+		fmt.Fprintln(os.Stderr, "usage: codexkit workspace check [root] [--json]")
+		os.Exit(1)
+	}
+
+	jsonOut := hasFlag(args, "--json")
+	root := workspace.DefaultRoot()
+	for _, arg := range args[1:] {
+		if arg != "--json" {
+			root = arg
+			break
+		}
+	}
+
+	manifest, err := workspace.LoadManifest(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	report := workspace.Check(root, manifest)
+	if jsonOut {
+		printJSON(report)
+	} else {
+		if report.Passed {
+			fmt.Printf("workspace check: PASS (%d findings)\n", len(report.Findings))
+		} else {
+			fmt.Printf("workspace check: FAIL (%d findings)\n", len(report.Findings))
+		}
+		for _, finding := range report.Findings {
+			status := "PASS"
+			if !finding.Passed {
+				status = "FAIL"
+			}
+			if finding.Repo != "" {
+				fmt.Printf("  %-16s %-20s %s\n", status, finding.Check, finding.Repo)
+				if finding.Message != "" {
+					fmt.Printf("    %s\n", finding.Message)
+				}
+				continue
+			}
+			fmt.Printf("  %-16s %-20s %s\n", status, finding.Check, finding.Message)
+		}
+	}
+
+	if !report.Passed {
 		os.Exit(1)
 	}
 }
