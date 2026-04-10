@@ -92,7 +92,10 @@ REPO_NAME="${REPO_NAME:-$(basename "$REPO_PATH")}"
 repo_file_dirty() {
   local repo_path="$1"
   local target_rel="$2"
-  [[ -n "$(git -C "$repo_path" status --porcelain --untracked-files=all -- "$target_rel" 2>/dev/null)" ]]
+  if ! git -C "$repo_path" ls-files --error-unmatch "$target_rel" >/dev/null 2>&1; then
+    return 1
+  fi
+  [[ -n "$(git -C "$repo_path" status --porcelain -- "$target_rel" 2>/dev/null)" ]]
 }
 
 mark_failure() {
@@ -111,13 +114,65 @@ report_missing_or_drift() {
   mark_failure
 }
 
+toml_validator_command() {
+  if command -v python3 >/dev/null 2>&1; then
+    printf 'python3\n'
+    return 0
+  fi
+  if command -v python >/dev/null 2>&1; then
+    printf 'python\n'
+    return 0
+  fi
+  return 1
+}
+
+validate_toml_file() {
+  local path="$1"
+  local label="$2"
+  local parser
+  parser="$(toml_validator_command)" || hg_die "python3 or python is required to validate $label TOML"
+
+  local parse_error
+  if ! parse_error="$("$parser" - "$path" <<'PY'
+import pathlib
+import sys
+import tomllib
+
+path = pathlib.Path(sys.argv[1])
+try:
+    tomllib.loads(path.read_text(encoding="utf-8"))
+except Exception as exc:  # pragma: no cover - surfaced to caller
+    print(exc)
+    raise SystemExit(1)
+PY
+  )"; then
+    hg_die "$REPO_NAME: invalid $label TOML (${parse_error})"
+  fi
+}
+
+validate_toml_text() {
+  local text="$1"
+  local label="$2"
+  local tmp
+  tmp="$(mktemp)"
+  printf '%s\n' "$text" >"$tmp"
+  validate_toml_file "$tmp" "$label"
+  rm -f "$tmp"
+}
+
 write_text_file() {
   local target_rel="$1"
   local expected="$2"
   local label="$3"
 
   local target="$REPO_PATH/$target_rel"
+  if [[ "$target_rel" == ".codex/config.toml" ]]; then
+    validate_toml_text "$expected" "$label"
+  fi
   if [[ -f "$target" ]] && diff -u <(printf '%s\n' "$expected") "$target" >/dev/null 2>&1; then
+    if [[ "$target_rel" == ".codex/config.toml" ]]; then
+      validate_toml_file "$target" "$label"
+    fi
     report_current "$label"
     return 0
   fi
@@ -150,6 +205,9 @@ write_text_file() {
 
   mkdir -p "$(dirname "$target")"
   printf '%s\n' "$expected" >"$target"
+  if [[ "$target_rel" == ".codex/config.toml" ]]; then
+    validate_toml_file "$target" "$label"
+  fi
   if git -C "$REPO_PATH" ls-files --error-unmatch "$target_rel" >/dev/null 2>&1; then
     printf "%s%-20s %s (updated)%s\n" "$HG_GREEN" "$REPO_NAME" "$label" "$HG_RESET"
     UPDATED=$((UPDATED + 1))

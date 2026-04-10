@@ -43,11 +43,12 @@ func ManifestPath(root string) string {
 
 // ConsolidationDecision captures one repo state from the docs-side matrix.
 type ConsolidationDecision struct {
-	Repo           string `json:"repo"`
-	State          string `json:"state"`
-	WorkspaceScope string `json:"workspace_scope,omitempty"`
-	GoWorkMember   *bool  `json:"go_work_member,omitempty"`
-	BaselineTarget *bool  `json:"baseline_target,omitempty"`
+	Repo             string `json:"repo"`
+	State            string `json:"state"`
+	WorkspaceScope   string `json:"workspace_scope,omitempty"`
+	GoWorkMember     *bool  `json:"go_work_member,omitempty"`
+	BaselineTarget   *bool  `json:"baseline_target,omitempty"`
+	ArchiveCandidate bool   `json:"archive_candidate,omitempty"`
 }
 
 // ConsolidationMatrix is the docs-owned record of merge and archive intent.

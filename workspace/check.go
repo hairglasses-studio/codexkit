@@ -39,11 +39,17 @@ func Check(root string, manifest Manifest) Report {
 
 	expectedGoWork := make(map[string]Repo)
 	manifestRepos := make(map[string]Repo, len(manifest.Repos))
+	matrix, matrixStatus := loadConsolidationMatrixForCheck(root)
+
 	for _, repo := range manifest.Repos {
 		manifestRepos[repo.Name] = repo
 		repoPath := filepath.Join(root, repo.Name)
 		if _, err := os.Stat(repoPath); err != nil {
-			report.add("repo_directory", repo.Name, false, "missing directory")
+			if repoDirectoryRequired(repo, matrixStatus.decisions[repo.Name]) {
+				report.add("repo_directory", repo.Name, false, "missing directory")
+			} else {
+				report.add("repo_directory", repo.Name, true, "optional archived compatibility clone absent")
+			}
 			continue
 		}
 		report.add("repo_directory", repo.Name, true, "")
@@ -87,14 +93,8 @@ func Check(root string, manifest Manifest) Report {
 		report.add("go_work_member", repoName, false, "present in go.work but not marked go_work_member in workspace manifest")
 	}
 
-	matrix, err := LoadConsolidationMatrix(root)
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		report.add("consolidation_matrix", "", true, "not found; skipped")
-	case err != nil:
-		report.add("consolidation_matrix", "", false, err.Error())
-	default:
-		report.add("consolidation_matrix", "", true, fmt.Sprintf("%d decisions", len(matrix.Decisions)))
+	report.add("consolidation_matrix", "", matrixStatus.passed, matrixStatus.message)
+	if matrixStatus.passed && matrixStatus.loaded {
 		for _, decision := range matrix.Decisions {
 			repo, ok := manifestRepos[decision.Repo]
 			if !ok {
@@ -150,6 +150,57 @@ func Check(root string, manifest Manifest) Report {
 		}
 	}
 	return report
+}
+
+type consolidationMatrixStatus struct {
+	decisions map[string]ConsolidationDecision
+	loaded    bool
+	passed    bool
+	message   string
+}
+
+func loadConsolidationMatrixForCheck(root string) (ConsolidationMatrix, consolidationMatrixStatus) {
+	matrix, err := LoadConsolidationMatrix(root)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return ConsolidationMatrix{}, consolidationMatrixStatus{
+			decisions: map[string]ConsolidationDecision{},
+			passed:    true,
+			message:   "not found; skipped",
+		}
+	case err != nil:
+		return ConsolidationMatrix{}, consolidationMatrixStatus{
+			decisions: map[string]ConsolidationDecision{},
+			passed:    false,
+			message:   err.Error(),
+		}
+	default:
+		decisions := make(map[string]ConsolidationDecision, len(matrix.Decisions))
+		for _, decision := range matrix.Decisions {
+			decisions[decision.Repo] = decision
+		}
+		return matrix, consolidationMatrixStatus{
+			decisions: decisions,
+			loaded:    true,
+			passed:    true,
+			message:   fmt.Sprintf("%d decisions", len(matrix.Decisions)),
+		}
+	}
+}
+
+func repoDirectoryRequired(repo Repo, decision ConsolidationDecision) bool {
+	if repo.Scope != "compatibility_only" {
+		return true
+	}
+	if !decision.ArchiveCandidate {
+		return true
+	}
+	switch decision.State {
+	case "merged_into", "merged_out_of_active_surface":
+		return false
+	default:
+		return true
+	}
 }
 
 // ParseGoWorkModules returns relative module paths listed in a go.work use block.

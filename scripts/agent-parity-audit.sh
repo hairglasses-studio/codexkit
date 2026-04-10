@@ -296,6 +296,9 @@ compute_workflow_status() {
       fi
       printf 'clean'
       ;;
+    local_only)
+      printf 'clean'
+      ;;
     *)
       if [[ "$has_workflows" -eq 0 ]]; then
         printf 'clean'

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/hairglasses-studio/codexkit"
+	toml "github.com/pelletier/go-toml/v2"
 )
 
 // Finding represents a single validation result.
@@ -226,6 +227,11 @@ func (r *Report) addProfiles(repoPath string) {
 	if err != nil {
 		return // already covered by required_file check
 	}
+	if err := validateCodexConfigTOML(data); err != nil {
+		r.add("codex_config_toml", false, fmt.Sprintf(".codex/config.toml must be valid TOML: %v", err))
+		return
+	}
+	r.add("codex_config_toml", true, "")
 	found := make(map[string]bool)
 	for _, match := range profileRe.FindAllStringSubmatch(string(data), -1) {
 		found[match[1]] = true
@@ -237,6 +243,11 @@ func (r *Report) addProfiles(repoPath string) {
 			r.add("profile", false, fmt.Sprintf("missing profile: %s", name))
 		}
 	}
+}
+
+func validateCodexConfigTOML(data []byte) error {
+	var parsed map[string]any
+	return toml.Unmarshal(data, &parsed)
 }
 
 func (r *Report) addAgentNaming(repoPath string) {

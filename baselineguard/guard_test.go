@@ -122,6 +122,25 @@ func TestCheck_MissingProfile(t *testing.T) {
 	}
 }
 
+func TestCheck_InvalidCodexConfigTOML(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, ".codex/config.toml", `
+approval_policy = "on-request"
+env_key_instructions = "source "$HOME/bad" && broken"
+`)
+
+	report := Check(dir)
+	found := false
+	for _, f := range report.Findings {
+		if f.Check == "codex_config_toml" && !f.Passed {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected codex_config_toml failure for invalid TOML")
+	}
+}
+
 func TestCheck_MissingGeminiContextBridge(t *testing.T) {
 	dir := setupCompliantRepo(t)
 	writeFile(t, dir, ".gemini/settings.json", "{}\n")
