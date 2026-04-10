@@ -21,10 +21,11 @@ Org-wide fleet operations for all repos in ~/hairglasses-studio.
   ```bash
   codexkit baseline ~/hairglasses-studio/<repo>
   ```
-- **Skills**: sync canonical `.agents/skills/` to `.claude/skills/` and `plugins/` mirrors.
+- **Skills**: sync canonical `.agents/skills/` to `.claude/skills/` and `plugins/` mirrors with the live `codexkit` engine.
   ```bash
-  ~/dotfiles/scripts/hg-skill-surface-sync.sh
+  codexkit skills sync ~/hairglasses-studio/<repo>
   ```
+  Use `codexkit skills check ~/hairglasses-studio/<repo>` for drift-only verification and `codexkit skills diff ~/hairglasses-studio/<repo>` for dry-run output. Repo-local wrappers such as `scripts/hg-skill-surface-sync.sh <repo_path>` are compatibility frontends around the same engine.
 - **MCP**: sync `.mcp.json` into `.codex/config.toml` server blocks.
   ```bash
   ~/dotfiles/scripts/hg-codex-mcp-sync.sh

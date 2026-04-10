@@ -23,10 +23,11 @@ Migrate repos from Claude-first state to the current Codex baseline. Works from 
    - Compatibility docs — CLAUDE.md, GEMINI.md, .github/copilot-instructions.md
    - `.codex/config.toml` — Codex-specific config
    - Live Codex workflows verified
-3. **Skill surface**: if the repo has skills, move them to `.agents/skills/` and generate compatibility outputs:
+3. **Skill surface**: if the repo has skills, move them to `.agents/skills/` and generate compatibility outputs with the live `codexkit` engine:
    ```bash
-   ~/dotfiles/scripts/hg-skill-surface-sync.sh
+   codexkit skills sync ~/hairglasses-studio/<repo>
    ```
+   If the repo bundles a wrapper such as `scripts/hg-skill-surface-sync.sh`, treat it as a compatibility frontend to `codexkit skills`, not the canonical engine.
 4. **Use shared scripts** for org-wide changes:
    - `hg-workflow-sync.sh` — sync CI workflows
    - `hg-codex-audit.sh` — audit Codex readiness
