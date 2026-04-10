@@ -48,6 +48,8 @@ func main() {
 		runFleet(os.Args[2:])
 	case "workspace":
 		runWorkspace(os.Args[2:])
+	case "bridge":
+		runBridge(os.Args[2:])
 	case "tools":
 		runTools()
 	case "help", "--help", "-h":
@@ -74,6 +76,7 @@ Commands:
   fleet report [scan_path]      Summary report of fleet health
   workspace check [root]        Validate workspace/manifest.json and go.work
   workspace refresh-parity      Refresh docs parity outputs through the canonical codexkit bridge
+  bridge <subcommand>           Run bridged control-plane checks backed by current rollout scripts
   tools                         List all registered tools
   help                          Show this help`)
 }
