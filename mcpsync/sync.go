@@ -272,15 +272,11 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 			if strings.TrimSpace(source.Command) == "" && strings.TrimSpace(source.URL) == "" {
 				return nil, fmt.Errorf("profile %s resolved to an empty command", name)
 			}
-			cwd := source.CWD
-			if cwd == "" {
-				cwd = "."
-			}
 			profiles = append(profiles, resolvedProfile{
 				Name:      name,
 				Command:   source.Command,
 				Args:      append([]string(nil), source.Args...),
-				CWD:       cwd,
+				CWD:       source.CWD,
 				Env:       cloneEnv(source.Env),
 				Transport: source.Transport,
 				URL:       source.URL,
@@ -355,9 +351,6 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 			if profile.Override.URL != "" {
 				resolved.URL = profile.Override.URL
 			}
-		}
-		if resolved.CWD == "" {
-			resolved.CWD = "."
 		}
 		if strings.TrimSpace(resolved.Command) == "" && strings.TrimSpace(resolved.URL) == "" {
 			return nil, fmt.Errorf("profile %s resolved to an empty command", resolved.Name)

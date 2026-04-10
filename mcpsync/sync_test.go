@@ -74,6 +74,34 @@ func TestSync_CreatesServerBlocks(t *testing.T) {
 	}
 }
 
+func TestSync_DoesNotInventRepoRelativeCWD(t *testing.T) {
+	dir := t.TempDir()
+	mcpJSON, _ := json.Marshal(map[string]any{
+		"mcpServers": map[string]any{
+			"demo": map[string]any{
+				"command": "bash",
+				"args":    []string{"-lc", "exec ./scripts/run-demo.sh"},
+			},
+		},
+	})
+	writeFile(t, dir, ".mcp.json", string(mcpJSON))
+	writeFile(t, dir, ".codex/config.toml", "")
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".codex/config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	if strings.Contains(content, `cwd = "."`) {
+		t.Fatalf("expected sync to avoid inventing repo-relative cwd, got:\n%s", content)
+	}
+}
+
 func TestSync_DetectsExisting(t *testing.T) {
 	dir := setupMCPRepo(t)
 
