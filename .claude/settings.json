@@ -2,10 +2,10 @@
   "mcpServers": {
     "codexkit": {
       "args": [
-        "./scripts/run-codexkit-mcp.sh"
+        "-lc",
+        "exec ./scripts/run-codexkit-mcp.sh"
       ],
-      "command": "bash",
-      "cwd": "."
+      "command": "bash"
     }
   }
 }

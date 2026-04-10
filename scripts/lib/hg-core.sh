@@ -26,6 +26,12 @@ hg_require() {
   done
 }
 
+hg_user_home() {
+  local user="${1:-}"
+  [[ -n "$user" ]] || return 1
+  getent passwd "$user" | cut -d: -f6
+}
+
 # ── Paths ──────────────────────────────────────
 _hg_core_path="${BASH_SOURCE[0]:-$0}"
 _hg_core_dir="$(cd "$(dirname "$_hg_core_path")" && pwd)"
@@ -70,3 +76,26 @@ else
 fi
 HG_STATE_DIR="${HG_STATE_DIR:-$HOME/.local/state/hg}"
 mkdir -p "$HG_STATE_DIR" 2>/dev/null || true
+
+hg_workspace_owner() {
+  local root="${1:-${HG_STUDIO_ROOT:-}}"
+  if [[ -n "$root" ]] && [[ -e "$root" ]]; then
+    stat -c '%U' "$root"
+    return 0
+  fi
+  id -un
+}
+
+hg_workspace_owner_home() {
+  local owner="${1:-}"
+  owner="${owner:-$(hg_workspace_owner "${2:-${HG_STUDIO_ROOT:-}}")}"
+
+  local home=""
+  home="$(hg_user_home "$owner" 2>/dev/null || true)"
+  if [[ -n "$home" ]]; then
+    printf '%s\n' "$home"
+    return 0
+  fi
+
+  printf '%s\n' "$HOME"
+}

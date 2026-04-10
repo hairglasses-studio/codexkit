@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="${HG_STUDIO_ROOT:-$HOME/hairglasses-studio}"
-export HG_STUDIO_ROOT="$ROOT"
-DOCS_ROOT="${DOCS_ROOT:-${HG_DOCS_ROOT:-$ROOT/docs}}"
-SCOPE_MANIFEST="${HG_PARITY_SCOPE_MANIFEST:-$DOCS_ROOT/projects/agent-parity/repo-scope.json}"
-WORKSPACE_MANIFEST="${HG_WORKSPACE_MANIFEST:-$ROOT/workspace/manifest.json}"
+ROOT="${HG_STUDIO_ROOT:-}"
+DOCS_ROOT="${DOCS_ROOT:-}"
+SCOPE_MANIFEST="${HG_PARITY_SCOPE_MANIFEST:-}"
+WORKSPACE_MANIFEST="${HG_WORKSPACE_MANIFEST:-}"
 WRITE_WORKSPACE_CACHE=0
 WRITE_WIKI_DOCS=0
 WRITE_JSON=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/hg-agent-parity.sh"
+ROOT="${HG_STUDIO_ROOT}"
+export HG_STUDIO_ROOT="$ROOT"
+DOCS_ROOT="${DOCS_ROOT:-${HG_DOCS_ROOT:-$ROOT/docs}}"
+SCOPE_MANIFEST="${SCOPE_MANIFEST:-$DOCS_ROOT/projects/agent-parity/repo-scope.json}"
+WORKSPACE_MANIFEST="${WORKSPACE_MANIFEST:-$ROOT/workspace/manifest.json}"
+WORKSPACE_OWNER="${HG_WORKSPACE_OWNER:-$(hg_workspace_owner "$ROOT")}"
+WORKSPACE_HOME="${HG_WORKSPACE_HOME:-$(hg_workspace_owner_home "$WORKSPACE_OWNER" "$ROOT")}"
 
 workspace_cache_dir() {
   printf '%s\n' "$DOCS_ROOT/agent-parity"
@@ -1022,20 +1028,20 @@ if [[ -z "$workflow_family_summary_text" ]]; then
   workflow_family_summary_md=$'\n'"- none"
 fi
 
-global_claude_commands=$(find "$HOME/.claude/commands" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-global_claude_skills=$(find "$HOME/.claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
-global_agents_skills=$(find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
-global_codex_skills=$(find "$HOME/.codex/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+global_claude_commands=$(find "$WORKSPACE_HOME/.claude/commands" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+global_claude_skills=$(find "$WORKSPACE_HOME/.claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+global_agents_skills=$(find "$WORKSPACE_HOME/.agents/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+global_codex_skills=$(find "$WORKSPACE_HOME/.codex/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
 workspace_global_sync_ok=false
 workspace_global_home_overlay_ok=false
-if [[ -x "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" ]] && "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" --root "$ROOT" --source-check >/dev/null 2>&1; then
+if [[ -x "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" ]] && env HOME="$WORKSPACE_HOME" HG_WORKSPACE_OWNER="$WORKSPACE_OWNER" HG_WORKSPACE_HOME="$WORKSPACE_HOME" "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" --root "$ROOT" --source-check >/dev/null 2>&1; then
   workspace_global_sync_ok=true
 fi
-if [[ -x "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" ]] && "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" --root "$ROOT" --check >/dev/null 2>&1; then
+if [[ -x "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" ]] && env HOME="$WORKSPACE_HOME" HG_WORKSPACE_OWNER="$WORKSPACE_OWNER" HG_WORKSPACE_HOME="$WORKSPACE_HOME" "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" --root "$ROOT" --check >/dev/null 2>&1; then
   workspace_global_home_overlay_ok=true
 fi
 antigravity_home_overlay_ok=false
-antigravity_metadata_path="$HOME/.gemini/antigravity/.hg-antigravity-sync.json"
+antigravity_metadata_path="$WORKSPACE_HOME/.gemini/antigravity/.hg-antigravity-sync.json"
 antigravity_total_mcp_servers=0
 antigravity_root_shared_servers=0
 antigravity_managed_workflows=0
@@ -1051,13 +1057,13 @@ antigravity_imported_env_vars="none"
 antigravity_missing_env_vars="OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, GEMINI_API_KEY"
 antigravity_env_bridge_mode="unknown"
 antigravity_global_gemini_md=false
-antigravity_ecosystem_metadata_path="$HOME/.gemini/antigravity/.hg-antigravity-ecosystem.json"
+antigravity_ecosystem_metadata_path="$WORKSPACE_HOME/.gemini/antigravity/.hg-antigravity-ecosystem.json"
 antigravity_archived_skill_sources=0
 antigravity_archived_workflow_sources=0
 antigravity_installed_extensions="none"
 antigravity_installed_extension_count=0
 antigravity_sidecar_count=0
-if [[ -x "$ROOT/dotfiles/scripts/hg-antigravity-sync.sh" ]] && "$ROOT/dotfiles/scripts/hg-antigravity-sync.sh" --root "$ROOT" --check >/dev/null 2>&1; then
+if [[ -x "$ROOT/dotfiles/scripts/hg-antigravity-sync.sh" ]] && env HOME="$WORKSPACE_HOME" HG_WORKSPACE_OWNER="$WORKSPACE_OWNER" HG_WORKSPACE_HOME="$WORKSPACE_HOME" "$ROOT/dotfiles/scripts/hg-antigravity-sync.sh" --root "$ROOT" --check >/dev/null 2>&1; then
   antigravity_home_overlay_ok=true
 fi
 if [[ -f "$antigravity_metadata_path" ]]; then
@@ -1166,10 +1172,12 @@ workflow family summary:${workflow_family_summary_text}
 repos with legacy .claude/commands: $total_repos_with_legacy_claude_commands
 total legacy .claude/commands files: $total_legacy_claude_command_count
 repos with unported legacy commands (no surface.yaml): $total_repos_with_unported_legacy_commands
-global user skills in ~/.claude/commands: $global_claude_commands
-global user skills in ~/.claude/skills: $global_claude_skills
-global user skills in ~/.agents/skills: $global_agents_skills
-global user skills in ~/.codex/skills: $global_codex_skills
+workspace owner: $WORKSPACE_OWNER
+workspace home: $WORKSPACE_HOME
+workspace-owner skills in ~/.claude/commands: $global_claude_commands
+workspace-owner skills in ~/.claude/skills: $global_claude_skills
+workspace-owner skills in ~/.agents/skills: $global_agents_skills
+workspace-owner skills in ~/.codex/skills: $global_codex_skills
 workspace global source contract up to date: $workspace_global_sync_ok
 workspace global home overlay up to date: $workspace_global_home_overlay_ok
 Antigravity home overlay up to date: $antigravity_home_overlay_ok
@@ -1270,6 +1278,8 @@ inventory_json="{
     \"repos_with_legacy_claude_commands\": ${total_repos_with_legacy_claude_commands},
     \"total_legacy_claude_command_count\": ${total_legacy_claude_command_count},
     \"repos_with_unported_legacy_commands\": ${total_repos_with_unported_legacy_commands},
+    \"workspace_owner\": $(jq -cn --arg v "$WORKSPACE_OWNER" '$v'),
+    \"workspace_home\": $(jq -cn --arg v "$WORKSPACE_HOME" '$v'),
     \"global_claude_commands\": ${global_claude_commands},
     \"global_claude_skills\": ${global_claude_skills},
     \"global_agents_skills\": ${global_agents_skills},
@@ -1399,7 +1409,9 @@ Summary from the latest audit:
 - Workflow governance missing owned workflow repos: ${total_workflow_missing_owned_workflow}
 - Repos with legacy \`.claude/commands\`: ${total_repos_with_legacy_claude_commands} (${total_legacy_claude_command_count} files)
 - Repos with unported legacy commands (no surface.yaml): ${total_repos_with_unported_legacy_commands}
-- Global user skills: ${global_claude_commands} commands / ${global_claude_skills} Claude skills / ${global_agents_skills} Agents / ${global_codex_skills} Codex
+- Workspace owner: \`${WORKSPACE_OWNER}\`
+- Workspace home: \`${WORKSPACE_HOME}\`
+- Workspace-owner skills: ${global_claude_commands} commands / ${global_claude_skills} Claude skills / ${global_agents_skills} Agents / ${global_codex_skills} Codex
 - Workspace global source contract up to date: ${workspace_global_sync_ok}
 - Workspace global home overlay up to date: ${workspace_global_home_overlay_ok}
 - Antigravity home overlay up to date: ${antigravity_home_overlay_ok}
@@ -1511,7 +1523,9 @@ Summary from the latest audit:
 - Workflow governance retired residue repos: ${total_workflow_retired_residue}
 - Workflow governance unexpected workflow repos: ${total_workflow_unexpected_workflow}
 - Workflow governance missing owned workflow repos: ${total_workflow_missing_owned_workflow}
-- Global user skills: ${global_claude_commands} commands / ${global_claude_skills} Claude skills / ${global_agents_skills} Agents / ${global_codex_skills} Codex
+- Workspace owner: \`${WORKSPACE_OWNER}\`
+- Workspace home: \`${WORKSPACE_HOME}\`
+- Workspace-owner skills: ${global_claude_commands} commands / ${global_claude_skills} Claude skills / ${global_agents_skills} Agents / ${global_codex_skills} Codex
 - Workspace global source contract up to date: ${workspace_global_sync_ok}
 - Workspace global home overlay up to date: ${workspace_global_home_overlay_ok}
 - Antigravity home overlay up to date: ${antigravity_home_overlay_ok}
