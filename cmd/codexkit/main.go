@@ -73,6 +73,7 @@ Commands:
   fleet audit [scan_path]       Run full audit on all repos
   fleet report [scan_path]      Summary report of fleet health
   workspace check [root]        Validate workspace/manifest.json and go.work
+  workspace refresh-parity      Refresh docs parity outputs through the canonical codexkit bridge
   tools                         List all registered tools
   help                          Show this help`)
 }
@@ -245,52 +246,63 @@ func runFleet(args []string) {
 }
 
 func runWorkspace(args []string) {
-	if len(args) == 0 || args[0] != "check" {
-		fmt.Fprintln(os.Stderr, "usage: codexkit workspace check [root] [--json]")
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit workspace <check|refresh-parity> ...")
 		os.Exit(1)
 	}
 
-	jsonOut := hasFlag(args, "--json")
-	root := workspace.DefaultRoot()
-	for _, arg := range args[1:] {
-		if arg != "--json" {
-			root = arg
-			break
+	switch args[0] {
+	case "check":
+		jsonOut := hasFlag(args, "--json")
+		root := workspace.DefaultRoot()
+		for _, arg := range args[1:] {
+			if arg != "--json" {
+				root = arg
+				break
+			}
 		}
-	}
 
-	manifest, err := workspace.LoadManifest(root)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
+		manifest, err := workspace.LoadManifest(root)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
 
-	report := workspace.Check(root, manifest)
-	if jsonOut {
-		printJSON(report)
-	} else {
-		if report.Passed {
-			fmt.Printf("workspace check: PASS (%d findings)\n", len(report.Findings))
+		report := workspace.Check(root, manifest)
+		if jsonOut {
+			printJSON(report)
 		} else {
-			fmt.Printf("workspace check: FAIL (%d findings)\n", len(report.Findings))
-		}
-		for _, finding := range report.Findings {
-			status := "PASS"
-			if !finding.Passed {
-				status = "FAIL"
+			if report.Passed {
+				fmt.Printf("workspace check: PASS (%d findings)\n", len(report.Findings))
+			} else {
+				fmt.Printf("workspace check: FAIL (%d findings)\n", len(report.Findings))
 			}
-			if finding.Repo != "" {
-				fmt.Printf("  %-16s %-20s %s\n", status, finding.Check, finding.Repo)
-				if finding.Message != "" {
-					fmt.Printf("    %s\n", finding.Message)
+			for _, finding := range report.Findings {
+				status := "PASS"
+				if !finding.Passed {
+					status = "FAIL"
 				}
-				continue
+				if finding.Repo != "" {
+					fmt.Printf("  %-16s %-20s %s\n", status, finding.Check, finding.Repo)
+					if finding.Message != "" {
+						fmt.Printf("    %s\n", finding.Message)
+					}
+					continue
+				}
+				fmt.Printf("  %-16s %-20s %s\n", status, finding.Check, finding.Message)
 			}
-			fmt.Printf("  %-16s %-20s %s\n", status, finding.Check, finding.Message)
 		}
-	}
 
-	if !report.Passed {
+		if !report.Passed {
+			os.Exit(1)
+		}
+	case "refresh-parity":
+		if err := runWorkspaceRefresh(args[1:]); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Fprintln(os.Stderr, "usage: codexkit workspace <check|refresh-parity> ...")
 		os.Exit(1)
 	}
 }
