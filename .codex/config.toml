@@ -9,8 +9,7 @@ sandbox_mode = "workspace-write"
 # Discovery-first codexkit profile for fleet baseline and sync inspection.
 [mcp_servers.codexkit_review]
 command = "bash"
-args = ["./scripts/run-codexkit-mcp.sh"]
-cwd = "."
+args = ["-lc", "exec ./scripts/run-codexkit-mcp.sh"]
 enabled_tools = [
   "baseline_check",
   "baseline_check_all",
@@ -25,8 +24,7 @@ enabled_tools = [
 # Curated codexkit workspace for skill sync, MCP sync, and fleet validation.
 [mcp_servers.codexkit_workspace]
 command = "bash"
-args = ["./scripts/run-codexkit-mcp.sh"]
-cwd = "."
+args = ["-lc", "exec ./scripts/run-codexkit-mcp.sh"]
 enabled_tools = [
   "baseline_check",
   "baseline_check_all",
