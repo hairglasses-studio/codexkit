@@ -603,10 +603,20 @@ has_mcp_server_health_tool() {
   fi
 }
 
+discover_repos() {
+  local candidate
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue
+    if [[ -e "$candidate/.git" ]]; then
+      printf '%s\n' "$candidate"
+    fi
+  done < <(find "$ROOT" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print | sort)
+}
+
 repos=()
 while IFS= read -r repo; do
   repos+=("$repo")
-done < <(find "$ROOT" -mindepth 2 -maxdepth 2 -type d -name .git -prune | sed 's#/\.git$##' | sort)
+done < <(discover_repos)
 
 total_claude_mcp=0
 total_claude_settings=0

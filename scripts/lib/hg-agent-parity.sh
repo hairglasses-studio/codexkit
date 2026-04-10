@@ -8,7 +8,7 @@ if ! command -v hg_require >/dev/null 2>&1; then
   source "$HG_AGENT_PARITY_LIB_DIR/hg-core.sh"
 fi
 
-HG_AGENT_PARITY_SURFACEKIT_ROOT="${HG_AGENT_PARITY_SURFACEKIT_ROOT:-${HG_AGENT_PARITY_ROOT:-$(cd "$HG_AGENT_PARITY_LIB_DIR/../.." && pwd)}}"
+HG_AGENT_PARITY_SURFACEKIT_ROOT="${HG_AGENT_PARITY_SURFACEKIT_ROOT:-${HG_AGENT_PARITY_ROOT:-${CODEXKIT_ROOT:-${HG_CODEXKIT:-${HG_SURFACEKIT:-$(cd "$HG_AGENT_PARITY_LIB_DIR/../.." && pwd)}}}}}"
 
 hg_parity_require_tools() {
   hg_require jq diff awk mktemp
@@ -489,13 +489,58 @@ hg_parity_load_local_llm_defaults() {
   fi
 
   export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"
-  export OLLAMA_CHAT_MODEL="${OLLAMA_CHAT_MODEL:-qwen3:8b}"
-  export OLLAMA_FAST_MODEL="${OLLAMA_FAST_MODEL:-qwen2.5-coder:7b}"
-  export OLLAMA_CODE_MODEL="${OLLAMA_CODE_MODEL:-devstral-small-2}"
-  export OLLAMA_HEAVY_CODE_MODEL="${OLLAMA_HEAVY_CODE_MODEL:-devstral-2}"
-  export OLLAMA_HIGH_CONTEXT_CODE_MODEL="${OLLAMA_HIGH_CONTEXT_CODE_MODEL:-qwen3-coder-next}"
+  export OLLAMA_CHAT_MODEL="${OLLAMA_CHAT_MODEL:-code-primary}"
+  export OLLAMA_FAST_MODEL="${OLLAMA_FAST_MODEL:-code-fast}"
+  export OLLAMA_CODE_MODEL="${OLLAMA_CODE_MODEL:-code-primary}"
+  export OLLAMA_HEAVY_CODE_MODEL="${OLLAMA_HEAVY_CODE_MODEL:-code-heavy}"
+  export OLLAMA_HIGH_CONTEXT_CODE_MODEL="${OLLAMA_HIGH_CONTEXT_CODE_MODEL:-code-long}"
+  export OLLAMA_CLOUD_CODE_MODEL="${OLLAMA_CLOUD_CODE_MODEL:-glm-5.1:cloud}"
+  export OLLAMA_CLOUD_VERIFIED_CODE_MODEL="${OLLAMA_CLOUD_VERIFIED_CODE_MODEL:-glm-5:cloud}"
+  export OLLAMA_MULTILINGUAL_CODE_MODEL="${OLLAMA_MULTILINGUAL_CODE_MODEL:-minimax-m2.1:cloud}"
+  export OLLAMA_THINKING_CODE_MODEL="${OLLAMA_THINKING_CODE_MODEL:-kimi-k2-thinking:cloud}"
+  export OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-nomic-embed-text:v1.5}"
   export OLLAMA_API_KEY="${OLLAMA_API_KEY:-ollama}"
   export OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-15m}"
+}
+
+hg_parity_render_codex_standard_profiles() {
+  cat <<'EOF'
+[profiles.readonly_quiet]
+approval_policy = "never"
+sandbox_mode = "read-only"
+model_reasoning_effort = "medium"
+
+[profiles.review]
+approval_policy = "on-request"
+sandbox_mode = "read-only"
+model_reasoning_effort = "high"
+
+[profiles.workspace_auto]
+approval_policy = "on-failure"
+sandbox_mode = "workspace-write"
+model_reasoning_effort = "high"
+
+[profiles.ci_json]
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+model_reasoning_effort = "medium"
+EOF
+}
+
+hg_parity_codex_has_standard_profiles() {
+  local content="$1"
+  [[ "$content" == *"[profiles.readonly_quiet]"* ]] &&
+    [[ "$content" == *"[profiles.review]"* ]] &&
+    [[ "$content" == *"[profiles.workspace_auto]"* ]] &&
+    [[ "$content" == *"[profiles.ci_json]"* ]]
+}
+
+hg_parity_codex_has_any_required_profile() {
+  local content="$1"
+  [[ "$content" == *"[profiles.readonly_quiet]"* ]] ||
+    [[ "$content" == *"[profiles.review]"* ]] ||
+    [[ "$content" == *"[profiles.workspace_auto]"* ]] ||
+    [[ "$content" == *"[profiles.ci_json]"* ]]
 }
 
 hg_parity_codex_ollama_start_marker() {
@@ -531,6 +576,11 @@ model_provider = "ollama_local"
 model = $(hg_parity_toml_quote "$OLLAMA_CHAT_MODEL")
 model_reasoning_effort = "low"
 
+[profiles.ollama_fast]
+model_provider = "ollama_local"
+model = $(hg_parity_toml_quote "$OLLAMA_FAST_MODEL")
+model_reasoning_effort = "low"
+
 [profiles.ollama_code]
 model_provider = "ollama_local"
 model = $(hg_parity_toml_quote "$OLLAMA_CODE_MODEL")
@@ -544,6 +594,26 @@ model_reasoning_effort = "high"
 [profiles.ollama_high_context]
 model_provider = "ollama_local"
 model = $(hg_parity_toml_quote "$OLLAMA_HIGH_CONTEXT_CODE_MODEL")
+model_reasoning_effort = "high"
+
+[profiles.ollama_cloud_code]
+model_provider = "ollama_local"
+model = $(hg_parity_toml_quote "$OLLAMA_CLOUD_CODE_MODEL")
+model_reasoning_effort = "high"
+
+[profiles.ollama_cloud_verified]
+model_provider = "ollama_local"
+model = $(hg_parity_toml_quote "$OLLAMA_CLOUD_VERIFIED_CODE_MODEL")
+model_reasoning_effort = "high"
+
+[profiles.ollama_multilingual]
+model_provider = "ollama_local"
+model = $(hg_parity_toml_quote "$OLLAMA_MULTILINGUAL_CODE_MODEL")
+model_reasoning_effort = "high"
+
+[profiles.ollama_thinking]
+model_provider = "ollama_local"
+model = $(hg_parity_toml_quote "$OLLAMA_THINKING_CODE_MODEL")
 model_reasoning_effort = "high"
 
 $(hg_parity_codex_ollama_end_marker)
@@ -565,7 +635,15 @@ hg_parity_render_codex_base_config() {
     return 0
   fi
 
-  printf 'approval_policy = "never"\nsandbox_mode = "workspace-write"\n'
+  cat <<EOF
+# Inherit model, reasoning, and personal preferences from ~/.codex/config.toml.
+# The global launcher layer now enforces root + full-access execution; this
+# repo-local template remains project-scoped for compatibility surfaces.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+$(hg_parity_render_codex_standard_profiles)
+EOF
 }
 
 hg_parity_upsert_generated_block_text() {
@@ -633,6 +711,10 @@ hg_parity_render_codex_config() {
   local repo_path="$1"
   local base_config ollama_block start_marker end_marker
   base_config="$(hg_parity_render_codex_base_config "$repo_path")"
+  if ! hg_parity_codex_has_standard_profiles "$base_config" && \
+     ! hg_parity_codex_has_any_required_profile "$base_config"; then
+    base_config="${base_config%$'\n'}"$'\n\n'"$(hg_parity_render_codex_standard_profiles)"
+  fi
   ollama_block="$(hg_parity_render_codex_ollama_profiles)"
   start_marker="$(hg_parity_codex_ollama_start_marker)"
   start_marker="${start_marker%$'\n'}"

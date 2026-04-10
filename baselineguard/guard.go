@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/hairglasses-studio/codexkit"
+	"github.com/hairglasses-studio/codexkit/mcpsync"
+	"github.com/hairglasses-studio/codexkit/skillsync"
 	toml "github.com/pelletier/go-toml/v2"
 )
 
@@ -271,68 +273,37 @@ func (r *Report) addAgentNaming(repoPath string) {
 }
 
 func (r *Report) addSkillSyncCheck(repoPath string) {
-	agentsDir := filepath.Join(repoPath, ".agents/skills")
-	entries, err := os.ReadDir(agentsDir)
-	if err != nil {
-		return // no .agents/skills is fine
+	if _, err := os.Stat(filepath.Join(repoPath, ".agents", "skills")); err != nil {
+		return
 	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		srcPath := filepath.Join(agentsDir, entry.Name(), "SKILL.md")
-		dstPath := filepath.Join(repoPath, ".claude/skills", entry.Name(), "SKILL.md")
-		srcData, err := os.ReadFile(srcPath)
-		if err != nil {
-			continue
-		}
-		dstData, err := os.ReadFile(dstPath)
-		if err != nil {
-			r.add("skill_sync", false, fmt.Sprintf("missing mirror: .claude/skills/%s/SKILL.md", entry.Name()))
-			continue
-		}
-		if string(srcData) != string(dstData) {
-			r.add("skill_sync", false, fmt.Sprintf("stale mirror: .claude/skills/%s/SKILL.md", entry.Name()))
-		} else {
-			r.add("skill_sync", true, entry.Name())
+	report := skillsync.Check(repoPath)
+	for _, err := range report.Errors {
+		r.add("skill_sync", false, err)
+	}
+	for _, action := range report.Actions {
+		switch action.Action {
+		case "create", "update", "remove":
+			r.add("skill_sync", false, action.Message)
+		case "unchanged":
+			r.add("skill_sync", true, action.Message)
 		}
 	}
 }
 
 func (r *Report) addMCPSyncCheck(repoPath string) {
-	mcpPath := filepath.Join(repoPath, ".mcp.json")
-	data, err := os.ReadFile(mcpPath)
-	if err != nil {
-		return // no .mcp.json is fine
-	}
-	var mcpFile struct {
-		MCPServers map[string]any `json:"mcpServers"`
-	}
-	if err := json.Unmarshal(data, &mcpFile); err != nil {
-		r.add("mcp_sync", false, fmt.Sprintf("invalid .mcp.json: %v", err))
+	if _, err := os.Stat(filepath.Join(repoPath, ".mcp.json")); err != nil {
 		return
 	}
-	if len(mcpFile.MCPServers) == 0 {
-		r.add("mcp_sync", true, "no MCP servers defined")
-		return
+	report := mcpsync.Diff(repoPath)
+	for _, err := range report.Errors {
+		r.add("mcp_sync", false, err)
 	}
-	configPath := filepath.Join(repoPath, ".codex/config.toml")
-	configData, err := os.ReadFile(configPath)
-	if err != nil {
-		r.add("mcp_sync", false, "MCP servers defined but .codex/config.toml missing")
-		return
-	}
-	configStr := string(configData)
-	mcpServerRe := regexp.MustCompile(`(?m)^\[mcp_servers\.([\w-]+)\]`)
-	found := make(map[string]bool)
-	for _, match := range mcpServerRe.FindAllStringSubmatch(configStr, -1) {
-		found[match[1]] = true
-	}
-	for name := range mcpFile.MCPServers {
-		if found[name] {
-			r.add("mcp_sync", true, name)
-		} else {
-			r.add("mcp_sync", false, fmt.Sprintf("missing in config.toml: [mcp_servers.%s]", name))
+	for _, action := range report.Actions {
+		switch action.Action {
+		case "update", "create", "remove":
+			r.add("mcp_sync", false, action.Message)
+		case "unchanged":
+			r.add("mcp_sync", true, action.Message)
 		}
 	}
 }
