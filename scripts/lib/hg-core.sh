@@ -67,13 +67,6 @@ if [[ -n "${DOTFILES_DIR:-}" ]] && [[ -d "${DOTFILES_DIR}/scripts" ]] && [[ -f "
 else
   HG_DOTFILES="$HG_STUDIO_ROOT/dotfiles"
 fi
-
-# Keep the historic surfacekit variable as a compatibility alias while downstream callers migrate.
-if [[ -n "${SURFACEKIT_DIR:-}" ]] && [[ -d "${SURFACEKIT_DIR}/scripts" ]] && [[ -f "${SURFACEKIT_DIR}/AGENTS.md" ]]; then
-  HG_SURFACEKIT="$(cd "${SURFACEKIT_DIR}" && pwd)"
-else
-  HG_SURFACEKIT="$HG_STUDIO_ROOT/surfacekit"
-fi
 HG_STATE_DIR="${HG_STATE_DIR:-$HOME/.local/state/hg}"
 mkdir -p "$HG_STATE_DIR" 2>/dev/null || true
 

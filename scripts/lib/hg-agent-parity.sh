@@ -8,7 +8,7 @@ if ! command -v hg_require >/dev/null 2>&1; then
   source "$HG_AGENT_PARITY_LIB_DIR/hg-core.sh"
 fi
 
-HG_AGENT_PARITY_SURFACEKIT_ROOT="${HG_AGENT_PARITY_SURFACEKIT_ROOT:-${HG_AGENT_PARITY_ROOT:-${CODEXKIT_ROOT:-${HG_CODEXKIT:-${HG_SURFACEKIT:-$(cd "$HG_AGENT_PARITY_LIB_DIR/../.." && pwd)}}}}}"
+HG_AGENT_PARITY_ROOT="${HG_AGENT_PARITY_ROOT:-${CODEXKIT_ROOT:-${HG_CODEXKIT:-$(cd "$HG_AGENT_PARITY_LIB_DIR/../.." && pwd)}}}"
 
 hg_parity_require_tools() {
   hg_require jq diff awk mktemp
@@ -287,7 +287,7 @@ hg_parity_metadata_path_label() {
   local repo_root parity_root dir base rel
 
   repo_root="$repo_path"
-  parity_root="$HG_AGENT_PARITY_SURFACEKIT_ROOT"
+  parity_root="$HG_AGENT_PARITY_ROOT"
   if [[ -d "$repo_root" ]]; then
     repo_root="$(cd "$repo_root" && pwd)"
   fi
@@ -326,7 +326,7 @@ hg_parity_metadata_path_label() {
 }
 
 hg_parity_gemini_sync_script() {
-  printf '%s\n' "$HG_AGENT_PARITY_SURFACEKIT_ROOT/scripts/gemini-settings-sync.sh"
+  printf '%s\n' "$HG_AGENT_PARITY_ROOT/scripts/gemini-settings-sync.sh"
 }
 
 hg_parity_generated_gemini_settings_count() {
@@ -482,7 +482,7 @@ hg_parity_render_claude_settings() {
 hg_parity_render_gemini_settings() {
   local repo_path="$1"
   local template_path template_json generated_mcp normalized_hooks
-  template_path="$HG_AGENT_PARITY_SURFACEKIT_ROOT/templates/gemini-settings.standard.json"
+  template_path="$HG_AGENT_PARITY_ROOT/templates/gemini-settings.standard.json"
   template_json='{}'
   if [[ -f "$template_path" ]]; then
     template_json="$(jq -c 'if type == "object" then . else {} end' "$template_path" 2>/dev/null || printf '{}\n')"
@@ -805,7 +805,7 @@ hg_parity_render_codex_base_config() {
     return 0
   fi
 
-  template_path="$HG_AGENT_PARITY_SURFACEKIT_ROOT/templates/codex-config.standard.toml"
+  template_path="$HG_AGENT_PARITY_ROOT/templates/codex-config.standard.toml"
   if [[ -f "$template_path" ]]; then
     cat "$template_path"
     return 0
@@ -905,7 +905,7 @@ hg_parity_gemini_settings_current() {
   local expected expected_metadata
   expected="$(hg_parity_render_gemini_settings "$repo_path")"
   expected_metadata="$(hg_parity_render_gemini_settings_metadata "$repo_path" \
-    "$HG_AGENT_PARITY_SURFACEKIT_ROOT/templates/gemini-settings.standard.json" \
+    "$HG_AGENT_PARITY_ROOT/templates/gemini-settings.standard.json" \
     "$repo_path/.mcp.json" \
     "$repo_path/.claude/settings.json")"
   hg_parity_compare_expected_file "$expected" "$repo_path/.gemini/settings.json" \

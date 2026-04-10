@@ -14,9 +14,8 @@ import (
 )
 
 type bridgeConfig struct {
-	RepoPath       string
-	RepoName       string
-	SurfacekitRoot string
+	RepoPath string
+	RepoName string
 }
 
 func runBridge(args []string) {
@@ -52,9 +51,9 @@ func printBridgeUsage() {
 	fmt.Println(`codexkit bridge
 
 Subcommands:
-  skill-surface-check <repo> [--surfacekit-root <deprecated>]
-  provider-settings-check <repo> [--repo-name <name>] [--surfacekit-root <deprecated>]
-  codex-mcp-check <repo> [--surfacekit-root <deprecated>]`)
+  skill-surface-check <repo>
+  provider-settings-check <repo> [--repo-name <name>]
+  codex-mcp-check <repo>`)
 }
 
 func runSkillSurfaceCheck(args []string) error {
@@ -116,12 +115,6 @@ func parseBridgeConfig(args []string, allowRepoName bool) (bridgeConfig, error) 
 		switch args[i] {
 		case "-h", "--help":
 			return bridgeConfig{}, fmt.Errorf("usage: see `codexkit bridge --help`")
-		case "--surfacekit-root":
-			if i+1 >= len(args) {
-				return bridgeConfig{}, fmt.Errorf("--surfacekit-root requires a value")
-			}
-			cfg.SurfacekitRoot = args[i+1]
-			i++
 		case "--repo-name":
 			if !allowRepoName {
 				return bridgeConfig{}, fmt.Errorf("--repo-name is not supported for this command")
@@ -150,14 +143,6 @@ func parseBridgeConfig(args []string, allowRepoName bool) (bridgeConfig, error) 
 		return bridgeConfig{}, err
 	}
 	cfg.RepoPath = repoPath
-	if cfg.SurfacekitRoot == "" {
-		root := os.Getenv("SURFACEKIT_ROOT")
-		if root != "" {
-			cfg.SurfacekitRoot = root
-		} else {
-			cfg.SurfacekitRoot = filepath.Join(filepath.Dir(repoPath), "surfacekit")
-		}
-	}
 	return cfg, nil
 }
 
@@ -239,7 +224,6 @@ func runCodexkitScript(root, scriptName string, scriptArgs ...string) error {
 		os.Environ(),
 		"CODEXKIT_ROOT="+root,
 		"HG_AGENT_PARITY_ROOT="+root,
-		"HG_AGENT_PARITY_SURFACEKIT_ROOT="+root,
 	)
 	return cmd.Run()
 }

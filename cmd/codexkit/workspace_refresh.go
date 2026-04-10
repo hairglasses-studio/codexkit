@@ -41,7 +41,6 @@ func runWorkspaceRefresh(args []string) error {
 		"HG_STUDIO_ROOT="+cfg.Root,
 		"CODEXKIT_ROOT="+cfg.CodexkitRoot,
 		"HG_AGENT_PARITY_ROOT="+cfg.CodexkitRoot,
-		"HG_AGENT_PARITY_SURFACEKIT_ROOT="+cfg.CodexkitRoot,
 	)
 	return cmd.Run()
 }
