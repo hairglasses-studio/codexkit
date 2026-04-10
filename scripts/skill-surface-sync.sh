@@ -54,6 +54,8 @@ done
   exit 1
 }
 
+REPO_PATH="$(cd "$REPO_PATH" && pwd)"
+
 (
   cd "$CODEXKIT_ROOT"
   GOWORK=off go run ./cmd/codexkit skills "$MODE" "$REPO_PATH"
