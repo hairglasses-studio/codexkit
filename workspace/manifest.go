@@ -14,6 +14,7 @@ type Repo struct {
 	Language       string `json:"language"`
 	BaselineTarget bool   `json:"baseline_target"`
 	GoWorkMember   bool   `json:"go_work_member"`
+	Lifecycle      string `json:"lifecycle"`
 }
 
 // Manifest is the canonical machine-readable workspace inventory.
@@ -40,6 +41,22 @@ func ManifestPath(root string) string {
 	return filepath.Join(root, "workspace", "manifest.json")
 }
 
+// ConsolidationDecision captures one repo state from the docs-side matrix.
+type ConsolidationDecision struct {
+	Repo  string `json:"repo"`
+	State string `json:"state"`
+}
+
+// ConsolidationMatrix is the docs-owned record of merge and archive intent.
+type ConsolidationMatrix struct {
+	Decisions []ConsolidationDecision `json:"decisions"`
+}
+
+// ConsolidationMatrixPath returns the docs-side consolidation matrix path.
+func ConsolidationMatrixPath(root string) string {
+	return filepath.Join(root, "docs", "inventory", "repo-consolidation-matrix.json")
+}
+
 // LoadManifest loads the workspace manifest from disk.
 func LoadManifest(root string) (Manifest, error) {
 	data, err := os.ReadFile(ManifestPath(root))
@@ -51,6 +68,19 @@ func LoadManifest(root string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	return manifest, nil
+}
+
+// LoadConsolidationMatrix loads the docs consolidation matrix from disk.
+func LoadConsolidationMatrix(root string) (ConsolidationMatrix, error) {
+	data, err := os.ReadFile(ConsolidationMatrixPath(root))
+	if err != nil {
+		return ConsolidationMatrix{}, err
+	}
+	var matrix ConsolidationMatrix
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		return ConsolidationMatrix{}, err
+	}
+	return matrix, nil
 }
 
 // Filter returns repos in manifest order that match the requested filter.

@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,7 +38,9 @@ func Check(root string, manifest Manifest) Report {
 	report := Report{Root: root}
 
 	expectedGoWork := make(map[string]Repo)
+	manifestRepos := make(map[string]Repo, len(manifest.Repos))
 	for _, repo := range manifest.Repos {
+		manifestRepos[repo.Name] = repo
 		repoPath := filepath.Join(root, repo.Name)
 		if _, err := os.Stat(repoPath); err != nil {
 			report.add("repo_directory", repo.Name, false, "missing directory")
@@ -82,6 +85,41 @@ func Check(root string, manifest Manifest) Report {
 			continue
 		}
 		report.add("go_work_member", repoName, false, "present in go.work but not marked go_work_member in workspace manifest")
+	}
+
+	matrix, err := LoadConsolidationMatrix(root)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		report.add("consolidation_matrix", "", true, "not found; skipped")
+	case err != nil:
+		report.add("consolidation_matrix", "", false, err.Error())
+	default:
+		report.add("consolidation_matrix", "", true, fmt.Sprintf("%d decisions", len(matrix.Decisions)))
+		for _, decision := range matrix.Decisions {
+			if decision.State != "merged_out_of_active_surface" {
+				continue
+			}
+			repo, ok := manifestRepos[decision.Repo]
+			if !ok {
+				report.add("consolidation_scope", decision.Repo, false, "repo is missing from workspace manifest")
+				continue
+			}
+			if repo.Scope != "compatibility_only" {
+				report.add("consolidation_scope", decision.Repo, false, fmt.Sprintf("repo marked %q in consolidation matrix should have compatibility_only scope", decision.State))
+			} else {
+				report.add("consolidation_scope", decision.Repo, true, "")
+			}
+			if repo.GoWorkMember {
+				report.add("consolidation_go_work_member", decision.Repo, false, fmt.Sprintf("repo marked %q in consolidation matrix must not remain in go.work", decision.State))
+			} else {
+				report.add("consolidation_go_work_member", decision.Repo, true, "")
+			}
+			if repo.BaselineTarget {
+				report.add("consolidation_baseline_target", decision.Repo, false, fmt.Sprintf("repo marked %q in consolidation matrix must not remain a baseline target", decision.State))
+			} else {
+				report.add("consolidation_baseline_target", decision.Repo, true, "")
+			}
+		}
 	}
 
 	report.Passed = true

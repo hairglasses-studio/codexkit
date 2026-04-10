@@ -149,3 +149,81 @@ use (
 		t.Fatalf("expected missing docs member/module and rogue extra, got %#v", report.Findings)
 	}
 }
+
+func TestCheckWorkspaceFlagsMergedOutRepoStillActive(t *testing.T) {
+	root := t.TempDir()
+	manifest := Manifest{
+		Version: 1,
+		Repos: []Repo{
+			{Name: "sway-mcp-go", Scope: "active_first_party", BaselineTarget: true, GoWorkMember: true, Lifecycle: "canonical"},
+			{Name: "docs", GoWorkMember: true},
+		},
+	}
+
+	writeWorkspaceFile(t, root, "sway-mcp-go/go.mod", "module github.com/hairglasses-studio/sway-mcp-go\n")
+	writeWorkspaceFile(t, root, "docs/go.mod", "module github.com/hairglasses-studio/docs\n")
+	writeWorkspaceFile(t, root, "go.work", `go 1.26.1
+
+use (
+	./docs
+	./sway-mcp-go
+)
+`)
+	writeWorkspaceFile(t, root, "docs/inventory/repo-consolidation-matrix.json", `{
+  "decisions": [
+    {"repo": "sway-mcp-go", "state": "merged_out_of_active_surface"}
+  ]
+}`)
+
+	report := Check(root, manifest)
+	if report.Passed {
+		t.Fatalf("Check() passed = true, want false")
+	}
+
+	var scopeFail, goWorkFail, baselineFail bool
+	for _, finding := range report.Findings {
+		switch {
+		case finding.Check == "consolidation_scope" && finding.Repo == "sway-mcp-go" && !finding.Passed:
+			scopeFail = true
+		case finding.Check == "consolidation_go_work_member" && finding.Repo == "sway-mcp-go" && !finding.Passed:
+			goWorkFail = true
+		case finding.Check == "consolidation_baseline_target" && finding.Repo == "sway-mcp-go" && !finding.Passed:
+			baselineFail = true
+		}
+	}
+	if !scopeFail || !goWorkFail || !baselineFail {
+		t.Fatalf("expected consolidation drift failures, got %#v", report.Findings)
+	}
+}
+
+func TestCheckWorkspacePassesMergedOutRepoWhenDemoted(t *testing.T) {
+	root := t.TempDir()
+	manifest := Manifest{
+		Version: 1,
+		Repos: []Repo{
+			{Name: "sway-mcp-go", Scope: "compatibility_only", BaselineTarget: false, GoWorkMember: false, Lifecycle: "compatibility"},
+			{Name: "docs", GoWorkMember: true},
+		},
+	}
+
+	if err := os.MkdirAll(filepath.Join(root, "sway-mcp-go"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeWorkspaceFile(t, root, "docs/go.mod", "module github.com/hairglasses-studio/docs\n")
+	writeWorkspaceFile(t, root, "go.work", `go 1.26.1
+
+use (
+	./docs
+)
+`)
+	writeWorkspaceFile(t, root, "docs/inventory/repo-consolidation-matrix.json", `{
+  "decisions": [
+    {"repo": "sway-mcp-go", "state": "merged_out_of_active_surface"}
+  ]
+}`)
+
+	report := Check(root, manifest)
+	if !report.Passed {
+		t.Fatalf("Check() passed = false, findings = %#v", report.Findings)
+	}
+}
