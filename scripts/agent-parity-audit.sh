@@ -136,6 +136,12 @@ scope_override_bool() {
 
 repo_scope() {
   local repo="$1"
+  local manifest_scope
+  manifest_scope="$(manifest_repo_field "$repo" "scope" "")"
+  if [[ -n "$manifest_scope" ]]; then
+    printf '%s' "$manifest_scope"
+    return
+  fi
   jq -r --arg repo "$repo" '(.repo_overrides[$repo].scope // .default_scope // "active_first_party")' "$SCOPE_MANIFEST"
 }
 

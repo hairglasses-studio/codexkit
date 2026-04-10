@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/hairglasses-studio/codexkit/mcpsync"
@@ -167,6 +168,9 @@ func findCodexkitRoot(repoPath string) string {
 		}
 		return root
 	}
+	if root, ok := sourceCodexkitRoot(); ok {
+		return root
+	}
 	cwd, err := os.Getwd()
 	if err == nil {
 		for _, candidate := range walkParents(cwd) {
@@ -181,6 +185,18 @@ func findCodexkitRoot(repoPath string) string {
 		}
 	}
 	return filepath.Join(filepath.Dir(repoPath), "codexkit")
+}
+
+func sourceCodexkitRoot() (string, bool) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", false
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	if !isCodexkitRoot(root) {
+		return "", false
+	}
+	return root, true
 }
 
 func walkParents(start string) []string {

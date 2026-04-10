@@ -270,23 +270,7 @@ translated_hook_rules="$(hg_parity_supported_source_hook_rule_count "$REPO_PATH"
 unsupported_hook_rules="$(hg_parity_unsupported_source_hook_rule_count "$REPO_PATH")"
 gemini_mcp_server_count="$(hg_parity_gemini_mcp_server_count "$REPO_PATH")"
 
-jq -n \
-  --arg generator "codexkit/scripts/gemini-settings-sync.sh" \
-  --arg template "$TEMPLATE_PATH" \
-  --arg mcp_json "$MCP_JSON_PATH" \
-  --arg claude_settings "$CLAUDE_SETTINGS_PATH" \
-  --argjson translated_hook_rules "$translated_hook_rules" \
-  --argjson unsupported_hook_rules "$unsupported_hook_rules" \
-  --argjson gemini_mcp_server_count "$gemini_mcp_server_count" \
-  '{
-    generator: $generator,
-    template: $template,
-    source_mcp_json: $mcp_json,
-    source_claude_settings: $claude_settings,
-    translated_hook_rules: $translated_hook_rules,
-    unsupported_claude_hook_rules: $unsupported_hook_rules,
-    gemini_mcp_server_count: $gemini_mcp_server_count
-  }' | jq '.' >"$rendered_owner"
+hg_parity_render_gemini_settings_metadata "$REPO_PATH" "$TEMPLATE_PATH" "$MCP_JSON_PATH" "$CLAUDE_SETTINGS_PATH" | jq '.' >"$rendered_owner"
 
 sync_rendered_file "$SETTINGS_PATH" "$rendered_settings" "Synced Gemini settings" || true
 if [[ -n "${OWNER_PATH:-}" ]]; then
