@@ -43,8 +43,11 @@ func ManifestPath(root string) string {
 
 // ConsolidationDecision captures one repo state from the docs-side matrix.
 type ConsolidationDecision struct {
-	Repo  string `json:"repo"`
-	State string `json:"state"`
+	Repo           string `json:"repo"`
+	State          string `json:"state"`
+	WorkspaceScope string `json:"workspace_scope,omitempty"`
+	GoWorkMember   *bool  `json:"go_work_member,omitempty"`
+	BaselineTarget *bool  `json:"baseline_target,omitempty"`
 }
 
 // ConsolidationMatrix is the docs-owned record of merge and archive intent.
@@ -54,6 +57,12 @@ type ConsolidationMatrix struct {
 
 // ConsolidationMatrixPath returns the docs-side consolidation matrix path.
 func ConsolidationMatrixPath(root string) string {
+	if docsRoot := os.Getenv("DOCS_ROOT"); docsRoot != "" {
+		return filepath.Join(docsRoot, "inventory", "repo-consolidation-matrix.json")
+	}
+	if docsRoot := os.Getenv("HG_DOCS_ROOT"); docsRoot != "" {
+		return filepath.Join(docsRoot, "inventory", "repo-consolidation-matrix.json")
+	}
 	return filepath.Join(root, "docs", "inventory", "repo-consolidation-matrix.json")
 }
 

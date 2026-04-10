@@ -1,10 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+
+	"github.com/hairglasses-studio/codexkit/mcpsync"
+	"github.com/hairglasses-studio/codexkit/skillsync"
 )
 
 type bridgeConfig struct {
@@ -46,9 +51,9 @@ func printBridgeUsage() {
 	fmt.Println(`codexkit bridge
 
 Subcommands:
-  skill-surface-check <repo> [--surfacekit-root <path>]
-  provider-settings-check <repo> [--repo-name <name>] [--surfacekit-root <path>]
-  codex-mcp-check <repo> [--surfacekit-root <path>]`)
+  skill-surface-check <repo> [--surfacekit-root <deprecated>]
+  provider-settings-check <repo> [--repo-name <name>] [--surfacekit-root <deprecated>]
+  codex-mcp-check <repo> [--surfacekit-root <deprecated>]`)
 }
 
 func runSkillSurfaceCheck(args []string) error {
@@ -56,7 +61,23 @@ func runSkillSurfaceCheck(args []string) error {
 	if err != nil {
 		return err
 	}
-	return runSurfacekitBridge(cfg, "skill-surface-sync.sh", cfg.RepoPath, "--check")
+	report := skillsync.Check(cfg.RepoPath)
+	for _, warning := range report.Warnings {
+		fmt.Fprintln(os.Stderr, warning)
+	}
+	if len(report.Errors) > 0 {
+		return errors.New(strings.Join(report.Errors, "; "))
+	}
+	if report.PendingChanges {
+		for _, action := range report.Actions {
+			if action.Action == "unchanged" {
+				continue
+			}
+			fmt.Fprintln(os.Stderr, action.Message)
+		}
+		return errors.New("skill surface drift detected")
+	}
+	return nil
 }
 
 func runProviderSettingsCheck(args []string) error {
@@ -64,12 +85,12 @@ func runProviderSettingsCheck(args []string) error {
 	if err != nil {
 		return err
 	}
-	bridgeArgs := []string{cfg.RepoPath}
+	scriptArgs := []string{cfg.RepoPath}
 	if cfg.RepoName != "" {
-		bridgeArgs = append(bridgeArgs, "--repo-name", cfg.RepoName)
+		scriptArgs = append(scriptArgs, "--repo-name", cfg.RepoName)
 	}
-	bridgeArgs = append(bridgeArgs, "--check")
-	return runSurfacekitBridge(cfg, "provider-settings-sync.sh", bridgeArgs...)
+	scriptArgs = append(scriptArgs, "--check")
+	return runCodexkitScript(findCodexkitRoot(cfg.RepoPath), "provider-settings-sync.sh", scriptArgs...)
 }
 
 func runCodexMCPCheck(args []string) error {
@@ -77,7 +98,15 @@ func runCodexMCPCheck(args []string) error {
 	if err != nil {
 		return err
 	}
-	return runSurfacekitBridge(cfg, "codex-mcp-sync.sh", cfg.RepoPath, "--dry-run")
+	diffText, err := mcpsync.DiffText(cfg.RepoPath)
+	if err != nil {
+		return err
+	}
+	if diffText != "" {
+		fmt.Fprint(os.Stdout, diffText)
+		return errors.New("Codex MCP drift detected")
+	}
+	return nil
 }
 
 func parseBridgeConfig(args []string, allowRepoName bool) (bridgeConfig, error) {
@@ -131,15 +160,70 @@ func parseBridgeConfig(args []string, allowRepoName bool) (bridgeConfig, error) 
 	return cfg, nil
 }
 
-func runSurfacekitBridge(cfg bridgeConfig, scriptName string, bridgeArgs ...string) error {
-	scriptPath := filepath.Join(cfg.SurfacekitRoot, "scripts", scriptName)
-	if _, err := os.Stat(scriptPath); err != nil {
-		return fmt.Errorf("surfacekit bridge script not found at %s: %w", scriptPath, err)
+func findCodexkitRoot(repoPath string) string {
+	if root := os.Getenv("CODEXKIT_ROOT"); root != "" {
+		if abs, err := filepath.Abs(root); err == nil {
+			return abs
+		}
+		return root
 	}
+	cwd, err := os.Getwd()
+	if err == nil {
+		for _, candidate := range walkParents(cwd) {
+			if isCodexkitRoot(candidate) {
+				return candidate
+			}
+		}
+	}
+	for _, candidate := range walkParents(filepath.Dir(repoPath)) {
+		if isCodexkitRoot(filepath.Join(candidate, "codexkit")) {
+			return filepath.Join(candidate, "codexkit")
+		}
+	}
+	return filepath.Join(filepath.Dir(repoPath), "codexkit")
+}
 
-	cmd := exec.Command("bash", append([]string{scriptPath}, bridgeArgs...)...)
+func walkParents(start string) []string {
+	parents := []string{}
+	current := start
+	for {
+		parents = append(parents, current)
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return parents
+}
+
+func isCodexkitRoot(path string) bool {
+	required := []string{
+		filepath.Join(path, "cmd", "codexkit", "main.go"),
+		filepath.Join(path, "scripts", "run-codexkit-mcp.sh"),
+	}
+	for _, candidate := range required {
+		if _, err := os.Stat(candidate); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func runCodexkitScript(root, scriptName string, scriptArgs ...string) error {
+	scriptPath := filepath.Join(root, "scripts", scriptName)
+	if _, err := os.Stat(scriptPath); err != nil {
+		return fmt.Errorf("codexkit bridge script not found at %s: %w", scriptPath, err)
+	}
+	cmd := exec.Command("bash", append([]string{scriptPath}, scriptArgs...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+	cmd.Env = append(
+		os.Environ(),
+		"CODEXKIT_ROOT="+root,
+		"HG_AGENT_PARITY_ROOT="+root,
+		"HG_AGENT_PARITY_SURFACEKIT_ROOT="+root,
+	)
 	return cmd.Run()
 }

@@ -8,7 +8,7 @@ import (
 
 func TestParseWorkspaceRefreshArgsDefaults(t *testing.T) {
 	t.Setenv("HOME", "/tmp/hg")
-	t.Setenv("SURFACEKIT_ROOT", "")
+	t.Setenv("CODEXKIT_ROOT", "/tmp/codexkit")
 
 	cfg, err := parseWorkspaceRefreshArgs(nil)
 	if err != nil {
@@ -19,8 +19,8 @@ func TestParseWorkspaceRefreshArgsDefaults(t *testing.T) {
 	if cfg.Root != wantRoot {
 		t.Fatalf("Root = %q, want %q", cfg.Root, wantRoot)
 	}
-	if cfg.SurfacekitRoot != filepath.Join(wantRoot, "surfacekit") {
-		t.Fatalf("SurfacekitRoot = %q", cfg.SurfacekitRoot)
+	if cfg.CodexkitRoot != "/tmp/codexkit" {
+		t.Fatalf("CodexkitRoot = %q", cfg.CodexkitRoot)
 	}
 	if cfg.WriteWorkspaceCache {
 		t.Fatal("WriteWorkspaceCache = true, want false")
@@ -28,7 +28,7 @@ func TestParseWorkspaceRefreshArgsDefaults(t *testing.T) {
 }
 
 func TestParseWorkspaceRefreshArgsCustom(t *testing.T) {
-	t.Setenv("SURFACEKIT_ROOT", "/tmp/custom-surfacekit")
+	t.Setenv("CODEXKIT_ROOT", "/tmp/custom-codexkit")
 
 	cfg, err := parseWorkspaceRefreshArgs([]string{"/workspace/demo", "--with-workspace-cache"})
 	if err != nil {
@@ -38,8 +38,8 @@ func TestParseWorkspaceRefreshArgsCustom(t *testing.T) {
 	if cfg.Root != "/workspace/demo" {
 		t.Fatalf("Root = %q, want /workspace/demo", cfg.Root)
 	}
-	if cfg.SurfacekitRoot != "/tmp/custom-surfacekit" {
-		t.Fatalf("SurfacekitRoot = %q, want /tmp/custom-surfacekit", cfg.SurfacekitRoot)
+	if cfg.CodexkitRoot != "/tmp/custom-codexkit" {
+		t.Fatalf("CodexkitRoot = %q, want /tmp/custom-codexkit", cfg.CodexkitRoot)
 	}
 	if !cfg.WriteWorkspaceCache {
 		t.Fatal("WriteWorkspaceCache = false, want true")
@@ -52,18 +52,14 @@ func TestParseWorkspaceRefreshArgsUnknownFlag(t *testing.T) {
 	}
 }
 
-func TestSurfacekitParityArgs(t *testing.T) {
-	got := surfacekitParityArgs("/workspace/demo", true)
+func TestParityAuditArgs(t *testing.T) {
+	got := parityAuditArgs(true)
 	want := []string{
-		"coverage",
-		"workspace",
-		"--root",
-		"/workspace/demo",
 		"--write-wiki-docs",
 		"--write-json",
 		"--write-workspace-cache",
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("surfacekitParityArgs() = %v, want %v", got, want)
+		t.Fatalf("parityAuditArgs() = %v, want %v", got, want)
 	}
 }

@@ -44,6 +44,8 @@ func main() {
 		runSkills(os.Args[2:])
 	case "mcp":
 		runMCP(os.Args[2:])
+	case "provider":
+		runProvider(os.Args[2:])
 	case "fleet":
 		runFleet(os.Args[2:])
 	case "workspace":
@@ -68,15 +70,20 @@ Commands:
   baseline check <repo|--all>   Run baseline-guard validation
   skills sync <repo>            Sync skills to .claude/skills/ and plugins/
   skills diff <repo>            Show what skill sync would change
+  skills check <repo>           Fail when managed skill mirrors drift
   skills list <repo>            List skills from surface.yaml
   mcp sync <repo>               Sync .mcp.json to .codex/config.toml
   mcp diff <repo>               Show what MCP sync would change
+  mcp check <repo>              Fail when the generated MCP block drifts
   mcp list <repo>               List MCP servers from .mcp.json
+  provider check <repo>         Verify Claude/Gemini provider settings parity
+  provider diff <repo>          Show provider settings drift without writing
+  provider sync <repo>          Apply provider settings parity
   fleet audit [scan_path]       Run full audit on all repos
   fleet report [scan_path]      Summary report of fleet health
   workspace check [root]        Validate workspace/manifest.json and go.work
-  workspace refresh-parity      Refresh docs parity outputs through the canonical codexkit bridge
-  bridge <subcommand>           Run bridged control-plane checks backed by current rollout scripts
+  workspace refresh-parity      Refresh docs parity outputs through codexkit-owned parity tooling
+  bridge <subcommand>           Compatibility wrapper for legacy parity entrypoints
   tools                         List all registered tools
   help                          Show this help`)
 }
@@ -156,7 +163,7 @@ func runBaseline(args []string) {
 
 func runSkills(args []string) {
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: codexkit skills <sync|diff|list> <repo_path>")
+		fmt.Fprintln(os.Stderr, "usage: codexkit skills <sync|diff|check|list> <repo_path>")
 		os.Exit(1)
 	}
 
@@ -168,6 +175,26 @@ func runSkills(args []string) {
 	case "diff":
 		report := skillsync.Diff(repoPath)
 		printJSON(report)
+	case "check":
+		report := skillsync.Check(repoPath)
+		for _, warning := range report.Warnings {
+			fmt.Fprintln(os.Stderr, warning)
+		}
+		if len(report.Errors) > 0 {
+			for _, err := range report.Errors {
+				fmt.Fprintln(os.Stderr, err)
+			}
+			os.Exit(1)
+		}
+		if report.PendingChanges {
+			for _, action := range report.Actions {
+				if action.Action == "unchanged" {
+					continue
+				}
+				fmt.Fprintln(os.Stderr, action.Message)
+			}
+			os.Exit(1)
+		}
 	case "list":
 		names, err := skillsync.List(repoPath)
 		if err != nil {
@@ -185,7 +212,7 @@ func runSkills(args []string) {
 
 func runMCP(args []string) {
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: codexkit mcp <sync|diff|list> <repo_path>")
+		fmt.Fprintln(os.Stderr, "usage: codexkit mcp <sync|diff|check|list> <repo_path>")
 		os.Exit(1)
 	}
 
@@ -197,6 +224,16 @@ func runMCP(args []string) {
 	case "diff":
 		report := mcpsync.Diff(repoPath)
 		printJSON(report)
+	case "check":
+		diffText, err := mcpsync.DiffText(repoPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		if diffText != "" {
+			fmt.Fprint(os.Stdout, diffText)
+			os.Exit(1)
+		}
 	case "list":
 		names, err := mcpsync.List(repoPath)
 		if err != nil {
@@ -208,6 +245,40 @@ func runMCP(args []string) {
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "unknown mcp command: %s\n", cmd)
+		os.Exit(1)
+	}
+}
+
+func runProvider(args []string) {
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit provider <check|diff|sync> <repo_path> [--repo-name <name>] [--allow-dirty] [--include-codex-config]")
+		os.Exit(1)
+	}
+
+	cmd, repoPath := args[0], args[1]
+	absRepoPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	scriptArgs := []string{absRepoPath}
+	if len(args) > 2 {
+		scriptArgs = append(scriptArgs, args[2:]...)
+	}
+	switch cmd {
+	case "check":
+		scriptArgs = append(scriptArgs, "--check")
+	case "diff":
+		scriptArgs = append(scriptArgs, "--dry-run")
+	case "sync":
+		scriptArgs = append(scriptArgs, "--write")
+	default:
+		fmt.Fprintf(os.Stderr, "unknown provider command: %s\n", cmd)
+		os.Exit(1)
+	}
+	if err := runCodexkitScript(findCodexkitRoot(absRepoPath), "provider-settings-sync.sh", scriptArgs...); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }

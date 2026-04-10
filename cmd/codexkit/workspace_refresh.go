@@ -11,7 +11,7 @@ import (
 
 type workspaceRefreshConfig struct {
 	Root                string
-	SurfacekitRoot      string
+	CodexkitRoot        string
 	WriteWorkspaceCache bool
 }
 
@@ -28,15 +28,21 @@ func runWorkspaceRefresh(args []string) error {
 		return err
 	}
 
-	runScript := filepath.Join(cfg.SurfacekitRoot, "scripts", "run-surfacekit.sh")
+	runScript := filepath.Join(cfg.CodexkitRoot, "scripts", "agent-parity-audit.sh")
 	if _, err := os.Stat(runScript); err != nil {
-		return fmt.Errorf("surfacekit launcher not found at %s: %w", runScript, err)
+		return fmt.Errorf("codexkit parity audit script not found at %s: %w", runScript, err)
 	}
 
-	cmd := exec.Command(runScript, surfacekitParityArgs(cfg.Root, cfg.WriteWorkspaceCache)...)
+	cmd := exec.Command("bash", append([]string{runScript}, parityAuditArgs(cfg.WriteWorkspaceCache)...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+	cmd.Env = append(os.Environ(),
+		"HG_STUDIO_ROOT="+cfg.Root,
+		"CODEXKIT_ROOT="+cfg.CodexkitRoot,
+		"HG_AGENT_PARITY_ROOT="+cfg.CodexkitRoot,
+		"HG_AGENT_PARITY_SURFACEKIT_ROOT="+cfg.CodexkitRoot,
+	)
 	return cmd.Run()
 }
 
@@ -62,23 +68,12 @@ func parseWorkspaceRefreshArgs(args []string) (workspaceRefreshConfig, error) {
 		}
 	}
 
-	cfg.SurfacekitRoot = os.Getenv("SURFACEKIT_ROOT")
-	if cfg.SurfacekitRoot == "" {
-		cfg.SurfacekitRoot = filepath.Join(cfg.Root, "surfacekit")
-	}
-
+	cfg.CodexkitRoot = findCodexkitRoot(cfg.Root)
 	return cfg, nil
 }
 
-func surfacekitParityArgs(root string, writeWorkspaceCache bool) []string {
-	args := []string{
-		"coverage",
-		"workspace",
-		"--root",
-		root,
-		"--write-wiki-docs",
-		"--write-json",
-	}
+func parityAuditArgs(writeWorkspaceCache bool) []string {
+	args := []string{"--write-wiki-docs", "--write-json"}
 	if writeWorkspaceCache {
 		args = append(args, "--write-workspace-cache")
 	}

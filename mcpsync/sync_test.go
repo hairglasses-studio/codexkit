@@ -62,15 +62,15 @@ func TestSync_CreatesServerBlocks(t *testing.T) {
 		t.Error("expected [mcp_servers.filesystem] in config.toml")
 	}
 
-	// Should have 2 create actions
-	creates := 0
+	// Should record both generated profiles.
+	updated := 0
 	for _, a := range report.Actions {
-		if a.Action == "create" {
-			creates++
+		if a.Action == "update" || a.Action == "create" {
+			updated++
 		}
 	}
-	if creates != 2 {
-		t.Errorf("expected 2 creates, got %d", creates)
+	if updated != 2 {
+		t.Errorf("expected 2 generated profile updates, got %d", updated)
 	}
 }
 
@@ -100,6 +100,9 @@ func TestSync_DryRunNoWrite(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, ".codex/config.toml"))
 	if strings.Contains(string(data), "[mcp_servers.") {
 		t.Error("dry-run should not write to config.toml")
+	}
+	if report.Diff == "" {
+		t.Error("dry-run report should include a unified diff")
 	}
 }
 
@@ -150,5 +153,138 @@ func TestSync_HTTPTransport(t *testing.T) {
 	}
 	if !strings.Contains(content, `url = "https://example.com/mcp"`) {
 		t.Error("expected url in config.toml")
+	}
+}
+
+func TestSync_ReplacesManagedBlockPreservingOtherConfig(t *testing.T) {
+	dir := t.TempDir()
+	mcpJSON, _ := json.Marshal(map[string]any{
+		"mcpServers": map[string]any{
+			"github": map[string]any{
+				"command": "npx",
+				"args":    []string{"-y", "@modelcontextprotocol/server-github"},
+			},
+		},
+	})
+	writeFile(t, dir, ".mcp.json", string(mcpJSON))
+	writeFile(t, dir, ".codex/config.toml", `approval_policy = "never"
+
+# BEGIN GENERATED MCP SERVERS: codex-mcp-sync
+[mcp_servers.stale]
+command = "stale"
+# END GENERATED MCP SERVERS: codex-mcp-sync
+
+model = "gpt-5"
+`)
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, ".codex/config.toml"))
+	content := string(data)
+	if !strings.Contains(content, `approval_policy = "never"`) {
+		t.Fatal("expected prefix config to be preserved")
+	}
+	if !strings.Contains(content, `model = "gpt-5"`) {
+		t.Fatal("expected suffix config to be preserved")
+	}
+	if strings.Contains(content, "[mcp_servers.stale]") {
+		t.Fatal("expected stale managed block to be replaced")
+	}
+	if !strings.Contains(content, "[mcp_servers.github]") {
+		t.Fatal("expected github profile in managed block")
+	}
+}
+
+func TestSync_RejectsUnmanagedBlocks(t *testing.T) {
+	dir := t.TempDir()
+	mcpJSON, _ := json.Marshal(map[string]any{
+		"mcpServers": map[string]any{
+			"github": map[string]any{
+				"command": "npx",
+				"args":    []string{"-y", "@modelcontextprotocol/server-github"},
+			},
+		},
+	})
+	writeFile(t, dir, ".mcp.json", string(mcpJSON))
+	writeFile(t, dir, ".codex/config.toml", `[mcp_servers.rogue]
+command = "rogue"
+`)
+
+	report := Sync(dir, true)
+	if len(report.Errors) == 0 {
+		t.Fatal("expected unmanaged block error")
+	}
+	if !strings.Contains(report.Errors[0], "unmanaged [mcp_servers.*] blocks") {
+		t.Fatalf("unexpected error: %v", report.Errors)
+	}
+}
+
+func TestSync_PolicyFileRendersOverrides(t *testing.T) {
+	dir := t.TempDir()
+	mcpJSON, _ := json.Marshal(map[string]any{
+		"mcpServers": map[string]any{
+			"runner": map[string]any{
+				"command": "bin/runner-mcp",
+				"args":    []string{"serve"},
+				"env": map[string]string{
+					"RUNNER_ENV": "source",
+				},
+			},
+		},
+	})
+	policyJSON, _ := json.Marshal(map[string]any{
+		"version": 1,
+		"profiles": []map[string]any{{
+			"name":                "runner-curated",
+			"from":                "runner",
+			"comment":             "Curated runner profile",
+			"enabled":             true,
+			"required":            true,
+			"startup_timeout_sec": 15,
+			"tool_timeout_sec":    45,
+			"enabled_tools":       []string{"launch", "status"},
+			"disabled_tools":      []string{"destroy"},
+			"tool_overrides": map[string]any{
+				"launch": map[string]any{
+					"approval_mode": "manual",
+				},
+			},
+			"override": map[string]any{
+				"cwd": ".",
+				"env": map[string]string{
+					"RUNNER_ENV": "curated",
+				},
+			},
+		}},
+	})
+	writeFile(t, dir, ".mcp.json", string(mcpJSON))
+	writeFile(t, dir, ".codex/mcp-profile-policy.json", string(policyJSON))
+	writeFile(t, dir, ".codex/config.toml", "")
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, ".codex/config.toml"))
+	content := string(data)
+	for _, want := range []string{
+		"[mcp_servers.runner-curated]",
+		`enabled = true`,
+		`required = true`,
+		`startup_timeout_sec = 15`,
+		`tool_timeout_sec = 45`,
+		`enabled_tools = [`,
+		`disabled_tools = [`,
+		`RUNNER_ENV = "curated"`,
+		`[mcp_servers.runner-curated.tools.launch]`,
+		`approval_mode = "manual"`,
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("expected config to contain %q\n%s", want, content)
+		}
 	}
 }

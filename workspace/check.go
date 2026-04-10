@@ -96,28 +96,48 @@ func Check(root string, manifest Manifest) Report {
 	default:
 		report.add("consolidation_matrix", "", true, fmt.Sprintf("%d decisions", len(matrix.Decisions)))
 		for _, decision := range matrix.Decisions {
-			if decision.State != "merged_out_of_active_surface" {
-				continue
-			}
 			repo, ok := manifestRepos[decision.Repo]
 			if !ok {
-				report.add("consolidation_scope", decision.Repo, false, "repo is missing from workspace manifest")
+				report.add("consolidation_manifest", decision.Repo, false, "repo is missing from workspace manifest")
 				continue
 			}
-			if repo.Scope != "compatibility_only" {
-				report.add("consolidation_scope", decision.Repo, false, fmt.Sprintf("repo marked %q in consolidation matrix should have compatibility_only scope", decision.State))
-			} else {
-				report.add("consolidation_scope", decision.Repo, true, "")
+			if decision.State == "merged_out_of_active_surface" {
+				if repo.Scope != "compatibility_only" {
+					report.add("consolidation_scope", decision.Repo, false, fmt.Sprintf("repo marked %q in consolidation matrix should have compatibility_only scope", decision.State))
+				} else {
+					report.add("consolidation_scope", decision.Repo, true, "")
+				}
+				if repo.GoWorkMember {
+					report.add("consolidation_go_work_member", decision.Repo, false, fmt.Sprintf("repo marked %q in consolidation matrix must not remain in go.work", decision.State))
+				} else {
+					report.add("consolidation_go_work_member", decision.Repo, true, "")
+				}
+				if repo.BaselineTarget {
+					report.add("consolidation_baseline_target", decision.Repo, false, fmt.Sprintf("repo marked %q in consolidation matrix must not remain a baseline target", decision.State))
+				} else {
+					report.add("consolidation_baseline_target", decision.Repo, true, "")
+				}
 			}
-			if repo.GoWorkMember {
-				report.add("consolidation_go_work_member", decision.Repo, false, fmt.Sprintf("repo marked %q in consolidation matrix must not remain in go.work", decision.State))
-			} else {
-				report.add("consolidation_go_work_member", decision.Repo, true, "")
+			if decision.WorkspaceScope != "" {
+				if repo.Scope != decision.WorkspaceScope {
+					report.add("consolidation_scope_override", decision.Repo, false, fmt.Sprintf("workspace manifest scope is %q, want %q per consolidation matrix", repo.Scope, decision.WorkspaceScope))
+				} else {
+					report.add("consolidation_scope_override", decision.Repo, true, "")
+				}
 			}
-			if repo.BaselineTarget {
-				report.add("consolidation_baseline_target", decision.Repo, false, fmt.Sprintf("repo marked %q in consolidation matrix must not remain a baseline target", decision.State))
-			} else {
-				report.add("consolidation_baseline_target", decision.Repo, true, "")
+			if decision.GoWorkMember != nil {
+				if repo.GoWorkMember != *decision.GoWorkMember {
+					report.add("consolidation_go_work_member_override", decision.Repo, false, fmt.Sprintf("workspace manifest go_work_member is %t, want %t per consolidation matrix", repo.GoWorkMember, *decision.GoWorkMember))
+				} else {
+					report.add("consolidation_go_work_member_override", decision.Repo, true, "")
+				}
+			}
+			if decision.BaselineTarget != nil {
+				if repo.BaselineTarget != *decision.BaselineTarget {
+					report.add("consolidation_baseline_target_override", decision.Repo, false, fmt.Sprintf("workspace manifest baseline_target is %t, want %t per consolidation matrix", repo.BaselineTarget, *decision.BaselineTarget))
+				} else {
+					report.add("consolidation_baseline_target_override", decision.Repo, true, "")
+				}
 			}
 		}
 	}
