@@ -38,13 +38,13 @@ type SyncAction struct {
 
 // SyncReport captures a full sync or check run.
 type SyncReport struct {
-	RepoPath        string       `json:"repo_path"`
-	DryRun          bool         `json:"dry_run"`
-	PendingChanges  bool         `json:"pending_changes"`
-	ValidationUsed  bool         `json:"validation_used"`
-	Actions         []SyncAction `json:"actions"`
-	Errors          []string     `json:"errors,omitempty"`
-	Warnings        []string     `json:"warnings,omitempty"`
+	RepoPath       string       `json:"repo_path"`
+	DryRun         bool         `json:"dry_run"`
+	PendingChanges bool         `json:"pending_changes"`
+	ValidationUsed bool         `json:"validation_used"`
+	Actions        []SyncAction `json:"actions"`
+	Errors         []string     `json:"errors,omitempty"`
+	Warnings       []string     `json:"warnings,omitempty"`
 }
 
 type SkillAlias struct {
@@ -70,11 +70,11 @@ type Surface struct {
 }
 
 type rawSurface struct {
-	Version       int               `json:"version"`
-	PluginRoot    string            `json:"plugin_root,omitempty"`
-	ClaudeManaged *bool             `json:"claude_managed,omitempty"`
-	PluginManaged *bool             `json:"plugin_managed,omitempty"`
-	Skills        []rawSkillEntry   `json:"skills"`
+	Version       int             `json:"version"`
+	PluginRoot    string          `json:"plugin_root,omitempty"`
+	ClaudeManaged *bool           `json:"claude_managed,omitempty"`
+	PluginManaged *bool           `json:"plugin_managed,omitempty"`
+	Skills        []rawSkillEntry `json:"skills"`
 }
 
 type rawSkillEntry struct {
@@ -283,6 +283,10 @@ func List(repoPath string) ([]string, error) {
 	return names, nil
 }
 
+func normalizedSkillName(name string) string {
+	return strings.ReplaceAll(name, "_", "-")
+}
+
 func run(repoPath string, mode syncMode) SyncReport {
 	report := SyncReport{
 		RepoPath: repoPath,
@@ -348,7 +352,22 @@ func run(repoPath string, mode syncMode) SyncReport {
 			}
 		}
 
+		claudeAliases := make([]SkillAlias, 0, len(skill.ClaudeAliases)+1)
+		seenClaudeAliases := make(map[string]struct{}, len(skill.ClaudeAliases)+1)
 		for _, alias := range skill.ClaudeAliases {
+			claudeAliases = append(claudeAliases, alias)
+			seenClaudeAliases[alias.Name] = struct{}{}
+		}
+		if normalized := normalizedSkillName(skill.Name); normalized != skill.Name {
+			if _, ok := seenClaudeAliases[normalized]; !ok {
+				claudeAliases = append(claudeAliases, SkillAlias{
+					Name:        normalized,
+					Description: fmt.Sprintf("Hyphenated compatibility alias for the %s workflow.", skill.Name),
+				})
+			}
+		}
+
+		for _, alias := range claudeAliases {
 			if err := registerDir(claudeDirs, alias.Name, "managed Claude skill"); err != nil {
 				report.Errors = append(report.Errors, err.Error())
 				continue

@@ -209,3 +209,67 @@ func TestParseSurface_YAML(t *testing.T) {
 		t.Errorf("expected 2 skills, got %d", len(surface.Skills))
 	}
 }
+
+func TestSync_AddsHyphenAliasForUnderscoreSkills(t *testing.T) {
+	dir := t.TempDir()
+	surface, _ := json.Marshal(map[string]any{
+		"version": 1,
+		"skills": []map[string]any{{
+			"name": "my_skill",
+		}},
+	})
+	writeFile(t, dir, ".agents/skills/surface.yaml", string(surface))
+	writeFile(t, dir, ".agents/skills/my_skill/SKILL.md", "---\nname: my_skill\ndescription: underscore skill\n---\n# My Skill\n")
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+
+	canonicalPath := filepath.Join(dir, ".claude/skills/my_skill/SKILL.md")
+	normalizedPath := filepath.Join(dir, ".claude/skills/my-skill/SKILL.md")
+
+	if _, err := os.Stat(canonicalPath); err != nil {
+		t.Fatalf("canonical Claude mirror missing: %v", err)
+	}
+	data, err := os.ReadFile(normalizedPath)
+	if err != nil {
+		t.Fatalf("normalized Claude alias missing: %v", err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "name: my-skill") {
+		t.Fatalf("normalized alias should rewrite name frontmatter: %s", text)
+	}
+	if !strings.Contains(text, "Hyphenated compatibility alias for the my_skill workflow.") {
+		t.Fatalf("normalized alias should describe the compatibility bridge: %s", text)
+	}
+}
+
+func TestSync_DoesNotDuplicateExplicitNormalizedAlias(t *testing.T) {
+	dir := t.TempDir()
+	surface, _ := json.Marshal(map[string]any{
+		"version": 1,
+		"skills": []map[string]any{{
+			"name": "my_skill",
+			"claude_aliases": []map[string]any{{
+				"name":        "my-skill",
+				"description": "explicit alias",
+			}},
+		}},
+	})
+	writeFile(t, dir, ".agents/skills/surface.yaml", string(surface))
+	writeFile(t, dir, ".agents/skills/my_skill/SKILL.md", "---\nname: my_skill\ndescription: underscore skill\n---\n# My Skill\n")
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".claude/skills/my-skill/SKILL.md"))
+	if err != nil {
+		t.Fatalf("expected explicit normalized alias file: %v", err)
+	}
+	if !strings.Contains(string(data), "description: 'explicit alias'") {
+		t.Fatalf("expected explicit alias description to win, got: %s", string(data))
+	}
+}
