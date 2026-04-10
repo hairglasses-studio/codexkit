@@ -284,7 +284,7 @@ hg_parity_gemini_owner_path() {
 hg_parity_metadata_path_label() {
   local repo_path="$1"
   local abs="$2"
-  local repo_root parity_root dir base
+  local repo_root parity_root dir base rel
 
   repo_root="$repo_path"
   parity_root="$HG_AGENT_PARITY_SURFACEKIT_ROOT"
@@ -310,7 +310,12 @@ hg_parity_metadata_path_label() {
     return
   fi
   if [[ "$abs" == "$parity_root/"* ]]; then
-    printf 'codexkit/%s\n' "${abs#"$parity_root/"}"
+    rel="${abs#"$parity_root/"}"
+    if [[ -e "$repo_root/$rel" ]]; then
+      printf '%s\n' "$rel"
+    else
+      printf 'codexkit/%s\n' "$rel"
+    fi
     return
   fi
   if [[ "$abs" == "$parity_root" ]]; then
