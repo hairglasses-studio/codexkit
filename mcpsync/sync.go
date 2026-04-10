@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	startMarker = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
-	endMarker   = "# END GENERATED MCP SERVERS: codex-mcp-sync"
+	startMarker       = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
+	endMarker         = "# END GENERATED MCP SERVERS: codex-mcp-sync"
 	ollamaStartMarker = "# BEGIN GENERATED OLLAMA PROFILES: provider-settings-sync"
-	ollamaEndMarker = "# END GENERATED OLLAMA PROFILES: provider-settings-sync"
+	ollamaEndMarker   = "# END GENERATED OLLAMA PROFILES: provider-settings-sync"
 )
 
 var mcpServerBlockRe = regexp.MustCompile(`(?m)^\[mcp_servers\.`)
@@ -148,13 +148,13 @@ func DiffText(repoPath string) (string, error) {
 }
 
 type plan struct {
-	RepoPath        string
-	ConfigPath      string
-	Profiles        []resolvedProfile
-	Output          string
-	Diff            string
-	PendingChanges  bool
-	Actions         []SyncAction
+	RepoPath       string
+	ConfigPath     string
+	Profiles       []resolvedProfile
+	Output         string
+	Diff           string
+	PendingChanges bool
+	Actions        []SyncAction
 }
 
 func run(repoPath string, dryRun bool) SyncReport {
@@ -200,30 +200,42 @@ func buildPlan(repoPath string) (*plan, error) {
 	if err != nil {
 		return nil, err
 	}
-	block, err := renderBlock(absRepoPath, profiles)
-	if err != nil {
-		return nil, err
-	}
 
 	var output string
-	switch {
-	case strings.Contains(configText, startMarker):
-		if mcpBlockInsideOllamaRegion(configText) {
-			var stripped string
-			stripped, err = removeMarkedRegion(configText)
-			if err == nil {
-				output, err = insertNewRegion(stripped, block)
+	if len(profiles) == 0 {
+		switch {
+		case strings.Contains(configText, startMarker):
+			output, err = removeMarkedRegion(configText)
+			if err != nil {
+				return nil, err
 			}
-		} else {
-			output, err = replaceMarkedRegion(configText, block)
+		default:
+			output = configText
 		}
-	case len(strings.TrimSpace(configText)) == 0:
-		output = block
-	default:
-		output, err = insertNewRegion(configText, block)
-	}
-	if err != nil {
-		return nil, err
+	} else {
+		block, renderErr := renderBlock(absRepoPath, profiles)
+		if renderErr != nil {
+			return nil, renderErr
+		}
+		switch {
+		case strings.Contains(configText, startMarker):
+			if mcpBlockInsideOllamaRegion(configText) {
+				var stripped string
+				stripped, err = removeMarkedRegion(configText)
+				if err == nil {
+					output, err = insertNewRegion(stripped, block)
+				}
+			} else {
+				output, err = replaceMarkedRegion(configText, block)
+			}
+		case len(strings.TrimSpace(configText)) == 0:
+			output = block
+		default:
+			output, err = insertNewRegion(configText, block)
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	diffText := unifiedDiffString(configText, output)
@@ -260,6 +272,9 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 	if _, err := os.Stat(profilePath); errors.Is(err, os.ErrNotExist) {
 		names := make([]string, 0, len(mcpFile.MCPServers))
 		for name := range mcpFile.MCPServers {
+			if strings.HasPrefix(name, "_") {
+				continue
+			}
 			names = append(names, name)
 		}
 		slices.Sort(names)
@@ -327,7 +342,7 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 			DisabledTools:     append([]string(nil), profile.DisabledTools...),
 			ToolOverrides:     cloneToolOverrides(profile.ToolOverrides),
 		}
-			if profile.Override != nil {
+		if profile.Override != nil {
 			if strings.TrimSpace(profile.Override.Command) != "" {
 				resolved.Command = profile.Override.Command
 			}

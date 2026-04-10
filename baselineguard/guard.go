@@ -328,6 +328,9 @@ func (r *Report) addMCPLauncherPortability(repoPath string) {
 		r.add("mcp_portability", true, "no MCP servers defined")
 	} else {
 		for name, server := range mcpFile.MCPServers {
+			if strings.HasPrefix(name, "_") {
+				continue
+			}
 			if msg := validateMCPServerPortability(server.Command, server.Args, server.CWD); msg != "" {
 				r.add("mcp_portability", false, fmt.Sprintf("%s: %s", name, msg))
 			} else {

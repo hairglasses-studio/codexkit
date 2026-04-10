@@ -169,6 +169,9 @@ func TestCheck_IgnoresExampleOnlyMCPServers(t *testing.T) {
 		if f.Check == "gemini_mcp_bridge" && !f.Passed {
 			t.Fatalf("did not expect gemini_mcp_bridge failure for example-only MCP config: %s", f.Message)
 		}
+		if f.Check == "mcp_portability" && !f.Passed {
+			t.Fatalf("did not expect mcp_portability failure for example-only MCP config: %s", f.Message)
+		}
 	}
 }
 

@@ -154,6 +154,79 @@ func TestSync_EmptyMCPServers(t *testing.T) {
 	if len(report.Actions) != 0 {
 		t.Error("expected no actions for empty mcpServers")
 	}
+	data, err := os.ReadFile(filepath.Join(dir, ".codex/config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), startMarker) {
+		t.Fatal("did not expect an empty managed MCP block for empty mcpServers")
+	}
+}
+
+func TestSync_IgnoresExampleOnlyMCPServers(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, `.mcp.json`, `{
+  "mcpServers": {
+    "_example_stdio_server": {
+      "command": "go",
+      "args": ["run", "./cmd/example"]
+    }
+  }
+}`)
+	writeFile(t, dir, ".codex/config.toml", "")
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	if len(report.Actions) != 0 {
+		t.Fatalf("expected no generated actions for example-only MCP servers, got %+v", report.Actions)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".codex/config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), startMarker) {
+		t.Fatal("did not expect a managed MCP block for example-only MCP servers")
+	}
+
+	names, err := List(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("expected no generated profile names for example-only MCP servers, got %v", names)
+	}
+}
+
+func TestSync_RemovesManagedBlockWhenNoRealServersRemain(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, `.mcp.json`, `{"mcpServers": {}}`)
+	writeFile(t, dir, ".codex/config.toml", `approval_policy = "never"
+
+# BEGIN GENERATED MCP SERVERS: codex-mcp-sync
+[mcp_servers.demo]
+command = "stale"
+# END GENERATED MCP SERVERS: codex-mcp-sync
+
+model = "gpt-5"
+`)
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".codex/config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	if strings.Contains(content, startMarker) {
+		t.Fatal("expected managed MCP block to be removed when no servers remain")
+	}
+	if !strings.Contains(content, `model = "gpt-5"`) {
+		t.Fatal("expected trailing config to be preserved")
+	}
 }
 
 func TestSync_HTTPTransport(t *testing.T) {
