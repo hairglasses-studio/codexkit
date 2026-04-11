@@ -5,7 +5,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/hairglasses-studio/codexkit"
@@ -14,9 +16,34 @@ import (
 	"github.com/hairglasses-studio/codexkit/mcpserver"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 	"github.com/hairglasses-studio/codexkit/skillsync"
+	"github.com/hairglasses-studio/mcpkit/observability"
+	"github.com/hairglasses-studio/mcpkit/slogcfg"
 )
 
 func main() {
+	ctx := context.Background()
+
+	slogcfg.Init(slogcfg.Config{
+		ServiceName: "codexkit-mcp",
+	})
+
+	obs, obsShutdown, err := observability.Init(ctx, observability.Config{
+		ServiceName:    "codexkit-mcp",
+		ServiceVersion: "0.2.0",
+		EnableMetrics:  true,
+		EnableTracing:  true,
+		OTLPEndpoint:   os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+		PrometheusPort: "9103",
+	})
+	if err != nil {
+		slog.Warn("failed to initialize observability", "error", err)
+	}
+	defer func() {
+		if obsShutdown != nil {
+			_ = obsShutdown(context.Background())
+		}
+	}()
+
 	reg := codexkit.NewRegistry()
 
 	modules := []codexkit.ToolModule{
@@ -42,7 +69,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	server := mcpserver.New(reg, info)
+	server := mcpserver.New(reg, info, obs)
 
 	if err := server.ServeStdio(); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)

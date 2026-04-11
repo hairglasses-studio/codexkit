@@ -59,6 +59,15 @@ func (r *Registry) Call(toolName string, params map[string]any) (any, error) {
 	return rt.def.Handler(params)
 }
 
+// ToolCategory returns module name for a tool, or "unknown" when missing.
+func (r *Registry) ToolCategory(toolName string) string {
+	rt, ok := r.tools[toolName]
+	if !ok || rt.module == nil {
+		return "unknown"
+	}
+	return rt.module.Name()
+}
+
 // HasTool checks if a tool is registered.
 func (r *Registry) HasTool(name string) bool {
 	_, ok := r.tools[name]

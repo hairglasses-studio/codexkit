@@ -10,6 +10,7 @@ package mcpserver
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,14 +18,17 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hairglasses-studio/codexkit"
+	"github.com/hairglasses-studio/mcpkit/observability"
 )
 
 // Server is an MCP server that dispatches tool calls via a Registry.
 type Server struct {
 	registry *codexkit.Registry
 	info     ServerInfo
+	obs      *observability.Provider
 	mu       sync.Mutex
 }
 
@@ -92,10 +96,15 @@ type MCPPromptArgInfo struct {
 }
 
 // New creates an MCP server backed by the given registry.
-func New(registry *codexkit.Registry, info ServerInfo) *Server {
+func New(registry *codexkit.Registry, info ServerInfo, obs ...*observability.Provider) *Server {
+	var provider *observability.Provider
+	if len(obs) > 0 {
+		provider = obs[0]
+	}
 	return &Server{
 		registry: registry,
 		info:     info,
+		obs:      provider,
 	}
 }
 
@@ -241,8 +250,28 @@ func (s *Server) handleToolsCall(req JSONRPCRequest) JSONRPCResponse {
 		}
 	}
 
+	category := s.registry.ToolCategory(params.Name)
+	ctx := context.Background()
+	start := time.Now()
+	var spanEnded bool
+	if s.obs != nil {
+		ctx, span := s.obs.StartSpan(ctx, params.Name)
+		if span != nil {
+			defer func() {
+				if !spanEnded {
+					span.End()
+				}
+			}()
+		}
+		s.obs.StartToolExecution(ctx, params.Name, category)
+		defer s.obs.EndToolExecution(ctx, params.Name, category)
+	}
+
 	result, err := s.registry.Call(params.Name, params.Arguments)
 	if err != nil {
+		if s.obs != nil {
+			s.obs.RecordToolInvocation(ctx, params.Name, category, time.Since(start), err)
+		}
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -253,11 +282,17 @@ func (s *Server) handleToolsCall(req JSONRPCRequest) JSONRPCResponse {
 	// Marshal result to JSON content block per MCP spec
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
+		if s.obs != nil {
+			s.obs.RecordToolInvocation(ctx, params.Name, category, time.Since(start), err)
+		}
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Error:   &JSONRPCError{Code: -32603, Message: fmt.Sprintf("internal error marshaling result: %v", err)},
 		}
+	}
+	if s.obs != nil {
+		s.obs.RecordToolInvocation(ctx, params.Name, category, time.Since(start), nil)
 	}
 	return JSONRPCResponse{
 		JSONRPC: "2.0",
