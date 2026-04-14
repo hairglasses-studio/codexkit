@@ -558,22 +558,22 @@ hg_parity_render_codex_standard_profiles() {
 [profiles.readonly_quiet]
 approval_policy = "never"
 sandbox_mode = "read-only"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "xhigh"
 
 [profiles.review]
 approval_policy = "on-request"
 sandbox_mode = "read-only"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 
 [profiles.workspace_auto]
 approval_policy = "on-failure"
 sandbox_mode = "workspace-write"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 
 [profiles.ci_json]
 approval_policy = "never"
 sandbox_mode = "workspace-write"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "xhigh"
 EOF
 }
 

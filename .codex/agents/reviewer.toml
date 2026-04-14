@@ -1,7 +1,7 @@
 name = "reviewer"
 description = "Patch and PR reviewer for codexkit focused on validation logic correctness and fleet safety."
 model = "gpt-5.4"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 sandbox_mode = "read-only"
 developer_instructions = """
 Review changes for validation logic correctness, fleet operation safety, and config generation reliability.

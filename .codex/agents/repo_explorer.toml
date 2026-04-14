@@ -1,7 +1,7 @@
 name = "repo_explorer"
 description = "Read-heavy explorer for codexkit validation rules, sync logic, and fleet patterns."
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
 sandbox_mode = "read-only"
 developer_instructions = """
 Map the validation rules, sync logic, and fleet management patterns.
