@@ -1,11 +1,7 @@
 {
   "mcpServers": {
     "codexkit": {
-      "command": "bash",
-      "args": [
-        "-lc",
-        "exec ./scripts/run-codexkit-mcp.sh"
-      ]
+      "command": "./scripts/run-codexkit-mcp.sh"
     }
   }
 }
