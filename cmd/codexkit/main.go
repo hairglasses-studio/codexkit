@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
 	"github.com/hairglasses-studio/codexkit/fleetaudit"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
+	"github.com/hairglasses-studio/codexkit/perfaudit"
 	"github.com/hairglasses-studio/codexkit/skillsync"
 	"github.com/hairglasses-studio/codexkit/workspace"
 )
@@ -23,6 +25,7 @@ func init() {
 		skillsync.Module(),
 		mcpsync.Module(),
 		fleetaudit.Module(),
+		perfaudit.Module(),
 	} {
 		if err := registry.Register(m); err != nil {
 			fmt.Fprintf(os.Stderr, "init error: %v\n", err)
@@ -50,6 +53,8 @@ func main() {
 		runFleet(os.Args[2:])
 	case "workspace":
 		runWorkspace(os.Args[2:])
+	case "perf":
+		runPerf(os.Args[2:])
 	case "bridge":
 		runBridge(os.Args[2:])
 	case "tools":
@@ -83,6 +88,10 @@ Commands:
   fleet report [scan_path]      Summary report of fleet health
   workspace check [root]        Validate workspace/manifest.json and go.work
   workspace refresh-parity      Refresh docs parity outputs through codexkit-owned parity tooling
+  perf audit [root] [--json] [--all-scopes]
+                                Scan the workspace for Codex performance bottlenecks
+  perf report [root] [--all-scopes]
+                                Print the Codex performance audit as Markdown
   bridge <subcommand>           Compatibility wrapper for legacy parity entrypoints
   tools                         List all registered tools
   help                          Show this help`)
@@ -279,6 +288,53 @@ func runProvider(args []string) {
 	}
 	if err := runCodexkitScript(findCodexkitRoot(absRepoPath), "provider-settings-sync.sh", scriptArgs...); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func runPerf(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit perf <audit|report> [root] [--json] [--all-scopes]")
+		os.Exit(1)
+	}
+
+	cmd := args[0]
+	root := workspace.DefaultRoot()
+	jsonOut := false
+	allScopes := false
+	rootSet := false
+	for _, arg := range args[1:] {
+		switch arg {
+		case "--json":
+			jsonOut = true
+		case "--all-scopes":
+			allScopes = true
+		default:
+			if strings.HasPrefix(arg, "-") {
+				fmt.Fprintf(os.Stderr, "unknown flag: %s\n", arg)
+				os.Exit(1)
+			}
+			if rootSet {
+				fmt.Fprintf(os.Stderr, "unexpected extra argument: %s\n", arg)
+				os.Exit(1)
+			}
+			root = arg
+			rootSet = true
+		}
+	}
+
+	report := perfaudit.Audit(root, perfaudit.Options{AllScopes: allScopes})
+	switch cmd {
+	case "audit":
+		if jsonOut {
+			printJSON(report)
+			return
+		}
+		fmt.Print(report.Markdown())
+	case "report":
+		fmt.Print(report.Markdown())
+	default:
+		fmt.Fprintf(os.Stderr, "unknown perf command: %s\n", cmd)
 		os.Exit(1)
 	}
 }

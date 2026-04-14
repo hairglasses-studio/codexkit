@@ -13,6 +13,7 @@ import (
 	"github.com/hairglasses-studio/codexkit/fleetaudit"
 	"github.com/hairglasses-studio/codexkit/mcpserver"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
+	"github.com/hairglasses-studio/codexkit/perfaudit"
 	"github.com/hairglasses-studio/codexkit/skillsync"
 )
 
@@ -24,6 +25,7 @@ func main() {
 		skillsync.Module(),
 		mcpsync.Module(),
 		fleetaudit.Module(),
+		perfaudit.Module(),
 	}
 
 	for _, m := range modules {

@@ -549,135 +549,8 @@ hg_parity_dotfiles_root() {
   printf '%s\n' "${HG_DOTFILES:-$HG_STUDIO_ROOT/dotfiles}"
 }
 
-hg_parity_local_llm_lib() {
-  printf '%s\n' "$(hg_parity_dotfiles_root)/scripts/lib/hg-local-llm.sh"
-}
-
-hg_parity_load_local_llm_defaults() {
-  local local_llm_lib
-  local_llm_lib="$(hg_parity_local_llm_lib)"
-
-  if [[ -f "$local_llm_lib" ]]; then
-    # shellcheck disable=SC1090
-    source "$local_llm_lib"
-    hg_local_llm_export_env
-    return 0
-  fi
-
-  export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"
-  export OLLAMA_CHAT_MODEL="${OLLAMA_CHAT_MODEL:-code-primary}"
-  export OLLAMA_FAST_MODEL="${OLLAMA_FAST_MODEL:-code-fast}"
-  export OLLAMA_CODE_MODEL="${OLLAMA_CODE_MODEL:-code-primary}"
-  export OLLAMA_HEAVY_CODE_MODEL="${OLLAMA_HEAVY_CODE_MODEL:-code-heavy}"
-  export OLLAMA_HIGH_CONTEXT_CODE_MODEL="${OLLAMA_HIGH_CONTEXT_CODE_MODEL:-code-long}"
-  export OLLAMA_CLOUD_CODE_MODEL="${OLLAMA_CLOUD_CODE_MODEL:-glm-5.1:cloud}"
-  export OLLAMA_CLOUD_VERIFIED_CODE_MODEL="${OLLAMA_CLOUD_VERIFIED_CODE_MODEL:-glm-5:cloud}"
-  export OLLAMA_MULTILINGUAL_CODE_MODEL="${OLLAMA_MULTILINGUAL_CODE_MODEL:-minimax-m2.1:cloud}"
-  export OLLAMA_THINKING_CODE_MODEL="${OLLAMA_THINKING_CODE_MODEL:-kimi-k2-thinking:cloud}"
-  export OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-nomic-embed-text:v1.5}"
-  export OLLAMA_API_KEY="${OLLAMA_API_KEY:-ollama}"
-  export OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-15m}"
-}
-
-hg_parity_default_ollama_support_mode() {
-  local repo_name="$1"
-  case "$repo_name" in
-    docs)
-      printf 'docs_only\n'
-      ;;
-    ralphglasses)
-      printf 'session_provider\n'
-      ;;
-    dotfiles|jobb|mcpkit|surfacekit)
-      printf 'consumer\n'
-      ;;
-    *)
-      printf 'none\n'
-      ;;
-  esac
-}
-
-hg_parity_ollama_support_mode() {
-  local repo_path="$1"
-  local repo_name="$2"
-  local configured mode
-
-  configured="$(hg_parity_repo_objective_string "$repo_name" "ollama_support_mode" "$(hg_parity_default_ollama_support_mode "$repo_name")")"
-  case "$configured" in
-    none|docs_only|consumer|native_consumer|session_provider)
-      mode="$configured"
-      ;;
-    *)
-      mode="none"
-      ;;
-  esac
-
-  if [[ "$mode" != "none" ]]; then
-    printf '%s\n' "$mode"
-    return 0
-  fi
-
-  if [[ -f "$repo_path/internal/session/provider_ollama.go" ]]; then
-    printf 'session_provider\n'
-    return 0
-  fi
-  if rg -q 'OLLAMA_BASE_URL|OLLAMA_CODE_MODEL|OLLAMA_EMBED_MODEL|RDLOOP_BASE_URL|ollama_local|aftrs_ollama_' \
-      "$repo_path" \
-      --glob '!**/.git/**' 2>/dev/null; then
-    printf 'consumer\n'
-    return 0
-  fi
-  printf 'none\n'
-}
-
-hg_parity_ollama_profile_source() {
-  local repo_path="$1"
-  local repo_name="$2"
-  local mode configured
-
-  mode="$(hg_parity_ollama_support_mode "$repo_path" "$repo_name")"
-  configured="$(hg_parity_repo_objective_string "$repo_name" "ollama_profile_source" "")"
-  if [[ -n "$configured" && "$configured" != "null" ]]; then
-    printf '%s\n' "$configured"
-    return 0
-  fi
-  if [[ "$mode" == "none" ]]; then
-    printf 'none\n'
-    return 0
-  fi
-  printf 'dotfiles\n'
-}
-
 hg_parity_provider_runtime_drift_count() {
-  local repo_path="$1"
-  local repo_name="$2"
-  local support_mode count
-
-  support_mode="$(hg_parity_ollama_support_mode "$repo_path" "$repo_name")"
-  count=0
-
-  case "$support_mode" in
-    none)
-      printf '0\n'
-      return 0
-      ;;
-    docs_only)
-      [[ -f "$repo_path/projects/agent-parity/2026-04-09-ollama-support-rollout.md" ]] || count=$((count + 1))
-      ;;
-    session_provider)
-      [[ -f "$repo_path/internal/session/provider_ollama.go" ]] || count=$((count + 1))
-      rg -q 'ProviderOllama|ollama_inventory' "$repo_path/internal/session" "$repo_path/internal/mcpserver" 2>/dev/null || count=$((count + 1))
-      ;;
-    consumer|native_consumer)
-      rg -q 'OLLAMA_BASE_URL|OLLAMA_CODE_MODEL|OLLAMA_EMBED_MODEL|RDLOOP_BASE_URL|ollama_local|provider-settings-sync|aftrs_ollama_' \
-        "$repo_path" \
-        --glob '!**/.git/**' 2>/dev/null || count=$((count + 1))
-      ;;
-  esac
-
-  local objective_override
-  objective_override="$(hg_parity_repo_objective_int "$repo_name" "provider_runtime_drift_count" "$count")"
-  printf '%s\n' "$objective_override"
+  printf '0\n'
 }
 
 hg_parity_render_codex_standard_profiles() {
@@ -718,83 +591,6 @@ hg_parity_codex_has_any_required_profile() {
     [[ "$content" == *"[profiles.review]"* ]] ||
     [[ "$content" == *"[profiles.workspace_auto]"* ]] ||
     [[ "$content" == *"[profiles.ci_json]"* ]]
-}
-
-hg_parity_codex_ollama_start_marker() {
-  printf '# BEGIN GENERATED OLLAMA PROFILES: provider-settings-sync\n'
-}
-
-hg_parity_codex_ollama_end_marker() {
-  printf '# END GENERATED OLLAMA PROFILES: provider-settings-sync\n'
-}
-
-hg_parity_render_codex_ollama_profiles() {
-  hg_parity_load_local_llm_defaults
-
-  local v1_url env_instruction
-  v1_url="${OLLAMA_BASE_URL%/}/v1"
-  env_instruction='source "$HOME/hairglasses-studio/dotfiles/scripts/lib/hg-local-llm.sh" && hg_local_llm_export_env'
-
-  cat <<EOF
-$(hg_parity_codex_ollama_start_marker)
-# Generated by codexkit/scripts/provider-settings-sync.sh from dotfiles shared local-model defaults.
-# Refresh this block after updating dotfiles Ollama defaults or host settings.
-
-[model_providers.ollama_local]
-name = "Local Ollama"
-base_url = $(hg_parity_toml_quote "$v1_url")
-env_key = "OLLAMA_API_KEY"
-env_key_instructions = $(hg_parity_toml_quote "$env_instruction")
-requires_openai_auth = false
-wire_api = "responses"
-
-[profiles.ollama_chat]
-model_provider = "ollama_local"
-model = $(hg_parity_toml_quote "$OLLAMA_CHAT_MODEL")
-model_reasoning_effort = "low"
-
-[profiles.ollama_fast]
-model_provider = "ollama_local"
-model = $(hg_parity_toml_quote "$OLLAMA_FAST_MODEL")
-model_reasoning_effort = "low"
-
-[profiles.ollama_code]
-model_provider = "ollama_local"
-model = $(hg_parity_toml_quote "$OLLAMA_CODE_MODEL")
-model_reasoning_effort = "medium"
-
-[profiles.ollama_heavy]
-model_provider = "ollama_local"
-model = $(hg_parity_toml_quote "$OLLAMA_HEAVY_CODE_MODEL")
-model_reasoning_effort = "high"
-
-[profiles.ollama_high_context]
-model_provider = "ollama_local"
-model = $(hg_parity_toml_quote "$OLLAMA_HIGH_CONTEXT_CODE_MODEL")
-model_reasoning_effort = "high"
-
-[profiles.ollama_cloud_code]
-model_provider = "ollama_local"
-model = $(hg_parity_toml_quote "$OLLAMA_CLOUD_CODE_MODEL")
-model_reasoning_effort = "high"
-
-[profiles.ollama_cloud_verified]
-model_provider = "ollama_local"
-model = $(hg_parity_toml_quote "$OLLAMA_CLOUD_VERIFIED_CODE_MODEL")
-model_reasoning_effort = "high"
-
-[profiles.ollama_multilingual]
-model_provider = "ollama_local"
-model = $(hg_parity_toml_quote "$OLLAMA_MULTILINGUAL_CODE_MODEL")
-model_reasoning_effort = "high"
-
-[profiles.ollama_thinking]
-model_provider = "ollama_local"
-model = $(hg_parity_toml_quote "$OLLAMA_THINKING_CODE_MODEL")
-model_reasoning_effort = "high"
-
-$(hg_parity_codex_ollama_end_marker)
-EOF
 }
 
 hg_parity_render_codex_base_config() {
@@ -884,21 +680,62 @@ PY
   rm -rf "$tmpdir"
 }
 
+hg_parity_strip_generated_block_text() {
+  local content="$1"
+  local start_marker="$2"
+  local end_marker="$3"
+  local tmpdir input_path output_path python_cmd
+
+  tmpdir="$(mktemp -d)"
+  input_path="$tmpdir/input"
+  output_path="$tmpdir/output"
+  printf '%s\n' "$content" >"$input_path"
+
+  python_cmd="$(command -v python3 || command -v python || true)"
+  [[ -n "$python_cmd" ]] || hg_die "python3 or python is required to remove generated parity blocks"
+
+  "$python_cmd" - "$input_path" "$output_path" "$start_marker" "$end_marker" <<'PY'
+from pathlib import Path
+import sys
+
+input_path = Path(sys.argv[1])
+output_path = Path(sys.argv[2])
+start_marker = sys.argv[3]
+end_marker = sys.argv[4]
+
+content = input_path.read_text(encoding="utf-8")
+lines = content.splitlines()
+out = []
+skip = False
+
+for line in lines:
+    if not skip and line.startswith(start_marker):
+        skip = True
+        continue
+    if skip and line == end_marker:
+        skip = False
+        continue
+    if skip:
+        continue
+    out.append(line)
+
+rendered = "\n".join(out).rstrip("\n")
+output_path.write_text(rendered + "\n", encoding="utf-8")
+PY
+
+  cat "$output_path"
+  rm -rf "$tmpdir"
+}
+
 hg_parity_render_codex_config() {
   local repo_path="$1"
-  local base_config ollama_block start_marker end_marker
+  local base_config
   base_config="$(hg_parity_render_codex_base_config "$repo_path")"
   if ! hg_parity_codex_has_standard_profiles "$base_config" && \
      ! hg_parity_codex_has_any_required_profile "$base_config"; then
     base_config="${base_config%$'\n'}"$'\n\n'"$(hg_parity_render_codex_standard_profiles)"
   fi
-  ollama_block="$(hg_parity_render_codex_ollama_profiles)"
-  start_marker="$(hg_parity_codex_ollama_start_marker)"
-  start_marker="${start_marker%$'\n'}"
-  end_marker="$(hg_parity_codex_ollama_end_marker)"
-  end_marker="${end_marker%$'\n'}"
-
-  hg_parity_upsert_generated_block_text "$base_config" "$start_marker" "$end_marker" "$ollama_block"
+  printf '%s\n' "$base_config"
 }
 
 hg_parity_gemini_settings_current() {

@@ -10,7 +10,6 @@ MODE="write"
 REPO_PATH=""
 REPO_NAME=""
 ALLOW_DIRTY=false
-INCLUDE_CODEX_CONFIG=false
 FAILED=0
 CREATED=0
 UPDATED=0
@@ -27,7 +26,6 @@ Sync:
 
 Options:
   --repo-name <name>  Repo name override used for manifest-backed objectives
-  --include-codex-config  Also enforce the generated local-model block in .codex/config.toml
   --dry-run           Show drift without writing
   --check             Exit non-zero when drift exists
   --write             Apply changes (default)
@@ -48,7 +46,6 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --include-codex-config)
-      INCLUDE_CODEX_CONFIG=true
       shift
       ;;
     --check)
@@ -235,12 +232,6 @@ check_required_extension() {
 }
 
 sync_provider_settings() {
-  if $INCLUDE_CODEX_CONFIG; then
-    local codex_expected
-    codex_expected="$(hg_parity_render_codex_config "$REPO_PATH")"
-    write_text_file ".codex/config.toml" "$codex_expected" "codex-config"
-  fi
-
   local claude_expected
   claude_expected="$(hg_parity_render_claude_settings "$REPO_PATH")"
   write_text_file ".claude/settings.json" "$claude_expected" "claude-settings"

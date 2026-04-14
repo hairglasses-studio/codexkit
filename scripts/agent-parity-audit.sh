@@ -670,9 +670,6 @@ total_repos_with_gemini_extensions=0
 total_repos_with_provider_mcp_bridge=0
 total_repos_with_provider_hook_bridge=0
 total_repos_with_provider_drift=0
-total_repos_with_ollama_support=0
-total_repos_with_ollama_session_provider=0
-total_repos_with_ollama_docs_only=0
 total_repos_with_provider_runtime_drift=0
 total_provider_runtime_drift_count=0
 total_repos_with_mcp_discovery_contract=0
@@ -789,8 +786,6 @@ for repo in "${repos[@]}"; do
   provider_mcp_bridge=$(hg_parity_provider_mcp_bridge_ok "$repo")
   provider_hook_bridge=$(hg_parity_provider_hook_bridge_ok "$repo" "$name")
   provider_drift=$(hg_parity_provider_drift_count "$repo" "$name")
-  ollama_support_mode=$(hg_parity_ollama_support_mode "$repo" "$name")
-  ollama_profile_source=$(hg_parity_ollama_profile_source "$repo" "$name")
   provider_runtime_drift=$(hg_parity_provider_runtime_drift_count "$repo" "$name")
   legacy_claude_commands=$(count_files "$repo" '*/.claude/commands/*.md')
   legacy_commands_unported=0
@@ -862,9 +857,6 @@ for repo in "${repos[@]}"; do
   [[ "$provider_mcp_bridge" -eq 1 ]] && total_repos_with_provider_mcp_bridge=$((total_repos_with_provider_mcp_bridge + 1))
   [[ "$provider_hook_bridge" -eq 1 ]] && total_repos_with_provider_hook_bridge=$((total_repos_with_provider_hook_bridge + 1))
   [[ "$provider_drift" -gt 0 ]] && total_repos_with_provider_drift=$((total_repos_with_provider_drift + 1))
-  [[ "$ollama_support_mode" != "none" ]] && total_repos_with_ollama_support=$((total_repos_with_ollama_support + 1))
-  [[ "$ollama_support_mode" == "session_provider" ]] && total_repos_with_ollama_session_provider=$((total_repos_with_ollama_session_provider + 1))
-  [[ "$ollama_support_mode" == "docs_only" ]] && total_repos_with_ollama_docs_only=$((total_repos_with_ollama_docs_only + 1))
   if [[ "$provider_runtime_drift" -gt 0 ]]; then
     total_repos_with_provider_runtime_drift=$((total_repos_with_provider_runtime_drift + 1))
     total_provider_runtime_drift_count=$((total_provider_runtime_drift_count + provider_runtime_drift))
@@ -949,7 +941,7 @@ for repo in "${repos[@]}"; do
     total_excluded_repos=$((total_excluded_repos + 1))
   fi
 
-  inventory_csv+="${name},${claude_mcp},${claude_settings},${claude_desktop},${agents_md},${agents_override},${claude_md},${gemini_md},${copilot_instructions},${codex_config},${codex_full_profiles},${skill_surface_manifest},${canonical_skills},${generated_claude_skills},${generated_plugin_skills},${mcp_json},${repo_mcp_servers},${mcp_discovery_contract},${mcp_resource_contract},${mcp_prompt_contract},${mcp_server_health},${full_mcp_contract},${mcp_policy},${generated_mcp_configs},${codex_unmanaged_mcp_servers},${example_only_mcp_json},${codex_mcp_servers},${codex_curated_mcp_servers},${codex_raw_mcp_servers},${legacy_model_tokens},${mcp_without_policy},${mcp_without_curated_codex},${codex_agents},${codex_plugin},${codex_workflows},${codex_hooks},${root_claude_settings},${root_gemini_settings},${legacy_gemini_config},${generated_gemini_settings},${gemini_mcp_servers},${gemini_translated_hook_rules},${claude_only_hook_gaps},${gemini_extensions},${provider_mcp_bridge},${provider_hook_bridge},${provider_drift},${ollama_support_mode},${ollama_profile_source},${provider_runtime_drift},${scope},${active_scope},${expected_codex_baseline},${expected_full_profiles},${expected_codex_agents},${expected_codex_workflows},${expected_codex_plugin},${expected_mcp_contract},${expected_provider_hook_bridge},${expected_codex_hooks}"$'\n'
+  inventory_csv+="${name},${claude_mcp},${claude_settings},${claude_desktop},${agents_md},${agents_override},${claude_md},${gemini_md},${copilot_instructions},${codex_config},${codex_full_profiles},${skill_surface_manifest},${canonical_skills},${generated_claude_skills},${generated_plugin_skills},${mcp_json},${repo_mcp_servers},${mcp_discovery_contract},${mcp_resource_contract},${mcp_prompt_contract},${mcp_server_health},${full_mcp_contract},${mcp_policy},${generated_mcp_configs},${codex_unmanaged_mcp_servers},${example_only_mcp_json},${codex_mcp_servers},${codex_curated_mcp_servers},${codex_raw_mcp_servers},${legacy_model_tokens},${mcp_without_policy},${mcp_without_curated_codex},${codex_agents},${codex_plugin},${codex_workflows},${codex_hooks},${root_claude_settings},${root_gemini_settings},${legacy_gemini_config},${generated_gemini_settings},${gemini_mcp_servers},${gemini_translated_hook_rules},${claude_only_hook_gaps},${gemini_extensions},${provider_mcp_bridge},${provider_hook_bridge},${provider_drift},${provider_runtime_drift},${scope},${active_scope},${expected_codex_baseline},${expected_full_profiles},${expected_codex_agents},${expected_codex_workflows},${expected_codex_plugin},${expected_mcp_contract},${expected_provider_hook_bridge},${expected_codex_hooks}"$'\n'
   inventory_json_rows+="${json_separator}"$'    {\n'
   inventory_json_rows+="      \"repo\": \"${name}\","$'\n'
   inventory_json_rows+="      \"claude_mcp_mentions\": ${claude_mcp},"$'\n'
@@ -1001,8 +993,6 @@ for repo in "${repos[@]}"; do
   inventory_json_rows+="      \"provider_mcp_bridge\": ${provider_mcp_bridge},"$'\n'
   inventory_json_rows+="      \"provider_hook_bridge\": ${provider_hook_bridge},"$'\n'
   inventory_json_rows+="      \"provider_drift_count\": ${provider_drift},"$'\n'
-  inventory_json_rows+="      \"ollama_support_mode\": \"${ollama_support_mode}\","$'\n'
-  inventory_json_rows+="      \"ollama_profile_source\": \"${ollama_profile_source}\","$'\n'
   inventory_json_rows+="      \"provider_runtime_drift_count\": ${provider_runtime_drift},"$'\n'
   inventory_json_rows+="      \"baseline_profile\": \"${baseline_profile}\","$'\n'
   inventory_json_rows+="      \"workflow_policy\": \"${workflow_policy}\","$'\n'
@@ -1022,7 +1012,7 @@ for repo in "${repos[@]}"; do
   inventory_json_rows+="      \"legacy_commands_unported\": ${legacy_commands_unported}"$'\n'
   inventory_json_rows+=$'    }\n'
   json_separator=$',\n'
-  inventory_md+="| ${name} | ${claude_mcp} | ${claude_settings} | ${claude_desktop} | ${agents_md} | ${agents_override} | ${claude_md} | ${gemini_md} | ${copilot_instructions} | ${codex_config} | ${codex_full_profiles} | ${skill_surface_manifest} | ${canonical_skills} | ${generated_claude_skills} | ${generated_plugin_skills} | ${has_skills} | ${has_roadmap} | ${has_ralph} | ${mcp_json} | ${repo_mcp_servers} | ${mcp_discovery_contract} | ${mcp_resource_contract} | ${mcp_prompt_contract} | ${mcp_server_health} | ${full_mcp_contract} | ${mcp_policy} | ${generated_mcp_configs} | ${codex_unmanaged_mcp_servers} | ${example_only_mcp_json} | ${codex_mcp_servers} | ${codex_curated_mcp_servers} | ${codex_raw_mcp_servers} | ${legacy_model_tokens} | ${mcp_without_policy} | ${mcp_without_curated_codex} | ${codex_agents} | ${codex_plugin} | ${codex_workflows} | ${codex_hooks} | ${root_claude_settings} | ${root_gemini_settings} | ${legacy_gemini_config} | ${generated_gemini_settings} | ${gemini_mcp_servers} | ${gemini_translated_hook_rules} | ${claude_only_hook_gaps} | ${gemini_extensions} | ${provider_mcp_bridge} | ${provider_hook_bridge} | ${provider_drift} | ${ollama_support_mode} | ${ollama_profile_source} | ${provider_runtime_drift} |"$'\n'
+  inventory_md+="| ${name} | ${claude_mcp} | ${claude_settings} | ${claude_desktop} | ${agents_md} | ${agents_override} | ${claude_md} | ${gemini_md} | ${copilot_instructions} | ${codex_config} | ${codex_full_profiles} | ${skill_surface_manifest} | ${canonical_skills} | ${generated_claude_skills} | ${generated_plugin_skills} | ${has_skills} | ${has_roadmap} | ${has_ralph} | ${mcp_json} | ${repo_mcp_servers} | ${mcp_discovery_contract} | ${mcp_resource_contract} | ${mcp_prompt_contract} | ${mcp_server_health} | ${full_mcp_contract} | ${mcp_policy} | ${generated_mcp_configs} | ${codex_unmanaged_mcp_servers} | ${example_only_mcp_json} | ${codex_mcp_servers} | ${codex_curated_mcp_servers} | ${codex_raw_mcp_servers} | ${legacy_model_tokens} | ${mcp_without_policy} | ${mcp_without_curated_codex} | ${codex_agents} | ${codex_plugin} | ${codex_workflows} | ${codex_hooks} | ${root_claude_settings} | ${root_gemini_settings} | ${legacy_gemini_config} | ${generated_gemini_settings} | ${gemini_mcp_servers} | ${gemini_translated_hook_rules} | ${claude_only_hook_gaps} | ${gemini_extensions} | ${provider_mcp_bridge} | ${provider_hook_bridge} | ${provider_drift} | ${provider_runtime_drift} |"$'\n'
 done
 
 workflow_family_summary_text=""
@@ -1269,9 +1259,6 @@ inventory_json="{
     \"repos_with_provider_mcp_bridge\": ${total_repos_with_provider_mcp_bridge},
     \"repos_with_provider_hook_bridge\": ${total_repos_with_provider_hook_bridge},
     \"repos_with_provider_drift\": ${total_repos_with_provider_drift},
-    \"total_repos_with_ollama_support\": ${total_repos_with_ollama_support},
-    \"total_repos_with_ollama_session_provider\": ${total_repos_with_ollama_session_provider},
-    \"total_repos_with_ollama_docs_only\": ${total_repos_with_ollama_docs_only},
     \"total_repos_with_provider_runtime_drift\": ${total_repos_with_provider_runtime_drift},
     \"total_provider_runtime_drift_count\": ${total_provider_runtime_drift_count},
     \"active_scope_repos\": ${total_active_scope_repos},
@@ -1344,7 +1331,7 @@ write_workspace_cache() {
   mkdir -p "$docs_dir"
 
   cat >"$docs_dir/repo-inventory.csv" <<EOF
-repo,claude_mcp_mentions,claude_settings_mentions,claude_desktop_config_mentions,agents_md_count,agents_override_md_count,claude_md_count,gemini_md_count,copilot_instructions_count,codex_config_count,codex_full_profile_pack_count,skill_surface_manifest_count,canonical_skill_count,generated_claude_skill_count,generated_plugin_skill_count,mcp_json_count,repo_mcp_server_count,mcp_discovery_contract,mcp_resource_contract,mcp_prompt_contract,mcp_server_health_contract,full_mcp_contract,mcp_policy_count,generated_codex_mcp_config_count,unmanaged_codex_mcp_server_count,example_only_mcp_json,codex_mcp_server_count,codex_curated_mcp_server_count,codex_raw_mcp_server_count,legacy_codex_model_token_count,mcp_without_policy,mcp_without_curated_codex,codex_agent_count,codex_plugin_count,codex_workflow_count,codex_hooks_enabled_count,root_claude_settings,root_gemini_settings,legacy_gemini_config_count,generated_gemini_settings_count,gemini_mcp_server_count,gemini_translated_hook_rule_count,claude_only_hook_gap_count,gemini_extension_count,provider_mcp_bridge,provider_hook_bridge,provider_drift_count,ollama_support_mode,ollama_profile_source,provider_runtime_drift_count,scope,active_scope,expected_codex_baseline,expected_full_profile_pack,expected_codex_agents,expected_codex_workflows,expected_codex_plugin,expected_mcp_contract,expected_provider_hook_bridge,expected_codex_hooks
+repo,claude_mcp_mentions,claude_settings_mentions,claude_desktop_config_mentions,agents_md_count,agents_override_md_count,claude_md_count,gemini_md_count,copilot_instructions_count,codex_config_count,codex_full_profile_pack_count,skill_surface_manifest_count,canonical_skill_count,generated_claude_skill_count,generated_plugin_skill_count,mcp_json_count,repo_mcp_server_count,mcp_discovery_contract,mcp_resource_contract,mcp_prompt_contract,mcp_server_health_contract,full_mcp_contract,mcp_policy_count,generated_codex_mcp_config_count,unmanaged_codex_mcp_server_count,example_only_mcp_json,codex_mcp_server_count,codex_curated_mcp_server_count,codex_raw_mcp_server_count,legacy_codex_model_token_count,mcp_without_policy,mcp_without_curated_codex,codex_agent_count,codex_plugin_count,codex_workflow_count,codex_hooks_enabled_count,root_claude_settings,root_gemini_settings,legacy_gemini_config_count,generated_gemini_settings_count,gemini_mcp_server_count,gemini_translated_hook_rule_count,claude_only_hook_gap_count,gemini_extension_count,provider_mcp_bridge,provider_hook_bridge,provider_drift_count,provider_runtime_drift_count,scope,active_scope,expected_codex_baseline,expected_full_profile_pack,expected_codex_agents,expected_codex_workflows,expected_codex_plugin,expected_mcp_contract,expected_provider_hook_bridge,expected_codex_hooks
 ${inventory_csv%$'\n'}
 EOF
 
@@ -1407,9 +1394,6 @@ Summary from the latest audit:
 - Repos with provider MCP bridge: ${total_repos_with_provider_mcp_bridge}
 - Repos with provider hook bridge: ${total_repos_with_provider_hook_bridge}
 - Repos with provider drift: ${total_repos_with_provider_drift}
-- Repos with any Ollama support: ${total_repos_with_ollama_support}
-- Repos with Ollama session-provider support: ${total_repos_with_ollama_session_provider}
-- Repos with docs-only Ollama support: ${total_repos_with_ollama_docs_only}
 - Repos with provider-runtime drift: ${total_repos_with_provider_runtime_drift} (${total_provider_runtime_drift_count} total drift points)
 - Active-scope repos: ${total_active_scope_repos}
 - Active operator repos: ${total_active_operator_repos}
@@ -1468,7 +1452,7 @@ write_wiki_docs() {
   mkdir -p "$docs_dir"
 
   cat >"$docs_dir/repo-inventory.csv" <<EOF
-repo,claude_mcp_mentions,claude_settings_mentions,claude_desktop_config_mentions,agents_md_count,agents_override_md_count,claude_md_count,gemini_md_count,copilot_instructions_count,codex_config_count,codex_full_profile_pack_count,skill_surface_manifest_count,canonical_skill_count,generated_claude_skill_count,generated_plugin_skill_count,mcp_json_count,repo_mcp_server_count,mcp_discovery_contract,mcp_resource_contract,mcp_prompt_contract,mcp_server_health_contract,full_mcp_contract,mcp_policy_count,generated_codex_mcp_config_count,unmanaged_codex_mcp_server_count,example_only_mcp_json,codex_mcp_server_count,codex_curated_mcp_server_count,codex_raw_mcp_server_count,legacy_codex_model_token_count,mcp_without_policy,mcp_without_curated_codex,codex_agent_count,codex_plugin_count,codex_workflow_count,codex_hooks_enabled_count,root_claude_settings,root_gemini_settings,legacy_gemini_config_count,generated_gemini_settings_count,gemini_mcp_server_count,gemini_translated_hook_rule_count,claude_only_hook_gap_count,gemini_extension_count,provider_mcp_bridge,provider_hook_bridge,provider_drift_count,ollama_support_mode,ollama_profile_source,provider_runtime_drift_count,scope,active_scope,expected_codex_baseline,expected_full_profile_pack,expected_codex_agents,expected_codex_workflows,expected_codex_plugin,expected_mcp_contract,expected_provider_hook_bridge,expected_codex_hooks
+repo,claude_mcp_mentions,claude_settings_mentions,claude_desktop_config_mentions,agents_md_count,agents_override_md_count,claude_md_count,gemini_md_count,copilot_instructions_count,codex_config_count,codex_full_profile_pack_count,skill_surface_manifest_count,canonical_skill_count,generated_claude_skill_count,generated_plugin_skill_count,mcp_json_count,repo_mcp_server_count,mcp_discovery_contract,mcp_resource_contract,mcp_prompt_contract,mcp_server_health_contract,full_mcp_contract,mcp_policy_count,generated_codex_mcp_config_count,unmanaged_codex_mcp_server_count,example_only_mcp_json,codex_mcp_server_count,codex_curated_mcp_server_count,codex_raw_mcp_server_count,legacy_codex_model_token_count,mcp_without_policy,mcp_without_curated_codex,codex_agent_count,codex_plugin_count,codex_workflow_count,codex_hooks_enabled_count,root_claude_settings,root_gemini_settings,legacy_gemini_config_count,generated_gemini_settings_count,gemini_mcp_server_count,gemini_translated_hook_rule_count,claude_only_hook_gap_count,gemini_extension_count,provider_mcp_bridge,provider_hook_bridge,provider_drift_count,provider_runtime_drift_count,scope,active_scope,expected_codex_baseline,expected_full_profile_pack,expected_codex_agents,expected_codex_workflows,expected_codex_plugin,expected_mcp_contract,expected_provider_hook_bridge,expected_codex_hooks
 ${inventory_csv%$'\n'}
 EOF
 
@@ -1527,9 +1511,6 @@ Summary from the latest audit:
 - Repos with provider MCP bridge: ${total_repos_with_provider_mcp_bridge}
 - Repos with provider hook bridge: ${total_repos_with_provider_hook_bridge}
 - Repos with provider drift: ${total_repos_with_provider_drift}
-- Repos with any Ollama support: ${total_repos_with_ollama_support}
-- Repos with Ollama session-provider support: ${total_repos_with_ollama_session_provider}
-- Repos with docs-only Ollama support: ${total_repos_with_ollama_docs_only}
 - Repos with provider-runtime drift: ${total_repos_with_provider_runtime_drift} (${total_provider_runtime_drift_count} total drift points)
 - Active-scope repos: ${total_active_scope_repos}
 - Active operator repos: ${total_active_operator_repos}

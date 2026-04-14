@@ -15,10 +15,8 @@ import (
 )
 
 const (
-	startMarker       = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
-	endMarker         = "# END GENERATED MCP SERVERS: codex-mcp-sync"
-	ollamaStartMarker = "# BEGIN GENERATED OLLAMA PROFILES: provider-settings-sync"
-	ollamaEndMarker   = "# END GENERATED OLLAMA PROFILES: provider-settings-sync"
+	startMarker = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
+	endMarker   = "# END GENERATED MCP SERVERS: codex-mcp-sync"
 )
 
 var mcpServerBlockRe = regexp.MustCompile(`(?m)^\[mcp_servers\.`)
@@ -219,15 +217,7 @@ func buildPlan(repoPath string) (*plan, error) {
 		}
 		switch {
 		case strings.Contains(configText, startMarker):
-			if mcpBlockInsideOllamaRegion(configText) {
-				var stripped string
-				stripped, err = removeMarkedRegion(configText)
-				if err == nil {
-					output, err = insertNewRegion(stripped, block)
-				}
-			} else {
-				output, err = replaceMarkedRegion(configText, block)
-			}
+			output, err = replaceMarkedRegion(configText, block)
 		case len(strings.TrimSpace(configText)) == 0:
 			output = block
 		default:
@@ -497,19 +487,6 @@ func removeMarkedRegion(configText string) (string, error) {
 }
 
 func insertNewRegion(configText, block string) (string, error) {
-	if idx := strings.Index(configText, ollamaEndMarker); idx >= 0 {
-		end := idx + len(ollamaEndMarker)
-		if end < len(configText) && configText[end] == '\n' {
-			end++
-		}
-		prefix := strings.TrimRight(configText[:end], "\n")
-		suffix := strings.TrimLeft(configText[end:], "\n")
-		if suffix == "" {
-			return prefix + "\n\n" + block, nil
-		}
-		return prefix + "\n\n" + block + suffix, nil
-	}
-
 	lines := strings.Split(configText, "\n")
 	for i, line := range lines {
 		if strings.HasPrefix(line, "[") {
@@ -528,16 +505,6 @@ func insertNewRegion(configText, block string) (string, error) {
 		return configText + "\n" + block, nil
 	}
 	return configText + "\n\n" + block, nil
-}
-
-func mcpBlockInsideOllamaRegion(configText string) bool {
-	mcpStart := strings.Index(configText, startMarker)
-	ollamaStart := strings.Index(configText, ollamaStartMarker)
-	ollamaEnd := strings.Index(configText, ollamaEndMarker)
-	if mcpStart < 0 || ollamaStart < 0 || ollamaEnd < 0 {
-		return false
-	}
-	return mcpStart > ollamaStart && mcpStart < ollamaEnd
 }
 
 func unifiedDiffString(before, after string) string {

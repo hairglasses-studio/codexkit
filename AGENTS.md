@@ -27,6 +27,7 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 | `mcpsync` | Sync `.mcp.json` → `.codex/config.toml` MCP server blocks |
 | `mcpserver` | MCP server — aggregates all ToolModules, deferred tool loading |
 | `fleetaudit` | Fleet-wide audit combining baseline, skill sync, and MCP sync checks |
+| `perfaudit` | Fleet-wide static audit for Codex performance bottlenecks and regression budgets |
 | `internal/toml` | Minimal TOML writer (zero external dependencies) |
 
 ## Baseline Checks
@@ -64,6 +65,8 @@ The MCP server (`cmd/codexkit-mcp`) exposes these tools:
 | `mcp_list` | mcpsync | List MCP servers |
 | `fleet_audit` | fleetaudit | Run full audit on all repos |
 | `fleet_report` | fleetaudit | Summary report of fleet health |
+| `perf_audit` | perfaudit | Scan the workspace for Codex performance bottlenecks |
+| `perf_report` | perfaudit | Render the Codex performance audit as Markdown |
 
 ## Protocol Support
 
