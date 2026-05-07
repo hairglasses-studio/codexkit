@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "codexkit": {
-      "command": "./scripts/run-codexkit-mcp.sh"
-    }
-  }
-}
