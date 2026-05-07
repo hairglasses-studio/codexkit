@@ -36,3 +36,22 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 - Live repo notes: AGENTS, skills, Codex config, configured .mcp.json, 9 workflow(s)
 
 <!-- whiteclaw-rollout:end -->
+---
+
+## Crosspollinate Suggestion: Adopt go-mcp-server pattern
+
+> **Source:** `~/hairglasses-studio/crosspollinate/patterns/go-mcp-server.md`
+> **Proposed:** 2026-05-07 (cycle 0, refined cycle 13)
+> **How to dismiss:** delete this section. Future crosspollinate cycles will detect the deletion and downgrade the recommendation.
+
+The crosspollinate loop synthesized a canonical pattern for Go MCP servers across the 12-member cluster (hg-mcp, process-mcp, github-runner-mcp, systemd-mcp, tmux-mcp, codexkit, geminikit, jobb, mcp-catalog, terraform-docs, jellyfin-mcp-deluxe, mcpkit) based on context7 docs (mcp-go + official Go SDK + MCP spec) and exemplar code in ralphglasses.
+
+Key recommendations relevant to this repo:
+
+- **Dual-SDK build tags** with separate handler files (`handler_mcpgo.go` vs `handler_officialsdk.go`) — the two SDK signatures differ and cannot share handler bodies.
+- **mcp-go error pattern**: validation/business errors → `mcp.NewToolResultError(msg), nil`; system errors → `nil, fmt.Errorf(...)`. Three cases, not one.
+- **Deferred-loading tool group registry** instead of eager registration. Keeps cold-start memory bounded.
+- **Discovery surfaces are MCP resources**, not tools (`<server>:///catalog/server`).
+
+See the pattern doc for the full `# Adoption checklist` and `# Anti-patterns` sections.
+
