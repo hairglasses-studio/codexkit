@@ -43,6 +43,7 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 > **Source:** `~/hairglasses-studio/crosspollinate/patterns/go-mcp-server.md`
 > **Proposed:** 2026-05-07 (cycle 0, refined cycle 13)
 > **How to dismiss:** delete this section. Future crosspollinate cycles will detect the deletion and downgrade the recommendation.
+> **Updated 2026-05-08:** cluster members reduced post-cycle-28 consolidate-repos: go-mcp-servers (was 12-member; now 8 active after process-mcp/geminikit/mcp-catalog/terraform-docs hard-deleted, systemd-mcp/tmux-mcp archive-only). See `crosspollinate/patterns/<topic>.md` for the current canonical active list.
 
 The crosspollinate loop synthesized a canonical pattern for Go MCP servers across the 12-member cluster (hg-mcp, process-mcp, github-runner-mcp, systemd-mcp, tmux-mcp, codexkit, geminikit, jobb, mcp-catalog, terraform-docs, jellyfin-mcp-deluxe, mcpkit) based on context7 docs (mcp-go + official Go SDK + MCP spec) and exemplar code in ralphglasses.
 
