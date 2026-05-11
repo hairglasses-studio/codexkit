@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     uses: hairglasses-studio/.github/.github/workflows/go-test.yml@main
+    with:
+      lane: ${{ github.event_name == 'pull_request' && 'fast' || 'standard' }}
