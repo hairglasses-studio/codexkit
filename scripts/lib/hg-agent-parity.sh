@@ -483,6 +483,7 @@ hg_parity_render_claude_settings() {
 hg_parity_render_gemini_settings() {
   local repo_path="$1"
   local template_path template_json generated_mcp normalized_hooks
+  local allowed_limit allowed_override_json
   template_path="$HG_AGENT_PARITY_ROOT/templates/gemini-settings.standard.json"
   template_json='{}'
   if [[ -f "$template_path" ]]; then
@@ -490,11 +491,26 @@ hg_parity_render_gemini_settings() {
   fi
   generated_mcp="$(hg_parity_gemini_mcp_servers_json "$repo_path")"
   normalized_hooks="$(hg_parity_source_hooks_json "$repo_path")"
+  allowed_limit="${HG_GEMINI_ALLOWED_LIMIT:-8}"
+  if [[ ! "$allowed_limit" =~ ^[0-9]+$ ]]; then
+    allowed_limit=8
+  fi
+  allowed_override_json="$(
+    jq -cn --arg csv "${HG_GEMINI_ALLOWED_SERVERS:-}" '
+      ($csv | split(",")
+        | map(gsub("^\\s+|\\s+$"; ""))
+        | map(select(length > 0))
+        | unique
+      )
+    '
+  )"
 
   jq -S -n \
     --argjson template "$template_json" \
     --argjson generated "$generated_mcp" \
-    --argjson hooks "$normalized_hooks" '
+    --argjson hooks "$normalized_hooks" \
+    --argjson allowed_override "$allowed_override_json" \
+    --argjson allowed_limit "$allowed_limit" '
       ($template | if type == "object" then . else {} end) as $base
       | (
           if (($base.context.fileName // null) | type) == "array" then
@@ -506,10 +522,25 @@ hg_parity_render_gemini_settings() {
         ) as $normalized
       | ($normalized + {mcpServers: $generated}) as $with_servers
       | (
-          if ($generated | length) > 0 then
+          ($generated | keys | sort) as $server_keys
+          | (
+              if ($allowed_override | length) > 0 then
+                ($allowed_override | map(select($generated[.] != null)))
+              else
+                $server_keys
+              end
+            ) as $candidate_allowed
+          | (
+              if ($allowed_limit > 0 and ($candidate_allowed | length) > $allowed_limit) then
+                $candidate_allowed[:$allowed_limit]
+              else
+                $candidate_allowed
+              end
+            ) as $bounded_allowed
+          | if ($generated | length) > 0 then
             $with_servers + {
               mcp: (($with_servers.mcp // {}) + {
-                allowed: (($generated | keys) | sort)
+                allowed: $bounded_allowed
               })
             }
           else
