@@ -1,6 +1,7 @@
 package mcpsync
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -79,6 +80,80 @@ func TestCheckGlobalProjectionArtifacts(t *testing.T) {
 	}
 	if !report.Passed {
 		t.Fatalf("global projection check failed: %+v", report.Findings)
+	}
+}
+
+func TestSyncGlobalProviderOverlaysWritesProviderTargets(t *testing.T) {
+	root := setupGlobalProjectionWorkspace(t)
+	home := t.TempDir()
+	claudePath := filepath.Join(home, ".claude.json")
+	codexPath := filepath.Join(home, ".codex", "config.toml")
+	geminiPath := filepath.Join(home, ".gemini", "settings.json")
+	writeRuntimeTestFile(t, home, ".claude.json", `{"projects":{"keep":{"mcpServers":{"manual":{"command":"manual"}}}}}`)
+	writeRuntimeTestFile(t, home, ".codex/config.toml", "model = \"gpt-5.4\"\n")
+	writeRuntimeTestFile(t, home, ".gemini/settings.json", `{"mcpServers":{"manual":{"command":"manual"}}}`)
+
+	report, err := SyncGlobalProviderOverlays(GlobalOverlaySyncOptions{
+		WorkspaceRoot:    root,
+		GeneratedAt:      "2026-05-10T00:00:00Z",
+		Mode:             GlobalOverlaySyncWrite,
+		ClaudeJSONPath:   claudePath,
+		ClaudeProjectKey: root,
+		CodexConfigPath:  codexPath,
+		GeminiConfigPath: geminiPath,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Pending {
+		t.Fatal("first sync should report pending work that was updated")
+	}
+	if report.CodexToolCount != 1 || report.ClaudeToolCount != 3 || report.GeminiToolCount != 3 {
+		t.Fatalf("provider counts = codex %d claude %d gemini %d, want 1/3/3", report.CodexToolCount, report.ClaudeToolCount, report.GeminiToolCount)
+	}
+
+	codexData, err := os.ReadFile(codexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	codexContent := string(codexData)
+	if !strings.Contains(codexContent, WorkspaceGlobalStartMarker) || !strings.Contains(codexContent, "[mcp_servers.studio_desktop]") {
+		t.Fatalf("codex overlay missing managed block:\n%s", codexContent)
+	}
+	if !strings.Contains(codexContent, "enabled_tools = [") || !strings.Contains(codexContent, `"app_click"`) {
+		t.Fatalf("codex overlay missing enabled tools:\n%s", codexContent)
+	}
+
+	claudeData, err := os.ReadFile(claudePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(claudeData), `"studio_desktop"`) || !strings.Contains(string(claudeData), `"keep"`) {
+		t.Fatalf("claude overlay did not merge managed project with existing JSON:\n%s", string(claudeData))
+	}
+
+	geminiData, err := os.ReadFile(geminiPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(geminiData), `"studio-desktop"`) || !strings.Contains(string(geminiData), `"manual"`) {
+		t.Fatalf("gemini overlay did not merge managed servers with existing JSON:\n%s", string(geminiData))
+	}
+
+	check, err := SyncGlobalProviderOverlays(GlobalOverlaySyncOptions{
+		WorkspaceRoot:    root,
+		GeneratedAt:      "2026-05-10T00:00:00Z",
+		Mode:             GlobalOverlaySyncCheck,
+		ClaudeJSONPath:   claudePath,
+		ClaudeProjectKey: root,
+		CodexConfigPath:  codexPath,
+		GeminiConfigPath: geminiPath,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if check.Pending {
+		t.Fatalf("check after sync should be clean: %+v", check.Actions)
 	}
 }
 

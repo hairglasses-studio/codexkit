@@ -112,6 +112,8 @@ Commands:
                                 Build the workspace-global MCP provider projection
   workspace global-mcp-projection-check [root] [--json] [--json-path <path>] [--markdown-path <path>] [--policy <path>] [--skip-artifacts]
                                 Fail when generated global MCP projection artifacts drift
+  workspace global-mcp-sync [root] [--json] [--check|--dry-run] [--claude-json <path>] [--claude-project-key <key>] [--codex-config <path>] [--gemini-settings <path>] [--policy <path>]
+                                Sync workspace-global Claude, Codex, and Gemini MCP overlays
   workspace source-contract-check [root] [--json] [--json-out <path>] [--json-path <path>] [--skills-only|--tools-only] [--skip-runtime-inventory] [--skill-validator auto|host|pinned|off]
                                 Fail when repo-controlled workspace, skill, MCP, runtime inventory, or global MCP projection sources drift
   workspace surface-index [root] [--json] [--json-out <path>] [--markdown-out <path>] [--skill-validator auto|host|pinned|off]
@@ -881,6 +883,15 @@ func runWorkspace(args []string) {
 		if !passed {
 			os.Exit(1)
 		}
+	case "global-mcp-sync":
+		passed, err := runWorkspaceGlobalMCPSync(args[1:])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		if !passed {
+			os.Exit(1)
+		}
 	case "source-contract-check":
 		passed, err := runWorkspaceSourceContractCheck(args[1:])
 		if err != nil {
@@ -1230,6 +1241,87 @@ func runWorkspaceRuntimeInventoryCheck(args []string) (bool, error) {
 		fmt.Printf("  %-16s %-20s %s\n", findingStatus, finding.Check, finding.Message)
 	}
 	return report.Passed, nil
+}
+
+func runWorkspaceGlobalMCPSync(args []string) (bool, error) {
+	root := workspace.DefaultRoot()
+	jsonOut := false
+	mode := mcpsync.GlobalOverlaySyncWrite
+	claudeJSONPath := ""
+	claudeProjectKey := ""
+	codexConfigPath := ""
+	geminiSettingsPath := ""
+	policyPath := ""
+	rootSet := false
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "--json":
+			jsonOut = true
+		case "--check":
+			mode = mcpsync.GlobalOverlaySyncCheck
+		case "--dry-run":
+			mode = mcpsync.GlobalOverlaySyncDryRun
+		case "--claude-json":
+			i++
+			if i >= len(args) {
+				return false, fmt.Errorf("--claude-json requires a path")
+			}
+			claudeJSONPath = args[i]
+		case "--claude-project-key":
+			i++
+			if i >= len(args) {
+				return false, fmt.Errorf("--claude-project-key requires a value")
+			}
+			claudeProjectKey = args[i]
+		case "--codex-config":
+			i++
+			if i >= len(args) {
+				return false, fmt.Errorf("--codex-config requires a path")
+			}
+			codexConfigPath = args[i]
+		case "--gemini-settings":
+			i++
+			if i >= len(args) {
+				return false, fmt.Errorf("--gemini-settings requires a path")
+			}
+			geminiSettingsPath = args[i]
+		case "--policy":
+			i++
+			if i >= len(args) {
+				return false, fmt.Errorf("--policy requires a path")
+			}
+			policyPath = args[i]
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return false, fmt.Errorf("unknown flag: %s", arg)
+			}
+			if rootSet {
+				return false, fmt.Errorf("unexpected extra argument: %s", arg)
+			}
+			root = arg
+			rootSet = true
+		}
+	}
+
+	report, err := mcpsync.SyncGlobalProviderOverlays(mcpsync.GlobalOverlaySyncOptions{
+		WorkspaceRoot:    root,
+		PolicyPath:       policyPath,
+		Mode:             mode,
+		ClaudeJSONPath:   claudeJSONPath,
+		ClaudeProjectKey: claudeProjectKey,
+		CodexConfigPath:  codexConfigPath,
+		GeminiConfigPath: geminiSettingsPath,
+	})
+	if err != nil {
+		return false, err
+	}
+	if jsonOut {
+		printJSON(report)
+	} else {
+		fmt.Print(report.Markdown())
+	}
+	return !(mode == mcpsync.GlobalOverlaySyncCheck && report.Pending), nil
 }
 
 func runWorkspaceSourceContractCheck(args []string) (bool, error) {
