@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/hairglasses-studio/codexkit"
@@ -113,9 +114,11 @@ Commands:
   workspace global-mcp-projection-check [root] [--json] [--json-path <path>] [--markdown-path <path>] [--policy <path>] [--skip-artifacts]
                                 Fail when generated global MCP projection artifacts drift
   workspace global-mcp-sync [root] [--json] [--check|--dry-run] [--claude-json <path>] [--claude-project-key <key>] [--codex-config <path>] [--gemini-settings <path>] [--policy <path>]
-                                Sync workspace-global Claude, Codex, and Gemini MCP overlays
+                                 Sync workspace-global Claude, Codex, and Gemini MCP overlays
+  workspace diff-preview --left <path> --right <path> --rel <path> --kind <kind> [--lines <n>]
+                                 Render one JSON diff-preview record matching the dotfiles manual projection contract
   workspace source-contract-check [root] [--json] [--json-out <path>] [--json-path <path>] [--skills-only|--tools-only] [--skip-runtime-inventory] [--skill-validator auto|host|pinned|off]
-                                Fail when repo-controlled workspace, skill, MCP, runtime inventory, or global MCP projection sources drift
+                                 Fail when repo-controlled workspace, skill, MCP, runtime inventory, or global MCP projection sources drift
   workspace surface-index [root] [--json] [--json-out <path>] [--markdown-out <path>] [--skill-validator auto|host|pinned|off]
                                 Build a baseline repo agent surface index
   workspace surface-index-check [root] [--json] [--json-path <path>] [--markdown-path <path>] [--skill-validator auto|host|pinned|off] [--skip-artifacts]
@@ -892,6 +895,11 @@ func runWorkspace(args []string) {
 		if !passed {
 			os.Exit(1)
 		}
+	case "diff-preview":
+		if err := runWorkspaceDiffPreview(args[1:]); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
 	case "source-contract-check":
 		passed, err := runWorkspaceSourceContractCheck(args[1:])
 		if err != nil {
@@ -1080,6 +1088,63 @@ func runWorkspaceGlobalMCPProjectionCheck(args []string) (bool, error) {
 		fmt.Printf("  %-16s %-20s %s\n", findingStatus, finding.Check, finding.Message)
 	}
 	return report.Passed, nil
+}
+
+func runWorkspaceDiffPreview(args []string) error {
+	left := ""
+	right := ""
+	rel := ""
+	kind := ""
+	lines := 20
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--left":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("--left requires a path")
+			}
+			left = args[i]
+		case "--right":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("--right requires a path")
+			}
+			right = args[i]
+		case "--rel":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("--rel requires a path")
+			}
+			rel = args[i]
+		case "--kind":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("--kind requires a value")
+			}
+			kind = args[i]
+		case "--lines":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("--lines requires a value")
+			}
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n <= 0 {
+				return fmt.Errorf("--lines must be a positive integer")
+			}
+			lines = n
+		default:
+			return fmt.Errorf("unknown flag: %s", args[i])
+		}
+	}
+	if left == "" || right == "" || rel == "" || kind == "" {
+		return fmt.Errorf("--left, --right, --rel, and --kind are required")
+	}
+	data, err := mcpsync.RenderDiffPreviewJSON(rel, left, right, kind, lines)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
 }
 
 func runWorkspaceRuntimeInventory(args []string) error {
