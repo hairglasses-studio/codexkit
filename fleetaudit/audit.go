@@ -93,6 +93,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "fleet_audit",
 			Description: "Run full audit on all repos in a scan directory",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -111,6 +112,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "fleet_report",
 			Description: "Generate a summary report of fleet health",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{

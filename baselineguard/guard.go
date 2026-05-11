@@ -1,6 +1,6 @@
 // Package baselineguard validates Codex repo baseline requirements.
 //
-// It checks for canonical instruction patterns, required files, Codex profiles,
+// It checks for canonical instruction patterns, required files, Codex config,
 // skill surface validity, agent naming conventions, skill sync drift,
 // MCP config drift, and protocol compliance (A2A, MCP discovery).
 package baselineguard
@@ -21,9 +21,17 @@ import (
 
 // Finding represents a single validation result.
 type Finding struct {
-	Check   string `json:"check"`
-	Passed  bool   `json:"passed"`
-	Message string `json:"message,omitempty"`
+	Check       string        `json:"check"`
+	Passed      bool          `json:"passed"`
+	Message     string        `json:"message,omitempty"`
+	Remediation []Remediation `json:"remediation,omitempty"`
+}
+
+// Remediation describes a concrete recovery action for a failed finding.
+type Remediation struct {
+	Kind    string   `json:"kind"`
+	Message string   `json:"message"`
+	Command []string `json:"command,omitempty"`
 }
 
 // Report is the full baseline-guard result for a repo.
@@ -46,16 +54,8 @@ var RequiredFiles = []string{
 	".codex/config.toml",
 }
 
-// RequiredProfiles lists the Codex profiles that must be defined.
-var RequiredProfiles = []string{
-	"readonly_quiet",
-	"review",
-	"workspace_auto",
-	"ci_json",
-}
-
-// PortableFrontmatterKeys re-exports the canonical set from the top-level package.
-var PortableFrontmatterKeys = codexkit.PortableFrontmatterKeys
+// PortableFrontmatterKeys re-exports the canonical source-key set from the top-level package.
+var PortableFrontmatterKeys = codexkit.SkillSourceFrontmatterKeys
 
 var (
 	canonicalAgentsRe = regexp.MustCompile(`(?m)^> Canonical instructions: AGENTS\.md`)
@@ -84,6 +84,7 @@ func Check(repoPath string) Report {
 	report.addA2AAwareness(repoPath)
 	report.addSkillPortability(repoPath)
 
+	report.addRemediations(repoPath)
 	report.Total = len(report.Findings)
 	for _, f := range report.Findings {
 		if !f.Passed {
@@ -96,6 +97,83 @@ func Check(repoPath string) Report {
 
 func (r *Report) add(check string, passed bool, msg string) {
 	r.Findings = append(r.Findings, Finding{Check: check, Passed: passed, Message: msg})
+}
+
+func (r *Report) addRemediations(repoPath string) {
+	for i := range r.Findings {
+		if r.Findings[i].Passed {
+			continue
+		}
+		r.Findings[i].Remediation = remediationForCheck(repoPath, r.Findings[i].Check)
+	}
+}
+
+func remediationForCheck(repoPath, check string) []Remediation {
+	command := func(args ...string) []string {
+		return append([]string{"codexkit"}, args...)
+	}
+	switch check {
+	case "skill_sync":
+		return []Remediation{{
+			Kind:    "generator",
+			Message: "regenerate skill mirrors",
+			Command: command("skills", "sync", repoPath, "--quiet-warnings"),
+		}}
+	case "mcp_sync":
+		return []Remediation{{
+			Kind:    "generator",
+			Message: "regenerate MCP config",
+			Command: command("mcp", "sync", repoPath),
+		}}
+	case "claude_settings_json", "gemini_settings_json", "gemini_context_bridge", "gemini_mcp_bridge":
+		return []Remediation{{
+			Kind:    "generator",
+			Message: "refresh provider settings",
+			Command: command("provider", "sync", repoPath),
+		}}
+	case "required_file", "canonical_agents", "canonical_claude", "canonical_gemini", "canonical_copilot":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "restore canonical provider instruction files: AGENTS.md, CLAUDE.md, GEMINI.md, .github/copilot-instructions.md",
+		}}
+	case "codex_config_toml", "project_local_profiles":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "edit .codex/config.toml; keep repo-local configs parseable and remove unsupported [profiles.*] tables",
+		}}
+	case "agent_naming":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "rename .codex/agents/*.toml files to underscore_case",
+		}}
+	case "skill_surface", "skill_file", "skill_portability":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "fix the canonical .agents/skills surface before regenerating provider mirrors",
+		}}
+	case "sync_wrapper_portability":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "make repo-local sync wrappers path-stable and run Go helpers with GOWORK=off",
+		}}
+	case "mcp_portability":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "make active .mcp.json and generated Codex MCP launchers use portable absolute commands and cwd values",
+		}}
+	case "mcp_discovery":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "publish or update .well-known/mcp.json for active HTTP MCP servers",
+		}}
+	case "a2a_awareness":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "fix .well-known/agent.json so the Agent2Agent metadata is valid",
+		}}
+	default:
+		return nil
+	}
 }
 
 func (r *Report) addRequiredFiles(repoPath string) {
@@ -235,17 +313,16 @@ func (r *Report) addProfiles(repoPath string) {
 		return
 	}
 	r.add("codex_config_toml", true, "")
-	found := make(map[string]bool)
-	for _, match := range profileRe.FindAllStringSubmatch(string(data), -1) {
-		found[match[1]] = true
+	matches := profileRe.FindAllStringSubmatch(string(data), -1)
+	if len(matches) == 0 {
+		r.add("project_local_profiles", true, ".codex/config.toml has no unsupported project-local profiles")
+		return
 	}
-	for _, name := range RequiredProfiles {
-		if found[name] {
-			r.add("profile", true, name)
-		} else {
-			r.add("profile", false, fmt.Sprintf("missing profile: %s", name))
-		}
+	names := make([]string, 0, len(matches))
+	for _, match := range matches {
+		names = append(names, match[1])
 	}
+	r.add("project_local_profiles", false, fmt.Sprintf("unsupported project-local profiles in .codex/config.toml: %s", strings.Join(names, ", ")))
 }
 
 func validateCodexConfigTOML(data []byte) error {
@@ -506,7 +583,7 @@ func (r *Report) addSkillPortability(repoPath string) {
 				continue
 			}
 			key := strings.TrimSpace(parts[0])
-			if !codexkit.PortableFrontmatterKeys[key] {
+			if !codexkit.SkillSourceFrontmatterKeys[key] {
 				nonPortable = append(nonPortable, key)
 			}
 		}
@@ -586,6 +663,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "baseline_check",
 			Description: "Run baseline-guard validation on a single repo",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -604,6 +682,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "baseline_check_all",
 			Description: "Run baseline-guard validation on all repos in ~/hairglasses-studio",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{

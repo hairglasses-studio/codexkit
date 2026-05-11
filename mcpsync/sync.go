@@ -45,6 +45,11 @@ type policyProfile struct {
 	From              string                  `json:"from"`
 	Mode              string                  `json:"mode,omitempty"`
 	Comment           string                  `json:"comment,omitempty"`
+	GlobalName        string                  `json:"global_name,omitempty"`
+	GlobalCodex       bool                    `json:"global_codex,omitempty"`
+	GlobalClaude      bool                    `json:"global_claude,omitempty"`
+	GlobalGemini      bool                    `json:"global_gemini,omitempty"`
+	GlobalRawSource   bool                    `json:"global_raw_source,omitempty"`
 	Enabled           *bool                   `json:"enabled,omitempty"`
 	Required          *bool                   `json:"required,omitempty"`
 	StartupTimeoutSec *int                    `json:"startup_timeout_sec,omitempty"`
@@ -576,11 +581,7 @@ func writeInlineArray(b *strings.Builder, key string, values []string) {
 }
 
 func writeMultiArray(b *strings.Builder, key string, values []string) {
-	fmt.Fprintf(b, "%s = [\n", key)
-	for _, value := range values {
-		fmt.Fprintf(b, "  %s,\n", quoteTOMLString(value))
-	}
-	b.WriteString("]\n")
+	writeInlineArray(b, key, values)
 }
 
 func quoteTOMLString(value string) string {

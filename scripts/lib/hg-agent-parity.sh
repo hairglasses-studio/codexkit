@@ -554,27 +554,7 @@ hg_parity_provider_runtime_drift_count() {
 }
 
 hg_parity_render_codex_standard_profiles() {
-  cat <<'EOF'
-[profiles.readonly_quiet]
-approval_policy = "never"
-sandbox_mode = "read-only"
-model_reasoning_effort = "xhigh"
-
-[profiles.review]
-approval_policy = "on-request"
-sandbox_mode = "read-only"
-model_reasoning_effort = "xhigh"
-
-[profiles.workspace_auto]
-approval_policy = "on-failure"
-sandbox_mode = "workspace-write"
-model_reasoning_effort = "xhigh"
-
-[profiles.ci_json]
-approval_policy = "never"
-sandbox_mode = "workspace-write"
-model_reasoning_effort = "xhigh"
-EOF
+  return 0
 }
 
 hg_parity_codex_has_standard_profiles() {
@@ -614,8 +594,6 @@ hg_parity_render_codex_base_config() {
 # repo-local template remains project-scoped for compatibility surfaces.
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
-
-$(hg_parity_render_codex_standard_profiles)
 EOF
 }
 
@@ -731,10 +709,6 @@ hg_parity_render_codex_config() {
   local repo_path="$1"
   local base_config
   base_config="$(hg_parity_render_codex_base_config "$repo_path")"
-  if ! hg_parity_codex_has_standard_profiles "$base_config" && \
-     ! hg_parity_codex_has_any_required_profile "$base_config"; then
-    base_config="${base_config%$'\n'}"$'\n\n'"$(hg_parity_render_codex_standard_profiles)"
-  fi
   printf '%s\n' "$base_config"
 }
 

@@ -50,7 +50,7 @@ jobs:
                 /^[A-Za-z0-9_-]+:/ {
                   key = $1
                   sub(/:.*/, "", key)
-                  if (key != "name" && key != "description" && key != "allowed-tools") {
+                  if (key != "name" && key != "description" && key != "allowed-tools" && key != "reload" && key != "disable-model-invocation") {
                     print key
                   }
                   next
@@ -168,3 +168,41 @@ jobs:
               done < <(find plugins -path '*/skills/*/SKILL.md' | sort)
             fi
           fi
+
+      - name: Validate self-hosted workspace contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          studio_root="${HG_STUDIO_ROOT:-$HOME/hairglasses-studio}"
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          [[ -d "$studio_root" ]] || fail "Studio workspace root not found: $studio_root"
+          [[ -d "$studio_root/codexkit/.git" ]] || fail "Studio workspace codexkit checkout not found: $studio_root/codexkit"
+          [[ -f "$studio_root/workspace/manifest.json" ]] || fail "Workspace manifest not found: $studio_root/workspace/manifest.json"
+          [[ -f "$studio_root/workspace/mcp-global-policy.json" ]] || fail "Workspace MCP policy not found: $studio_root/workspace/mcp-global-policy.json"
+
+          echo "HG_STUDIO_ROOT=$studio_root" >> "$GITHUB_ENV"
+
+      - name: Validate workspace source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          studio_root="${HG_STUDIO_ROOT:-$HOME/hairglasses-studio}"
+          GOWORK=off go run ./cmd/codexkit workspace source-contract-check "$studio_root" \
+            --skill-validator=off \
+            --json-path "$studio_root/docs/inventory/workspace-source-contract-2026-05-10.json"
+          GOWORK=off go run ./cmd/codexkit workspace surface-index-check "$studio_root" \
+            --skill-validator=off \
+            --json-path "$studio_root/docs/inventory/repo-surface-index-2026-05-10.json" \
+            --markdown-path "$studio_root/docs/inventory/repo-surface-index-2026-05-10.md"
+          GOWORK=off go run ./cmd/codexkit workspace primitive-index-check "$studio_root" \
+            --json-path "$studio_root/docs/inventory/workspace-agent-primitives-2026-05-10.json" \
+            --markdown-path "$studio_root/docs/inventory/workspace-agent-primitives-2026-05-10.md"
+          GOWORK=off go run ./cmd/codexkit workspace global-mcp-projection-check "$studio_root" \
+            --json-path "$studio_root/docs/inventory/workspace-global-mcp-projection-2026-05-10.json" \
+            --markdown-path "$studio_root/docs/inventory/workspace-global-mcp-projection-2026-05-10.md"

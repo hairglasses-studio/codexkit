@@ -34,12 +34,13 @@ func TestMetadataPathLabelPrefersRepoRelativePathForCodexkitSelfAudit(t *testing
 	}
 
 	scriptPath := filepath.Join(toolRoot, "scripts", "lib", "hg-agent-parity.sh")
+	realScript := realAgentParityScript(t)
 	source := strings.ReplaceAll(`#!/usr/bin/env bash
 set -euo pipefail
 hg_require() { return 0; }
 source "__REAL_SCRIPT__"
 hg_parity_metadata_path_label "__REPO_ROOT__" "__TOOL_TEMPLATE__"
-`, "__REAL_SCRIPT__", filepath.Join("/tmp/codexkit-refresh-yJiz8x", "scripts", "lib", "hg-agent-parity.sh"))
+`, "__REAL_SCRIPT__", realScript)
 	source = strings.ReplaceAll(source, "__REPO_ROOT__", repoRoot)
 	source = strings.ReplaceAll(source, "__TOOL_TEMPLATE__", toolTemplate)
 	if err := os.WriteFile(scriptPath, []byte(source), 0o755); err != nil {
@@ -47,7 +48,7 @@ hg_parity_metadata_path_label "__REPO_ROOT__" "__TOOL_TEMPLATE__"
 	}
 
 	cmd := exec.Command("bash", scriptPath)
-	cmd.Env = append(os.Environ(), "HG_AGENT_PARITY_SURFACEKIT_ROOT="+toolRoot)
+	cmd.Env = append(os.Environ(), "HG_AGENT_PARITY_ROOT="+toolRoot)
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("metadata label command failed: %v", err)
@@ -83,12 +84,13 @@ func TestMetadataPathLabelKeepsCodexkitPrefixForExternalRepos(t *testing.T) {
 	}
 
 	scriptPath := filepath.Join(toolRoot, "scripts", "lib", "hg-agent-parity.sh")
+	realScript := realAgentParityScript(t)
 	source := strings.ReplaceAll(`#!/usr/bin/env bash
 set -euo pipefail
 hg_require() { return 0; }
 source "__REAL_SCRIPT__"
 hg_parity_metadata_path_label "__REPO_ROOT__" "__TOOL_TEMPLATE__"
-`, "__REAL_SCRIPT__", filepath.Join("/tmp/codexkit-refresh-yJiz8x", "scripts", "lib", "hg-agent-parity.sh"))
+`, "__REAL_SCRIPT__", realScript)
 	source = strings.ReplaceAll(source, "__REPO_ROOT__", repoRoot)
 	source = strings.ReplaceAll(source, "__TOOL_TEMPLATE__", toolTemplate)
 	if err := os.WriteFile(scriptPath, []byte(source), 0o755); err != nil {
@@ -96,7 +98,7 @@ hg_parity_metadata_path_label "__REPO_ROOT__" "__TOOL_TEMPLATE__"
 	}
 
 	cmd := exec.Command("bash", scriptPath)
-	cmd.Env = append(os.Environ(), "HG_AGENT_PARITY_SURFACEKIT_ROOT="+toolRoot)
+	cmd.Env = append(os.Environ(), "HG_AGENT_PARITY_ROOT="+toolRoot)
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("metadata label command failed: %v", err)
@@ -105,4 +107,17 @@ hg_parity_metadata_path_label "__REPO_ROOT__" "__TOOL_TEMPLATE__"
 	if got := strings.TrimSpace(string(out)); got != "codexkit/templates/gemini-settings.standard.json" {
 		t.Fatalf("metadata path label = %q, want %q", got, "codexkit/templates/gemini-settings.standard.json")
 	}
+}
+
+func realAgentParityScript(t *testing.T) string {
+	t.Helper()
+
+	path, err := filepath.Abs(filepath.Join("..", "..", "scripts", "lib", "hg-agent-parity.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

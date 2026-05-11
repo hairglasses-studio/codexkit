@@ -14,7 +14,13 @@ import (
 	"github.com/hairglasses-studio/codexkit/mcpserver"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 	"github.com/hairglasses-studio/codexkit/perfaudit"
+	"github.com/hairglasses-studio/codexkit/primitiveindex"
+	"github.com/hairglasses-studio/codexkit/reporeadiness"
 	"github.com/hairglasses-studio/codexkit/skillsync"
+	"github.com/hairglasses-studio/codexkit/sourcecontract"
+	"github.com/hairglasses-studio/codexkit/surfaceindex"
+	"github.com/hairglasses-studio/codexkit/unificationaudit"
+	"github.com/hairglasses-studio/codexkit/workspace"
 )
 
 func main() {
@@ -26,6 +32,12 @@ func main() {
 		mcpsync.Module(),
 		fleetaudit.Module(),
 		perfaudit.Module(),
+		primitiveindex.Module(),
+		reporeadiness.Module(),
+		sourcecontract.Module(),
+		surfaceindex.Module(),
+		unificationaudit.Module(),
+		workspace.Module(),
 	}
 
 	for _, m := range modules {

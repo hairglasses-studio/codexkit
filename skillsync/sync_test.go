@@ -145,7 +145,7 @@ func TestSync_RejectsNonPortableFrontmatter(t *testing.T) {
 		}},
 	})
 	writeFile(t, dir, ".agents/skills/surface.yaml", string(surface))
-	writeFile(t, dir, ".agents/skills/myskill/SKILL.md", "---\nname: myskill\ndescription: bad skill\nreload: true\n---\n# My Skill\n")
+	writeFile(t, dir, ".agents/skills/myskill/SKILL.md", "---\nname: myskill\ndescription: bad skill\ncustom_key: true\n---\n# My Skill\n")
 
 	report := Sync(dir, false)
 	if len(report.Errors) == 0 {
@@ -153,6 +153,116 @@ func TestSync_RejectsNonPortableFrontmatter(t *testing.T) {
 	}
 	if !strings.Contains(report.Errors[0], "non-portable frontmatter") {
 		t.Fatalf("expected non-portable frontmatter error, got %v", report.Errors)
+	}
+}
+
+func TestSync_UsesAgentskillsValidatorFallback(t *testing.T) {
+	dir := setupSyncRepo(t)
+	binDir := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "validator.log")
+	validator := filepath.Join(binDir, "agentskills")
+	if err := os.WriteFile(validator, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SKILLS_VALIDATOR_LOG\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir)
+	t.Setenv("SKILLS_VALIDATOR_LOG", logPath)
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	if !report.ValidationUsed {
+		t.Fatal("expected validator fallback to be used")
+	}
+	if report.ValidationCommand != "agentskills" {
+		t.Fatalf("ValidationCommand = %q, want agentskills", report.ValidationCommand)
+	}
+	log, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(log), "validate ") || !strings.Contains(string(log), "/myskill") {
+		t.Fatalf("validator log did not include expected validate call: %s", string(log))
+	}
+}
+
+func TestCheckWithOptions_HostValidatorFailsWhenMissing(t *testing.T) {
+	dir := setupSyncRepo(t)
+	t.Setenv("PATH", t.TempDir())
+
+	report := CheckWithOptions(dir, Options{ValidatorMode: ValidatorHost})
+	if len(report.Errors) == 0 {
+		t.Fatal("expected missing host validator error")
+	}
+	if !strings.Contains(report.Errors[0], "requires skills-ref or agentskills") {
+		t.Fatalf("unexpected error: %v", report.Errors)
+	}
+}
+
+func TestCheckWithOptions_OffValidatorSuppressesWarning(t *testing.T) {
+	dir := setupSyncRepo(t)
+	t.Setenv("PATH", t.TempDir())
+
+	report := CheckWithOptions(dir, Options{ValidatorMode: ValidatorOff})
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	if report.ValidationUsed {
+		t.Fatal("did not expect validator to be used")
+	}
+	if len(report.Warnings) > 0 {
+		t.Fatalf("did not expect validator warnings, got %v", report.Warnings)
+	}
+}
+
+func TestCheckWithOptions_PinnedValidatorUsesUVX(t *testing.T) {
+	dir := setupSyncRepo(t)
+	binDir := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "validator.log")
+	validator := filepath.Join(binDir, "uvx")
+	if err := os.WriteFile(validator, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SKILLS_VALIDATOR_LOG\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir)
+	t.Setenv("SKILLS_VALIDATOR_LOG", logPath)
+
+	report := CheckWithOptions(dir, Options{ValidatorMode: ValidatorPinned})
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	if report.ValidationCommand != "uvx --from skills-ref==0.1.1 agentskills" {
+		t.Fatalf("ValidationCommand = %q", report.ValidationCommand)
+	}
+	log, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(log), "--from skills-ref==0.1.1 agentskills validate ") {
+		t.Fatalf("validator log did not include expected uvx validate call: %s", string(log))
+	}
+}
+
+func TestCheckWithOptions_PinnedValidatorIgnoresHostValidator(t *testing.T) {
+	dir := setupSyncRepo(t)
+	binDir := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "validator.log")
+	hostValidator := filepath.Join(binDir, "skills-ref")
+	if err := os.WriteFile(hostValidator, []byte("#!/bin/sh\necho host validator should not run >&2\nexit 42\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pinnedValidator := filepath.Join(binDir, "uvx")
+	if err := os.WriteFile(pinnedValidator, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SKILLS_VALIDATOR_LOG\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir)
+	t.Setenv("SKILLS_VALIDATOR_LOG", logPath)
+
+	report := CheckWithOptions(dir, Options{ValidatorMode: ValidatorPinned})
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	if report.ValidationCommand != "uvx --from skills-ref==0.1.1 agentskills" {
+		t.Fatalf("ValidationCommand = %q", report.ValidationCommand)
 	}
 }
 
@@ -192,8 +302,8 @@ func TestFilterPortableFrontmatter(t *testing.T) {
 func TestFilterPortableFrontmatter_PreservesReload(t *testing.T) {
 	input := "---\nname: test\nreload: true\n---\n# Content\n"
 	result := FilterPortableFrontmatter(input)
-	if strings.Contains(result, "reload: true") {
-		t.Error("reload key should be filtered from portable frontmatter")
+	if !strings.Contains(result, "reload: true") {
+		t.Error("reload key should be preserved in portable frontmatter")
 	}
 }
 

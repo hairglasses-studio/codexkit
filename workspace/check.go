@@ -42,6 +42,10 @@ func Check(root string, manifest Manifest) Report {
 	matrix, matrixStatus := loadConsolidationMatrixForCheck(root)
 
 	for _, repo := range manifest.Repos {
+		if _, exists := manifestRepos[repo.Name]; exists {
+			report.add("manifest_repo_unique", repo.Name, false, "duplicate repo name")
+			continue
+		}
 		manifestRepos[repo.Name] = repo
 		repoPath := filepath.Join(root, repo.Name)
 		if _, err := os.Stat(repoPath); err != nil {
@@ -65,11 +69,17 @@ func Check(root string, manifest Manifest) Report {
 
 	actualMembers, err := ParseGoWorkModules(filepath.Join(root, "go.work"))
 	if err != nil {
-		report.add("go_work_parse", "", false, err.Error())
-		report.Passed = false
-		return report
+		if os.IsNotExist(err) && len(expectedGoWork) == 0 {
+			report.add("go_work_parse", "", true, "not found; skipped because manifest has no go_work_member repos")
+			actualMembers = nil
+		} else {
+			report.add("go_work_parse", "", false, err.Error())
+			report.Passed = false
+			return report
+		}
+	} else {
+		report.add("go_work_parse", "", true, fmt.Sprintf("%d members", len(actualMembers)))
 	}
-	report.add("go_work_parse", "", true, fmt.Sprintf("%d members", len(actualMembers)))
 
 	actualSet := make(map[string]struct{}, len(actualMembers))
 	for _, member := range actualMembers {
@@ -98,6 +108,10 @@ func Check(root string, manifest Manifest) Report {
 		for _, decision := range matrix.Decisions {
 			repo, ok := manifestRepos[decision.Repo]
 			if !ok {
+				if decision.WorkspaceScope == "compatibility_only" || decision.ArchiveCandidate {
+					report.add("consolidation_manifest", decision.Repo, true, "optional compatibility repo absent from current workspace manifest")
+					continue
+				}
 				report.add("consolidation_manifest", decision.Repo, false, "repo is missing from workspace manifest")
 				continue
 			}
@@ -191,6 +205,9 @@ func loadConsolidationMatrixForCheck(root string) (ConsolidationMatrix, consolid
 func repoDirectoryRequired(repo Repo, decision ConsolidationDecision) bool {
 	if repo.Scope != "compatibility_only" {
 		return true
+	}
+	if !repo.BaselineTarget && !repo.GoWorkMember {
+		return false
 	}
 	if !decision.ArchiveCandidate {
 		return true

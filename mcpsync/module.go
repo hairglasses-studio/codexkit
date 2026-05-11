@@ -19,6 +19,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "mcp_sync",
 			Description: "Sync MCP server definitions from .mcp.json to .codex/config.toml",
+			Annotations: codexkit.ToolAnnotations(false, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -39,6 +40,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "mcp_diff",
 			Description: "Show what MCP sync would change (dry-run)",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -57,6 +59,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "mcp_list",
 			Description: "List MCP servers defined in .mcp.json",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -70,6 +73,46 @@ func (m *module) Tools() []codexkit.ToolDef {
 					return nil, fmt.Errorf("repo_path is required")
 				}
 				return List(repoPath)
+			},
+		},
+		{
+			Name:        "mcp_runtime_inventory",
+			Description: "Build a manifest-backed runtime MCP projection inventory without starting device-bound services.",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
+			Schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"workspace_root": map[string]any{"type": "string", "description": "Workspace root. Defaults to ~/hairglasses-studio."},
+					"policy_path":    map[string]any{"type": "string", "description": "Optional global MCP policy path."},
+				},
+			},
+			Handler: func(params map[string]any) (any, error) {
+				workspaceRoot, _ := params["workspace_root"].(string)
+				policyPath, _ := params["policy_path"].(string)
+				return BuildRuntimeInventory(RuntimeInventoryOptions{
+					WorkspaceRoot: workspaceRoot,
+					PolicyPath:    policyPath,
+				})
+			},
+		},
+		{
+			Name:        "workspace_global_mcp_projection",
+			Description: "Build the workspace-global MCP provider projection for Codex, Claude, and Gemini from manifest-backed sources.",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
+			Schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"workspace_root": map[string]any{"type": "string", "description": "Workspace root. Defaults to ~/hairglasses-studio."},
+					"policy_path":    map[string]any{"type": "string", "description": "Optional global MCP policy path."},
+				},
+			},
+			Handler: func(params map[string]any) (any, error) {
+				workspaceRoot, _ := params["workspace_root"].(string)
+				policyPath, _ := params["policy_path"].(string)
+				return BuildGlobalProjection(GlobalProjectionOptions{
+					WorkspaceRoot: workspaceRoot,
+					PolicyPath:    policyPath,
+				})
 			},
 		},
 	}

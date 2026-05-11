@@ -1,6 +1,6 @@
 # codexkit Roadmap
 
-Last updated: 2026-04-08.
+Last updated: 2026-05-11.
 
 ## Current State
 
@@ -10,6 +10,15 @@ Codex fleet management toolkit for baseline validation, skill sync, and MCP prof
 - Lifecycle: `active`
 - Language profile: `Go`
 - Visibility / sensitivity: `PRIVATE` / `internal`
+
+## Unification Loop Improvements
+
+- [x] Add repo-scoped remediation hints to `codexkit baseline check` failure output, including exact `baseline check`, `skills sync`, `mcp sync`, and `provider sync` commands where the failing check maps to a generator.
+- [x] Move remediation hint metadata into structured baseline findings so CLI, MCP, and unification reports use the same recovery contract.
+- [x] Make `codexkit baseline check --json` suppress human text by default so automation receives machine-readable JSON.
+- [x] Teach unification reports to display structured baseline remediation commands when the baseline queue is non-empty.
+- [x] Extend unification cycle notes to include the first baseline remediation command when the baseline queue is non-empty.
+
 <!-- whiteclaw-rollout:start -->
 ## Whiteclaw-Derived Overhaul (2026-04-08)
 
@@ -55,4 +64,3 @@ Key recommendations relevant to this repo:
 - **Discovery surfaces are MCP resources**, not tools (`<server>:///catalog/server`).
 
 See the pattern doc for the full `# Adoption checklist` and `# Anti-patterns` sections.
-

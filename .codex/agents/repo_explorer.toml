@@ -1,6 +1,6 @@
 name = "repo_explorer"
 description = "Read-heavy explorer for codexkit validation rules, sync logic, and fleet patterns."
-model = "gpt-5.4"
+model = "gpt-5.3-codex-spark"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "read-only"
 developer_instructions = """

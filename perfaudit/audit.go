@@ -879,6 +879,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "perf_audit",
 			Description: "Scan the workspace for current Codex performance bottlenecks",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -898,6 +899,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "perf_report",
 			Description: "Return a human-readable summary of the Codex performance audit",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{

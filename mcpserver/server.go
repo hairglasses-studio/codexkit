@@ -68,6 +68,7 @@ type JSONRPCError struct {
 type MCPToolInfo struct {
 	Name         string         `json:"name"`
 	Description  string         `json:"description"`
+	Annotations  map[string]any `json:"annotations,omitempty"`
 	InputSchema  map[string]any `json:"inputSchema,omitempty"`
 	DeferLoading bool           `json:"defer_loading,omitempty"`
 }
@@ -208,6 +209,7 @@ func (s *Server) handleToolsList(req JSONRPCRequest) JSONRPCResponse {
 		info := MCPToolInfo{
 			Name:        t.Name,
 			Description: t.Description,
+			Annotations: t.Annotations,
 			InputSchema: map[string]any{
 				"type":       "object",
 				"properties": map[string]any{},

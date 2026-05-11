@@ -22,11 +22,12 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 
 | Package | Purpose |
 |---------|---------|
-| `baselineguard` | Validate Codex repo baseline (canonical patterns, profiles, skills, agents, protocol compliance) |
+| `baselineguard` | Validate Codex repo baseline (canonical patterns, project config, skills, agents, protocol compliance) |
 | `skillsync` | Sync `.agents/skills/` → `.claude/skills/` + `plugins/` mirrors |
 | `mcpsync` | Sync `.mcp.json` → `.codex/config.toml` MCP server blocks |
 | `mcpserver` | MCP server — aggregates all ToolModules, deferred tool loading |
 | `fleetaudit` | Fleet-wide audit combining baseline, skill sync, and MCP sync checks |
+| `reporeadiness` | Score repo mutation readiness lanes from manifest, fleet mode, git state, and baseline status |
 | `perfaudit` | Fleet-wide static audit for Codex performance bottlenecks and regression budgets |
 | `internal/toml` | Minimal TOML writer (zero external dependencies) |
 
@@ -39,7 +40,7 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 | `canonical_claude` | CLAUDE.md references AGENTS.md |
 | `canonical_gemini` | GEMINI.md references AGENTS.md |
 | `canonical_copilot` | copilot-instructions.md mentions AGENTS.md |
-| `profile` | Required Codex profiles defined (readonly_quiet, review, workspace_auto, ci_json) |
+| `project_local_profiles` | Repo-local `.codex/config.toml` does not define unsupported `[profiles.*]` tables |
 | `agent_naming` | Agent filenames use underscore_case |
 | `skill_surface` | surface.yaml is valid |
 | `skill_file` | Each skill has SKILL.md |
@@ -65,6 +66,7 @@ The MCP server (`cmd/codexkit-mcp`) exposes these tools:
 | `mcp_list` | mcpsync | List MCP servers |
 | `fleet_audit` | fleetaudit | Run full audit on all repos |
 | `fleet_report` | fleetaudit | Summary report of fleet health |
+| `repo_readiness_score` | reporeadiness | Score autonomous mutation readiness lanes for workspace repos |
 | `perf_audit` | perfaudit | Scan the workspace for Codex performance bottlenecks |
 | `perf_report` | perfaudit | Render the Codex performance audit as Markdown |
 

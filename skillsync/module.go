@@ -19,6 +19,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "skill_sync",
 			Description: "Sync skills from .agents/skills/ to .claude/skills/ and plugins/ mirrors",
+			Annotations: codexkit.ToolAnnotations(false, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -39,6 +40,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "skill_diff",
 			Description: "Show what skill sync would change (dry-run)",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -57,6 +59,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 		{
 			Name:        "skill_list",
 			Description: "List skills defined in surface.yaml",
+			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{

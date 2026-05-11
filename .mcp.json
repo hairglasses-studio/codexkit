@@ -1,7 +1,8 @@
 {
   "mcpServers": {
     "codexkit": {
-      "command": "./scripts/run-codexkit-mcp.sh"
+      "command": "/home/hg/hairglasses-studio/codexkit/scripts/run-codexkit-mcp.sh",
+      "args": []
     }
   }
 }

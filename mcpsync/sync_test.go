@@ -392,3 +392,46 @@ func TestSync_PolicyFileRendersOverrides(t *testing.T) {
 		}
 	}
 }
+
+func TestSync_RendersToolAllowlistsCompactly(t *testing.T) {
+	dir := t.TempDir()
+	mcpJSON, _ := json.Marshal(map[string]any{
+		"mcpServers": map[string]any{
+			"runner": map[string]any{
+				"command": "npx",
+				"args":    []string{"-y", "@example/runner"},
+			},
+		},
+	})
+	policyJSON, _ := json.Marshal(map[string]any{
+		"version": 1,
+		"profiles": []map[string]any{{
+			"name":           "runner",
+			"from":           "runner",
+			"enabled_tools":  []string{"launch", "status", "tail"},
+			"disabled_tools": []string{"destroy", "reset"},
+		}},
+	})
+	writeFile(t, dir, ".mcp.json", string(mcpJSON))
+	writeFile(t, dir, ".codex/mcp-profile-policy.json", string(policyJSON))
+	writeFile(t, dir, ".codex/config.toml", "")
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, ".codex/config.toml"))
+	content := string(data)
+	for _, want := range []string{
+		`enabled_tools = ["launch", "status", "tail"]`,
+		`disabled_tools = ["destroy", "reset"]`,
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("expected compact tool array %q\n%s", want, content)
+		}
+	}
+	if strings.Contains(content, "enabled_tools = [\n") || strings.Contains(content, "disabled_tools = [\n") {
+		t.Fatalf("tool arrays should render on one line\n%s", content)
+	}
+}

@@ -44,14 +44,6 @@ func TestAudit_DefaultsToActiveScopeAndDetectsBottlenecks(t *testing.T) {
 		`command = "bash"`,
 		`args = ["-lc", "exec ./scripts/run-demo.sh"]`,
 		``,
-		`[profiles.readonly_quiet]`,
-		`approval_policy = "never"`,
-		`[profiles.review]`,
-		`approval_policy = "on-request"`,
-		`[profiles.workspace_auto]`,
-		`approval_policy = "on-failure"`,
-		`[profiles.ci_json]`,
-		`approval_policy = "never"`,
 		`# filler to push the config above the bloat threshold`,
 		strings.Repeat("# filler line\n", 130),
 	}, "\n"))
@@ -61,7 +53,7 @@ func TestAudit_DefaultsToActiveScopeAndDetectsBottlenecks(t *testing.T) {
 	writeFile(t, repoPath, "prompts/huge-prompt.md", strings.Repeat("B", 17000))
 
 	archivedPath := filepath.Join(root, "archived-repo")
-	writeFile(t, archivedPath, ".codex/config.toml", `[profiles.readonly_quiet]`+"\n")
+	writeFile(t, archivedPath, ".codex/config.toml", `approval_policy = "on-request"`+"\n")
 
 	report := Audit(root, Options{})
 	if report.Summary.Scope != "active" {
@@ -129,9 +121,9 @@ func TestAudit_AllScopesIncludesNonActiveReposAndDocsArchivePrompts(t *testing.T
 			},
 		},
 	})
-	writeFile(t, filepath.Join(root, "docs"), ".codex/config.toml", `[profiles.readonly_quiet]`+"\n")
+	writeFile(t, filepath.Join(root, "docs"), ".codex/config.toml", `approval_policy = "on-request"`+"\n")
 	writeFile(t, filepath.Join(root, "docs"), "prompts/library.md", strings.Repeat("P", 4000))
-	writeFile(t, filepath.Join(root, "compat-repo"), ".codex/config.toml", `[profiles.readonly_quiet]`+"\n")
+	writeFile(t, filepath.Join(root, "compat-repo"), ".codex/config.toml", `approval_policy = "on-request"`+"\n")
 
 	report := Audit(root, Options{AllScopes: true})
 	if len(report.Repos) != 2 {
@@ -161,7 +153,7 @@ func TestMarkdownIncludesPriorityTable(t *testing.T) {
 			},
 		},
 	})
-	writeFile(t, filepath.Join(root, "active-repo"), ".codex/config.toml", `[profiles.readonly_quiet]`+"\n")
+	writeFile(t, filepath.Join(root, "active-repo"), ".codex/config.toml", `approval_policy = "on-request"`+"\n")
 
 	markdown := Audit(root, Options{}).Markdown()
 	if !strings.Contains(markdown, "Codex Performance Audit") {

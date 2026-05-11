@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/hairglasses-studio/codexkit"
 )
 
 type syncMode string
@@ -22,10 +24,19 @@ const (
 	modeCheck  syncMode = "check"
 )
 
-var portableFrontmatterKeys = map[string]bool{
-	"name":          true,
-	"description":   true,
-	"allowed-tools": true,
+// ValidatorMode controls how external Agent Skills validators are used.
+type ValidatorMode string
+
+const (
+	ValidatorAuto   ValidatorMode = "auto"
+	ValidatorHost   ValidatorMode = "host"
+	ValidatorPinned ValidatorMode = "pinned"
+	ValidatorOff    ValidatorMode = "off"
+)
+
+// Options controls skill sync and check behavior.
+type Options struct {
+	ValidatorMode ValidatorMode
 }
 
 // SyncAction describes one mirror operation.
@@ -38,13 +49,14 @@ type SyncAction struct {
 
 // SyncReport captures a full sync or check run.
 type SyncReport struct {
-	RepoPath       string       `json:"repo_path"`
-	DryRun         bool         `json:"dry_run"`
-	PendingChanges bool         `json:"pending_changes"`
-	ValidationUsed bool         `json:"validation_used"`
-	Actions        []SyncAction `json:"actions"`
-	Errors         []string     `json:"errors,omitempty"`
-	Warnings       []string     `json:"warnings,omitempty"`
+	RepoPath          string       `json:"repo_path"`
+	DryRun            bool         `json:"dry_run"`
+	PendingChanges    bool         `json:"pending_changes"`
+	ValidationUsed    bool         `json:"validation_used"`
+	ValidationCommand string       `json:"validation_command,omitempty"`
+	Actions           []SyncAction `json:"actions"`
+	Errors            []string     `json:"errors,omitempty"`
+	Warnings          []string     `json:"warnings,omitempty"`
 }
 
 type SkillAlias struct {
@@ -230,7 +242,7 @@ func FilterPortableFrontmatter(content string) string {
 			continue
 		}
 		key := strings.TrimSpace(parts[0])
-		if !portableFrontmatterKeys[key] {
+		if !codexkit.PortableFrontmatterKeys[key] {
 			continue
 		}
 		if key == "allowed-tools" {
@@ -255,19 +267,24 @@ func FilterPortableFrontmatter(content string) string {
 // Sync writes the managed skill mirrors.
 func Sync(repoPath string, dryRun bool) SyncReport {
 	if dryRun {
-		return run(repoPath, modeDryRun)
+		return run(repoPath, modeDryRun, Options{})
 	}
-	return run(repoPath, modeWrite)
+	return run(repoPath, modeWrite, Options{})
 }
 
 // Diff returns the dry-run report.
 func Diff(repoPath string) SyncReport {
-	return run(repoPath, modeDryRun)
+	return run(repoPath, modeDryRun, Options{})
 }
 
 // Check verifies that the managed skill mirrors are current.
 func Check(repoPath string) SyncReport {
-	return run(repoPath, modeCheck)
+	return run(repoPath, modeCheck, Options{})
+}
+
+// CheckWithOptions verifies that managed skill mirrors are current.
+func CheckWithOptions(repoPath string, opts Options) SyncReport {
+	return run(repoPath, modeCheck, opts)
 }
 
 // List returns skill names from the surface definition.
@@ -287,7 +304,7 @@ func normalizedSkillName(name string) string {
 	return strings.ReplaceAll(name, "_", "-")
 }
 
-func run(repoPath string, mode syncMode) SyncReport {
+func run(repoPath string, mode syncMode, opts Options) SyncReport {
 	report := SyncReport{
 		RepoPath: repoPath,
 		DryRun:   mode != modeWrite,
@@ -307,10 +324,13 @@ func run(repoPath string, mode syncMode) SyncReport {
 
 	claudeDirs := map[string]struct{}{}
 	pluginDirs := map[string]struct{}{}
-	validationAvailable := commandAvailable("skills-ref")
+	validator, validationAvailable, validationErr := resolveSkillsValidator(opts.ValidatorMode)
 	report.ValidationUsed = validationAvailable
-	if !validationAvailable {
-		report.Warnings = append(report.Warnings, "skills-ref not found; skipped canonical skill validation")
+	report.ValidationCommand = validator.Display
+	if validationErr != nil {
+		report.Errors = append(report.Errors, validationErr.Error())
+	} else if !validationAvailable && normalizedValidatorMode(opts.ValidatorMode) == ValidatorAuto {
+		report.Warnings = append(report.Warnings, "skills-ref/agentskills not found; skipped canonical skill validation")
 	}
 
 	for _, skill := range surface.Skills {
@@ -326,7 +346,7 @@ func run(repoPath string, mode syncMode) SyncReport {
 			continue
 		}
 		if validationAvailable {
-			if err := validateWithSkillsRef(skill.Name, canonicalDir, content); err != nil {
+			if err := validateWithSkillsRef(validator, skill.Name, canonicalDir, content); err != nil {
 				report.Errors = append(report.Errors, err.Error())
 				continue
 			}
@@ -499,7 +519,7 @@ func validatePortableFrontmatter(path string, content []byte) error {
 			return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
 		}
 		key := strings.TrimSpace(parts[0])
-		if !portableFrontmatterKeys[key] {
+		if !codexkit.SkillSourceFrontmatterKeys[key] {
 			return fmt.Errorf("non-portable frontmatter in %s: %s", path, key)
 		}
 		inTools = key == "allowed-tools"
@@ -611,39 +631,48 @@ func splitFrontmatter(content []byte) ([]string, int, bool) {
 	return strings.Split(frontmatter, "\n"), bodyStart, true
 }
 
-func validateWithSkillsRef(canonicalName, canonicalDir string, canonicalSkill []byte) error {
-	validateDir := canonicalDir
-	cleanup := func() {}
-	if strings.Contains(canonicalName, "_") {
-		tmpRoot, err := os.MkdirTemp("", "codexkit-skills-ref-*")
-		if err != nil {
-			return fmt.Errorf("create temp dir for skills-ref: %w", err)
-		}
-		cleanup = func() { _ = os.RemoveAll(tmpRoot) }
-		compatName := strings.ReplaceAll(canonicalName, "_", "-")
-		validateDir = filepath.Join(tmpRoot, compatName)
-		if err := copyDir(canonicalDir, validateDir); err != nil {
-			cleanup()
-			return fmt.Errorf("prepare skills-ref copy for %s: %w", canonicalName, err)
-		}
-		content := strings.Replace(string(canonicalSkill), "name: "+canonicalName, "name: "+compatName, 1)
-		if err := os.WriteFile(filepath.Join(validateDir, "SKILL.md"), []byte(content), 0o644); err != nil {
-			cleanup()
-			return fmt.Errorf("rewrite compat SKILL.md for %s: %w", canonicalName, err)
-		}
+func validateWithSkillsRef(validator skillValidator, canonicalName, canonicalDir string, canonicalSkill []byte) error {
+	validateDir, cleanup, err := prepareSkillsRefValidationDir(canonicalName, canonicalDir, canonicalSkill)
+	if err != nil {
+		return err
 	}
 	defer cleanup()
 
-	cmd := exec.Command("skills-ref", "validate", validateDir)
+	args := append([]string{}, validator.Args...)
+	args = append(args, validateDir)
+	cmd := exec.Command(validator.Command, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		msg := strings.TrimSpace(string(output))
 		if msg == "" {
 			msg = err.Error()
 		}
-		return fmt.Errorf("skills-ref validation failed for %s: %s", canonicalName, msg)
+		return fmt.Errorf("%s validation failed for %s: %s", validator.Display, canonicalName, msg)
 	}
 	return nil
+}
+
+func prepareSkillsRefValidationDir(canonicalName, canonicalDir string, canonicalSkill []byte) (string, func(), error) {
+	tmpRoot, err := os.MkdirTemp("", "codexkit-skills-ref-*")
+	if err != nil {
+		return "", func() {}, fmt.Errorf("create temp dir for skills-ref: %w", err)
+	}
+	cleanup := func() { _ = os.RemoveAll(tmpRoot) }
+	compatName := strings.ReplaceAll(canonicalName, "_", "-")
+	validateDir := filepath.Join(tmpRoot, compatName)
+	if err := copyDir(canonicalDir, validateDir); err != nil {
+		cleanup()
+		return "", func() {}, fmt.Errorf("prepare skills-ref copy for %s: %w", canonicalName, err)
+	}
+	content := FilterPortableFrontmatter(string(canonicalSkill))
+	if compatName != canonicalName {
+		content = strings.Replace(content, "name: "+canonicalName, "name: "+compatName, 1)
+	}
+	if err := os.WriteFile(filepath.Join(validateDir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		cleanup()
+		return "", func() {}, fmt.Errorf("rewrite compat SKILL.md for %s: %w", canonicalName, err)
+	}
+	return validateDir, cleanup, nil
 }
 
 func copyDir(src, dst string) error {
@@ -670,6 +699,80 @@ func copyDir(src, dst string) error {
 func commandAvailable(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
+}
+
+type skillValidator struct {
+	Command string
+	Args    []string
+	Display string
+}
+
+func resolveSkillsValidator(mode ValidatorMode) (skillValidator, bool, error) {
+	mode = normalizedValidatorMode(mode)
+	switch mode {
+	case ValidatorAuto, ValidatorHost, ValidatorPinned, ValidatorOff:
+	default:
+		return skillValidator{}, false, fmt.Errorf("unknown skill validator mode: %s", mode)
+	}
+	if mode == ValidatorOff {
+		return skillValidator{}, false, nil
+	}
+	if mode == ValidatorPinned {
+		if commandAvailable("uvx") {
+			return skillValidator{
+				Command: "uvx",
+				Args:    []string{"--from", "skills-ref==0.1.1", "agentskills", "validate"},
+				Display: "uvx --from skills-ref==0.1.1 agentskills",
+			}, true, nil
+		}
+		if commandAvailable("npx") {
+			return skillValidator{
+				Command: "npx",
+				Args:    []string{"-y", "skills-ref@0.1.5", "validate"},
+				Display: "npx -y skills-ref@0.1.5",
+			}, true, nil
+		}
+		return skillValidator{}, false, fmt.Errorf("skill validator mode pinned requires uvx or npx on PATH")
+	}
+
+	if command, ok := skillsValidatorCommand(); ok {
+		return skillValidator{Command: command, Args: []string{"validate"}, Display: command}, true, nil
+	}
+	if mode == ValidatorAuto {
+		return skillValidator{}, false, nil
+	}
+	return skillValidator{}, false, fmt.Errorf("skill validator mode host requires skills-ref or agentskills on PATH")
+}
+
+func normalizedValidatorMode(mode ValidatorMode) ValidatorMode {
+	switch mode {
+	case "", ValidatorAuto:
+		return ValidatorAuto
+	case ValidatorHost, ValidatorPinned, ValidatorOff:
+		return mode
+	default:
+		return mode
+	}
+}
+
+// ParseValidatorMode parses a CLI/API validator mode string.
+func ParseValidatorMode(raw string) (ValidatorMode, error) {
+	mode := normalizedValidatorMode(ValidatorMode(raw))
+	switch mode {
+	case ValidatorAuto, ValidatorHost, ValidatorPinned, ValidatorOff:
+		return mode, nil
+	default:
+		return "", fmt.Errorf("unknown skill validator mode: %s", raw)
+	}
+}
+
+func skillsValidatorCommand() (string, bool) {
+	for _, command := range []string{"skills-ref", "agentskills"} {
+		if commandAvailable(command) {
+			return command, true
+		}
+	}
+	return "", false
 }
 
 func errorsIsNotExist(err error) bool {

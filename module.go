@@ -25,6 +25,10 @@ type ToolDef struct {
 	// Description is a short human-readable summary.
 	Description string `json:"description"`
 
+	// Annotations exposes MCP tool behavior hints such as readOnlyHint,
+	// destructiveHint, idempotentHint, and openWorldHint.
+	Annotations map[string]any `json:"annotations,omitempty"`
+
 	// Schema is the JSON Schema for the tool's input parameters.
 	// nil means the tool takes no parameters.
 	Schema map[string]any `json:"inputSchema,omitempty"`
@@ -34,6 +38,16 @@ type ToolDef struct {
 	Handler func(params map[string]any) (any, error) `json:"-"`
 }
 
+// ToolAnnotations builds MCP behavior hints for tool definitions.
+func ToolAnnotations(readOnly, destructive, idempotent, openWorld bool) map[string]any {
+	return map[string]any{
+		"readOnlyHint":    readOnly,
+		"destructiveHint": destructive,
+		"idempotentHint":  idempotent,
+		"openWorldHint":   openWorld,
+	}
+}
+
 // PortableFrontmatterKeys are the only keys allowed in portable
 // skill frontmatter per the Agent Skills open standard (Dec 2025).
 var PortableFrontmatterKeys = map[string]bool{
@@ -41,4 +55,14 @@ var PortableFrontmatterKeys = map[string]bool{
 	"description":   true,
 	"allowed-tools": true,
 	"reload":        true, // hot-reloading support (Jan 2026)
+}
+
+// SkillSourceFrontmatterKeys are allowed in canonical repo-owned skill sources.
+// Provider-specific export paths still filter down to PortableFrontmatterKeys.
+var SkillSourceFrontmatterKeys = map[string]bool{
+	"name":                     true,
+	"description":              true,
+	"allowed-tools":            true,
+	"reload":                   true,
+	"disable-model-invocation": true,
 }

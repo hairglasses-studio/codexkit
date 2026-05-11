@@ -21,18 +21,6 @@ func setupCompliantRepo(t *testing.T) string {
 	writeFile(t, dir, ".github/copilot-instructions.md", "See AGENTS.md in the repository root.\n")
 	writeFile(t, dir, ".codex/config.toml", `
 approval_policy = "on-request"
-
-[profiles.readonly_quiet]
-approval_policy = "never"
-
-[profiles.review]
-approval_policy = "on-request"
-
-[profiles.workspace_auto]
-approval_policy = "on-failure"
-
-[profiles.ci_json]
-approval_policy = "never"
 `)
 	writeFile(t, dir, ".codex/agents/reviewer.toml", `name = "reviewer"`)
 	writeFile(t, dir, ".codex/agents/repo_explorer.toml", `name = "repo_explorer"`)
@@ -93,6 +81,34 @@ func TestCheck_MissingAgentsMd(t *testing.T) {
 	}
 }
 
+func TestCheck_AddsStructuredRemediation(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, ".claude/skills/test_skill/SKILL.md", "# stale\n")
+
+	report := Check(dir)
+	var skillSync *Finding
+	for i := range report.Findings {
+		if report.Findings[i].Check == "skill_sync" && !report.Findings[i].Passed {
+			skillSync = &report.Findings[i]
+			break
+		}
+	}
+	if skillSync == nil {
+		t.Fatal("expected failed skill_sync finding")
+	}
+	if len(skillSync.Remediation) != 1 {
+		t.Fatalf("expected one remediation, got %#v", skillSync.Remediation)
+	}
+	remediation := skillSync.Remediation[0]
+	if remediation.Kind != "generator" {
+		t.Fatalf("remediation kind = %q, want generator", remediation.Kind)
+	}
+	wantCommand := []string{"codexkit", "skills", "sync", dir, "--quiet-warnings"}
+	if !equalStrings(remediation.Command, wantCommand) {
+		t.Fatalf("remediation command = %#v, want %#v", remediation.Command, wantCommand)
+	}
+}
+
 func TestCheck_MissingCanonicalPattern(t *testing.T) {
 	dir := setupCompliantRepo(t)
 	writeFile(t, dir, "AGENTS.md", "# Test\n\nNo canonical line here.\n")
@@ -103,7 +119,19 @@ func TestCheck_MissingCanonicalPattern(t *testing.T) {
 	}
 }
 
-func TestCheck_MissingProfile(t *testing.T) {
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestCheck_RejectsProjectLocalProfiles(t *testing.T) {
 	dir := setupCompliantRepo(t)
 	writeFile(t, dir, ".codex/config.toml", `
 [profiles.readonly_quiet]
@@ -112,16 +140,16 @@ func TestCheck_MissingProfile(t *testing.T) {
 
 	report := Check(dir)
 	if report.Passed {
-		t.Fatal("expected FAIL for missing profiles")
+		t.Fatal("expected FAIL for unsupported project-local profiles")
 	}
-	failCount := 0
+	found := false
 	for _, f := range report.Findings {
-		if f.Check == "profile" && !f.Passed {
-			failCount++
+		if f.Check == "project_local_profiles" && !f.Passed {
+			found = true
 		}
 	}
-	if failCount != 2 {
-		t.Fatalf("expected 2 missing profiles, got %d", failCount)
+	if !found {
+		t.Fatal("expected project_local_profiles failure")
 	}
 }
 
@@ -246,11 +274,6 @@ func TestCheck_MCPPortabilityFlagsGeneratedConfigCWD(t *testing.T) {
 }
 `)
 	writeFile(t, dir, ".codex/config.toml", `
-[profiles.readonly_quiet]
-[profiles.review]
-[profiles.workspace_auto]
-[profiles.ci_json]
-
 [mcp_servers.demo]
 cwd = "."
 `)
@@ -405,17 +428,7 @@ func TestCheck_MCPSyncHonorsProfilePolicy(t *testing.T) {
 }
 `)
 	writeFile(t, dir, ".codex/config.toml", `
-[profiles.readonly_quiet]
-approval_policy = "never"
-
-[profiles.review]
 approval_policy = "on-request"
-
-[profiles.workspace_auto]
-approval_policy = "on-failure"
-
-[profiles.ci_json]
-approval_policy = "never"
 `)
 	if report := mcpsync.Sync(dir, false); len(report.Errors) > 0 {
 		t.Fatalf("unexpected mcpsync errors: %v", report.Errors)

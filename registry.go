@@ -50,6 +50,15 @@ func (r *Registry) ListTools() []ToolDef {
 	return defs
 }
 
+// GetTool returns a registered tool definition by name.
+func (r *Registry) GetTool(name string) (ToolDef, bool) {
+	rt, ok := r.tools[name]
+	if !ok {
+		return ToolDef{}, false
+	}
+	return rt.def, true
+}
+
 // Call dispatches a tool call by name.
 func (r *Registry) Call(toolName string, params map[string]any) (any, error) {
 	rt, ok := r.tools[toolName]
