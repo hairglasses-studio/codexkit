@@ -1044,56 +1044,6 @@ fi
 if [[ -x "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" ]] && env HOME="$WORKSPACE_HOME" HG_WORKSPACE_OWNER="$WORKSPACE_OWNER" HG_WORKSPACE_HOME="$WORKSPACE_HOME" "$ROOT/dotfiles/scripts/hg-workspace-global-sync.sh" --root "$ROOT" --check >/dev/null 2>&1; then
   workspace_global_home_overlay_ok=true
 fi
-antigravity_home_overlay_ok=false
-antigravity_metadata_path="$WORKSPACE_HOME/.gemini/antigravity/.hg-antigravity-sync.json"
-antigravity_total_mcp_servers=0
-antigravity_root_shared_servers=0
-antigravity_managed_workflows=0
-antigravity_repo_workflows=0
-antigravity_skill_workflows=0
-antigravity_workspace_workflows=0
-antigravity_global_workflows=0
-antigravity_workspace_skills=0
-antigravity_global_skills=0
-antigravity_mcp_name_collisions=0
-antigravity_workflow_name_collisions=0
-antigravity_imported_env_vars="none"
-antigravity_missing_env_vars="OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, GEMINI_API_KEY"
-antigravity_env_bridge_mode="unknown"
-antigravity_global_gemini_md=false
-antigravity_ecosystem_metadata_path="$WORKSPACE_HOME/.gemini/antigravity/.hg-antigravity-ecosystem.json"
-antigravity_archived_skill_sources=0
-antigravity_archived_workflow_sources=0
-antigravity_installed_extensions="none"
-antigravity_installed_extension_count=0
-antigravity_sidecar_count=0
-if [[ -x "$ROOT/dotfiles/scripts/hg-antigravity-sync.sh" ]] && env HOME="$WORKSPACE_HOME" HG_WORKSPACE_OWNER="$WORKSPACE_OWNER" HG_WORKSPACE_HOME="$WORKSPACE_HOME" "$ROOT/dotfiles/scripts/hg-antigravity-sync.sh" --root "$ROOT" --check >/dev/null 2>&1; then
-  antigravity_home_overlay_ok=true
-fi
-if [[ -f "$antigravity_metadata_path" ]]; then
-  antigravity_total_mcp_servers=$(jq -r '.total_mcp_server_count // 0' "$antigravity_metadata_path")
-  antigravity_root_shared_servers=$(jq -r '.root_shared_server_count // 0' "$antigravity_metadata_path")
-  antigravity_managed_workflows=$(jq -r '.managed_workflow_count // 0' "$antigravity_metadata_path")
-  antigravity_repo_workflows=$(jq -r '.repo_workflow_count // 0' "$antigravity_metadata_path")
-  antigravity_skill_workflows=$(jq -r '.skill_workflow_count // 0' "$antigravity_metadata_path")
-  antigravity_workspace_workflows=$(jq -r '.workspace_workflow_count // .managed_workflow_count // 0' "$antigravity_metadata_path")
-  antigravity_global_workflows=$(jq -r '.global_workflow_count // 0' "$antigravity_metadata_path")
-  antigravity_workspace_skills=$(jq -r '.workspace_skill_count // 0' "$antigravity_metadata_path")
-  antigravity_global_skills=$(jq -r '.global_skill_count // 0' "$antigravity_metadata_path")
-  antigravity_mcp_name_collisions=$(jq -r '.mcp_name_collision_count // 0' "$antigravity_metadata_path")
-  antigravity_workflow_name_collisions=$(jq -r '.workflow_name_collision_count // 0' "$antigravity_metadata_path")
-  antigravity_imported_env_vars=$(jq -r '(.imported_env_vars // []) | if length == 0 then "none" else join(", ") end' "$antigravity_metadata_path")
-  antigravity_missing_env_vars=$(jq -r '(.missing_env_vars // []) | if length == 0 then "none" else join(", ") end' "$antigravity_metadata_path")
-  antigravity_env_bridge_mode=$(jq -r '.env_bridge_mode // "unknown"' "$antigravity_metadata_path")
-  antigravity_global_gemini_md=$(jq -r '.global_gemini_md_present // false' "$antigravity_metadata_path")
-fi
-if [[ -f "$antigravity_ecosystem_metadata_path" ]]; then
-  antigravity_archived_skill_sources=$(jq -r '.archived_skill_source_count // 0' "$antigravity_ecosystem_metadata_path")
-  antigravity_archived_workflow_sources=$(jq -r '.archived_workflow_source_count // 0' "$antigravity_ecosystem_metadata_path")
-  antigravity_installed_extensions=$(jq -r '(.installed_extensions // []) | if length == 0 then "none" else join(", ") end' "$antigravity_ecosystem_metadata_path")
-  antigravity_installed_extension_count=$(jq -r '.installed_extension_count // 0' "$antigravity_ecosystem_metadata_path")
-  antigravity_sidecar_count=$(jq -r '.sidecar_count // 0' "$antigravity_ecosystem_metadata_path")
-fi
 
 cat <<EOF
 Agent parity audit root: $ROOT
@@ -1184,19 +1134,6 @@ workspace-owner skills in ~/.agents/skills: $global_agents_skills
 workspace-owner skills in ~/.codex/skills: $global_codex_skills
 workspace global source contract up to date: $workspace_global_sync_ok
 workspace global home overlay up to date: $workspace_global_home_overlay_ok
-Antigravity home overlay up to date: $antigravity_home_overlay_ok
-Antigravity MCP servers: $antigravity_total_mcp_servers ($antigravity_root_shared_servers root shared)
-Antigravity managed workflows: $antigravity_managed_workflows ($antigravity_repo_workflows repo + $antigravity_skill_workflows skill, $antigravity_global_workflows global)
-Antigravity workspace skills: $antigravity_workspace_skills
-Antigravity global skills: $antigravity_global_skills
-Antigravity imported env vars: $antigravity_imported_env_vars
-Antigravity missing env vars: $antigravity_missing_env_vars
-Antigravity env bridge mode: $antigravity_env_bridge_mode
-Antigravity global GEMINI.md present: $antigravity_global_gemini_md
-Antigravity archived sources: skills=$antigravity_archived_skill_sources workflows=$antigravity_archived_workflow_sources
-Antigravity installed extensions: $antigravity_installed_extensions
-Antigravity sidecar tools provisioned: $antigravity_sidecar_count
-Antigravity naming collisions: mcp=$antigravity_mcp_name_collisions workflows=$antigravity_workflow_name_collisions
 EOF
 
 inventory_json="{
@@ -1291,28 +1228,7 @@ inventory_json="{
     \"global_agents_skills\": ${global_agents_skills},
     \"global_codex_skills\": ${global_codex_skills},
     \"workspace_global_sync_up_to_date\": ${workspace_global_sync_ok},
-    \"workspace_global_home_overlay_up_to_date\": ${workspace_global_home_overlay_ok},
-    \"antigravity_home_overlay_up_to_date\": ${antigravity_home_overlay_ok},
-    \"antigravity_total_mcp_servers\": ${antigravity_total_mcp_servers},
-    \"antigravity_root_shared_servers\": ${antigravity_root_shared_servers},
-    \"antigravity_managed_workflows\": ${antigravity_managed_workflows},
-    \"antigravity_repo_workflows\": ${antigravity_repo_workflows},
-    \"antigravity_skill_workflows\": ${antigravity_skill_workflows},
-    \"antigravity_workspace_workflows\": ${antigravity_workspace_workflows},
-    \"antigravity_global_workflows\": ${antigravity_global_workflows},
-    \"antigravity_workspace_skills\": ${antigravity_workspace_skills},
-    \"antigravity_global_skills\": ${antigravity_global_skills},
-    \"antigravity_mcp_name_collisions\": ${antigravity_mcp_name_collisions},
-    \"antigravity_workflow_name_collisions\": ${antigravity_workflow_name_collisions},
-    \"antigravity_imported_env_vars\": $(jq -cn --arg v "$antigravity_imported_env_vars" '$v'),
-    \"antigravity_missing_env_vars\": $(jq -cn --arg v "$antigravity_missing_env_vars" '$v'),
-    \"antigravity_env_bridge_mode\": $(jq -cn --arg v "$antigravity_env_bridge_mode" '$v'),
-    \"antigravity_global_gemini_md_present\": ${antigravity_global_gemini_md},
-    \"antigravity_archived_skill_sources\": ${antigravity_archived_skill_sources},
-    \"antigravity_archived_workflow_sources\": ${antigravity_archived_workflow_sources},
-    \"antigravity_installed_extension_count\": ${antigravity_installed_extension_count},
-    \"antigravity_installed_extensions\": $(jq -cn --arg v "$antigravity_installed_extensions" '$v'),
-    \"antigravity_sidecar_count\": ${antigravity_sidecar_count}
+    \"workspace_global_home_overlay_up_to_date\": ${workspace_global_home_overlay_ok}
   },
   \"workflow_families\": [${workflow_family_summary_json}
   ],
@@ -1421,19 +1337,6 @@ Summary from the latest audit:
 - Workspace-owner skills: ${global_claude_commands} commands / ${global_claude_skills} Claude skills / ${global_agents_skills} Agents / ${global_codex_skills} Codex
 - Workspace global source contract up to date: ${workspace_global_sync_ok}
 - Workspace global home overlay up to date: ${workspace_global_home_overlay_ok}
-- Antigravity home overlay up to date: ${antigravity_home_overlay_ok}
-- Antigravity MCP servers: ${antigravity_total_mcp_servers} (${antigravity_root_shared_servers} root shared)
-- Antigravity managed workflows: ${antigravity_managed_workflows} (${antigravity_repo_workflows} repo + ${antigravity_skill_workflows} skill, ${antigravity_global_workflows} global)
-- Antigravity workspace skills: ${antigravity_workspace_skills}
-- Antigravity global skills: ${antigravity_global_skills}
-- Antigravity imported env vars: ${antigravity_imported_env_vars}
-- Antigravity missing env vars: ${antigravity_missing_env_vars}
-- Antigravity env bridge mode: ${antigravity_env_bridge_mode}
-- Antigravity global GEMINI.md present: ${antigravity_global_gemini_md}
-- Antigravity archived sources: skills=${antigravity_archived_skill_sources}, workflows=${antigravity_archived_workflow_sources}
-- Antigravity installed extensions: ${antigravity_installed_extensions}
-- Antigravity sidecar tools provisioned: ${antigravity_sidecar_count}
-- Antigravity naming collisions: mcp=${antigravity_mcp_name_collisions}, workflows=${antigravity_workflow_name_collisions}
 
 ## Workflow governance families
 ${workflow_family_summary_md}
@@ -1536,19 +1439,6 @@ Summary from the latest audit:
 - Workspace-owner skills: ${global_claude_commands} commands / ${global_claude_skills} Claude skills / ${global_agents_skills} Agents / ${global_codex_skills} Codex
 - Workspace global source contract up to date: ${workspace_global_sync_ok}
 - Workspace global home overlay up to date: ${workspace_global_home_overlay_ok}
-- Antigravity home overlay up to date: ${antigravity_home_overlay_ok}
-- Antigravity MCP servers: ${antigravity_total_mcp_servers} (${antigravity_root_shared_servers} root shared)
-- Antigravity managed workflows: ${antigravity_managed_workflows} (${antigravity_repo_workflows} repo + ${antigravity_skill_workflows} skill, ${antigravity_global_workflows} global)
-- Antigravity workspace skills: ${antigravity_workspace_skills}
-- Antigravity global skills: ${antigravity_global_skills}
-- Antigravity imported env vars: ${antigravity_imported_env_vars}
-- Antigravity missing env vars: ${antigravity_missing_env_vars}
-- Antigravity env bridge mode: ${antigravity_env_bridge_mode}
-- Antigravity global GEMINI.md present: ${antigravity_global_gemini_md}
-- Antigravity archived sources: skills=${antigravity_archived_skill_sources}, workflows=${antigravity_archived_workflow_sources}
-- Antigravity installed extensions: ${antigravity_installed_extensions}
-- Antigravity sidecar tools provisioned: ${antigravity_sidecar_count}
-- Antigravity naming collisions: mcp=${antigravity_mcp_name_collisions}, workflows=${antigravity_workflow_name_collisions}
 
 ## Workflow governance families
 ${workflow_family_summary_md}
