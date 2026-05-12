@@ -11,6 +11,7 @@ import (
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
 	"github.com/hairglasses-studio/codexkit/fleetaudit"
+	"github.com/hairglasses-studio/codexkit/llmreduction"
 	"github.com/hairglasses-studio/codexkit/mcpserver"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 	"github.com/hairglasses-studio/codexkit/perfaudit"
@@ -31,6 +32,7 @@ func main() {
 		skillsync.Module(),
 		mcpsync.Module(),
 		fleetaudit.Module(),
+		llmreduction.Module(),
 		perfaudit.Module(),
 		primitiveindex.Module(),
 		reporeadiness.Module(),

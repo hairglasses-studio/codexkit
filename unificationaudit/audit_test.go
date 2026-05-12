@@ -159,6 +159,38 @@ func TestBaselineCheckCommandUsesWorkspaceRoot(t *testing.T) {
 	}
 }
 
+func TestClassifyShell_HGModuleScriptsAreBootstrap(t *testing.T) {
+	role, reasons := classifyShell("scripts/hg-llm-surface-loop.sh", []byte("#!/usr/bin/env bash\nset -euo pipefail\nexec go run ./cmd/codexkit\n"))
+	if role != "os_bootstrap" {
+		t.Fatalf("role = %q, want os_bootstrap", role)
+	}
+	if len(reasons) == 0 || !strings.Contains(reasons[0], "workspace operator") {
+		t.Fatalf("unexpected reasons: %+v", reasons)
+	}
+}
+
+func TestClassifyShell_FunctionDenseLibIsStructuredParser(t *testing.T) {
+	content := `#!/usr/bin/env bash
+set -euo pipefail
+f1() { echo 1; }
+f2() { echo 2; }
+f3() { echo 3; }
+f4() { echo 4; }
+f5() { echo 5; }
+f6() { echo 6; }
+f7() { echo 7; }
+f8() { echo 8; }
+f9() { jq -r '.a'; }
+`
+	role, reasons := classifyShell("lib/example_commands.sh", []byte(content))
+	if role != "structured_parser" {
+		t.Fatalf("role = %q, want structured_parser", role)
+	}
+	if len(reasons) == 0 || !strings.Contains(reasons[0], "function-dense shell library") {
+		t.Fatalf("unexpected reasons: %+v", reasons)
+	}
+}
+
 func TestBaselineRemediationCommandUsesWorkspaceRoot(t *testing.T) {
 	got := baselineRemediationCommand(
 		"/tmp/studio",

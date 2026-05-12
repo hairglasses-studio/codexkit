@@ -11,6 +11,7 @@ import (
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
 	"github.com/hairglasses-studio/codexkit/fleetaudit"
+	"github.com/hairglasses-studio/codexkit/llmreduction"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 	"github.com/hairglasses-studio/codexkit/perfaudit"
 	"github.com/hairglasses-studio/codexkit/primitiveindex"
@@ -31,6 +32,7 @@ func init() {
 		skillsync.Module(),
 		mcpsync.Module(),
 		fleetaudit.Module(),
+		llmreduction.Module(),
 		perfaudit.Module(),
 		primitiveindex.Module(),
 		reporeadiness.Module(),
@@ -71,6 +73,8 @@ func main() {
 		runRepoReadiness(os.Args[2:])
 	case "unification":
 		runUnification(os.Args[2:])
+	case "reduction":
+		runReduction(os.Args[2:])
 	case "bridge":
 		runBridge(os.Args[2:])
 	case "tools":
@@ -137,11 +141,13 @@ Commands:
 	  unification audit [root] [--json] [--all-scopes]
 	                                Scan the workspace for shell, hook, and skill-source unification candidates
   unification report [root] [--all-scopes]
-                                Print the codebase unification audit as Markdown
+                                 Print the codebase unification audit as Markdown
   unification cycle [root] [--json] [--all-scopes] [--write] [--notes-dir <path>] [--previous-notes <path>] [--cycle-id <id>] [--require-notes-applied] [--ack-carry-forward <reason>]
-                                Generate a repeatable unification cycle note; defaults to the latest prior note for carry-forward checks
+                                 Generate a repeatable unification cycle note; defaults to the latest prior note for carry-forward checks
   unification shell-file <repo> <path> [--json]
-                                Inventory functions, entrypoints, and obvious callers for one shell file
+                                 Inventory functions, entrypoints, and obvious callers for one shell file
+  reduction <audit|dedup|plan|apply|verify> [root] [--json] [--all-scopes] [--max-repos <n>] [--limit <n>] [--execute]
+                                 Run LLM-surface reduction ranking and tranche planning helpers
   bridge <subcommand>           Compatibility wrapper for legacy parity entrypoints
   tools                         List all registered tools
   help                          Show this help`)
@@ -742,6 +748,143 @@ func runUnificationShellFile(args []string) {
 		return
 	}
 	fmt.Print(inventory.Markdown())
+}
+
+func runReduction(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit reduction <audit|dedup|plan|apply|verify> [root] [--json] [--all-scopes] [--max-repos <n>] [--limit <n>] [--execute]")
+		os.Exit(1)
+	}
+
+	cmd := args[0]
+	root := workspace.DefaultRoot()
+	jsonOut := false
+	allScopes := false
+	execute := false
+	maxRepos := 8
+	limit := 25
+	rootSet := false
+
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "--json":
+			jsonOut = true
+		case "--all-scopes":
+			allScopes = true
+		case "--execute":
+			execute = true
+		case "--max-repos":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "--max-repos requires a value")
+				os.Exit(1)
+			}
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n <= 0 {
+				fmt.Fprintln(os.Stderr, "--max-repos must be a positive integer")
+				os.Exit(1)
+			}
+			maxRepos = n
+		case "--limit":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "--limit requires a value")
+				os.Exit(1)
+			}
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n <= 0 {
+				fmt.Fprintln(os.Stderr, "--limit must be a positive integer")
+				os.Exit(1)
+			}
+			limit = n
+		default:
+			if strings.HasPrefix(arg, "-") {
+				fmt.Fprintf(os.Stderr, "unknown reduction flag: %s\n", arg)
+				os.Exit(1)
+			}
+			if rootSet {
+				fmt.Fprintf(os.Stderr, "unexpected extra argument: %s\n", arg)
+				os.Exit(1)
+			}
+			root = arg
+			rootSet = true
+		}
+	}
+
+	switch cmd {
+	case "audit":
+		report, err := llmreduction.BuildDebtAudit(root, allScopes)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		if jsonOut {
+			printJSON(report)
+			return
+		}
+		fmt.Printf("scanned=%d top_repo=%s p0=%d p1=%d p2=%d\n", report.Summary.ReposScanned, report.Summary.TopRepo, report.Summary.P0, report.Summary.P1, report.Summary.P2)
+	case "dedup":
+		candidates, err := llmreduction.BuildDedupCandidates(root, allScopes, limit)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		if jsonOut {
+			printJSON(candidates)
+			return
+		}
+		for _, candidate := range candidates {
+			fmt.Printf("%s\t%s\t%s\n", candidate.Repo, candidate.Kind, candidate.Path)
+		}
+	case "plan":
+		plan, err := llmreduction.BuildReductionPlan(root, allScopes, maxRepos)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		if jsonOut {
+			printJSON(plan)
+			return
+		}
+		for _, item := range plan.Items {
+			fmt.Printf("%s\t%s\t%s\n", item.Repo, item.Priority, item.Action)
+		}
+	case "apply":
+		plan, err := llmreduction.BuildReductionPlan(root, allScopes, maxRepos)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		result := map[string]any{
+			"execute": execute,
+			"applied": false,
+			"note":    "safety default: generated plan only; repo-specific mutation executors are required",
+			"plan":    plan,
+		}
+		if jsonOut {
+			printJSON(result)
+			return
+		}
+		fmt.Println(result["note"])
+	case "verify":
+		report, err := llmreduction.BuildDebtAudit(root, allScopes)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		if jsonOut {
+			printJSON(map[string]any{
+				"current": report,
+				"delta":   "baseline omitted",
+			})
+			return
+		}
+		fmt.Printf("verify: scanned=%d top_repo=%s\n", report.Summary.ReposScanned, report.Summary.TopRepo)
+	default:
+		fmt.Fprintf(os.Stderr, "unknown reduction command: %s\n", cmd)
+		os.Exit(1)
+	}
 }
 
 func runFleet(args []string) {

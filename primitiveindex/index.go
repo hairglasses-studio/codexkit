@@ -658,21 +658,36 @@ func shouldSkipDir(rel string) bool {
 	}
 	base := pathBase(rel)
 	switch base {
-	case ".git", "node_modules", ".venv", "vendor":
+	case ".git", ".tools", "node_modules", ".venv", "vendor":
+		return true
+	}
+	if strings.HasPrefix(base, "s2f_") {
 		return true
 	}
 	return rel == "vault" ||
 		rel == "docs/repo-claude" ||
 		rel == "docs/research" ||
+		rel == "docs/agent-parity" ||
+		strings.HasPrefix(rel, "docs/agent-parity/") ||
+		strings.HasPrefix(rel, "agent-parity/") ||
+		strings.HasPrefix(rel, ".ralph/probe/") ||
+		strings.Contains(rel, "/.ralph/probe/") ||
 		strings.Contains(rel, "/.ralph/worktrees")
 }
 
 func shouldSkipFile(rel string) bool {
 	return strings.Contains(rel, "/node_modules/") ||
+		strings.Contains(rel, "/.tools/") ||
 		strings.Contains(rel, "/.venv/") ||
 		strings.HasPrefix(rel, "vault/") ||
 		strings.HasPrefix(rel, "docs/repo-claude/") ||
 		strings.HasPrefix(rel, "docs/research/") ||
+		strings.HasPrefix(rel, "docs/agent-parity/") ||
+		strings.HasPrefix(rel, "agent-parity/") ||
+		strings.HasPrefix(rel, "s2f_") ||
+		strings.Contains(rel, "/s2f_") ||
+		strings.HasPrefix(rel, ".ralph/probe/") ||
+		strings.Contains(rel, "/.ralph/probe/") ||
 		strings.Contains(rel, "/.ralph/worktrees/")
 }
 

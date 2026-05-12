@@ -21,6 +21,7 @@ const (
 	GeneratedBy          = "codexkit unification audit"
 	IndexKind            = "workspace codebase unification audit"
 	RoadmapFreshnessDays = 90
+	smallWrapperMaxLines = 120
 )
 
 var ignoredDirNames = map[string]bool{
@@ -30,6 +31,7 @@ var ignoredDirNames = map[string]bool{
 	".pytest_cache": true,
 	".ruff_cache":   true,
 	".terraform":    true,
+	".tools":        true,
 	".venv":         true,
 	"__pycache__":   true,
 	"bin":           true,
@@ -611,10 +613,17 @@ func shouldSkipDir(rel, name string) bool {
 	if ignoredDirNames[name] {
 		return true
 	}
+	if strings.HasPrefix(name, "s2f_") {
+		return true
+	}
 	return strings.HasPrefix(rel, ".claude/worktrees/") ||
 		strings.HasPrefix(rel, ".ralph/worktrees/") ||
+		strings.HasPrefix(rel, ".ralph/probe/") ||
+		strings.HasPrefix(rel, "agent-parity/") ||
+		strings.HasPrefix(rel, "docs/agent-parity/") ||
 		strings.Contains(rel, "/.claude/worktrees/") ||
-		strings.Contains(rel, "/.ralph/worktrees/")
+		strings.Contains(rel, "/.ralph/worktrees/") ||
+		strings.Contains(rel, "/.ralph/probe/")
 }
 
 func rootSourceSkillDir(rel string) (string, bool) {
@@ -704,9 +713,26 @@ func classifyShell(rel string, data []byte) (string, []string) {
 		reasons = append(reasons, "test or fixture support")
 		return "test_or_fixture", reasons
 	}
+	if strings.HasPrefix(lowerRel, "scripts/hg-") || strings.HasPrefix(lowerRel, "scripts/hg-modules/") {
+		reasons = append(reasons, "workspace operator command surface")
+		return "os_bootstrap", reasons
+	}
+	if (strings.HasPrefix(lowerRel, "lib/") || strings.Contains(lowerRel, "/lib/")) &&
+		countShellFunctionDefs(data) >= 8 &&
+		!containsAny(lowerContent, "while true", "nohup ", "systemd-run", "\nwait\n", " &\n") {
+		reasons = append(reasons, "function-dense shell library module")
+		return "structured_parser", reasons
+	}
+	if lines <= smallWrapperMaxLines && containsAny(lowerContent,
+		"exec ", "go run", "go test", "uv run", "python -m", "npm ", "npx ", "pnpm ", "yarn ",
+		"cargo ", "docker compose", "./cmd/", "cmd/",
+	) {
+		reasons = append(reasons, "small command wrapper")
+		return "wrapper", reasons
+	}
 	if containsAny(lowerContent,
 		"sqlite3", "psql ", "mysql ", "redis-cli", "flock ", "trap ", "mktemp", "jsonl",
-		"queue", "state", "systemd-run", "docker ", "docker-compose", "rclone ", "rsync ",
+		"queue", " state ", "state_dir", ".state", "state/", "systemd-run", "docker ", "docker-compose", "rclone ", "rsync ",
 		"aws ", "gcloud ", "kubectl ", "terraform ", "git push", "git commit", "while true",
 		"retry", "nohup ", ">>", " tee -a", " mv ", " cp ", " rm ", " mkdir ", " touch ",
 	) || strings.Contains(lowerContent, "\nwait\n") || strings.Contains(lowerContent, " &\n") {
@@ -719,13 +745,6 @@ func classifyShell(rel string, data []byte) (string, []string) {
 	) {
 		reasons = append(reasons, "structured parsing or embedded interpreter logic")
 		return "structured_parser", reasons
-	}
-	if lines <= 80 && containsAny(lowerContent,
-		"exec ", "go run", "go test", "uv run", "python -m", "npm ", "npx ", "pnpm ", "yarn ",
-		"cargo ", "docker compose", "./cmd/", "cmd/",
-	) {
-		reasons = append(reasons, "small command wrapper")
-		return "wrapper", reasons
 	}
 	return "unknown", reasons
 }
@@ -756,6 +775,15 @@ func countLines(data []byte) int {
 		lines++
 	}
 	return lines
+}
+
+func countShellFunctionDefs(data []byte) int {
+	if len(data) == 0 {
+		return 0
+	}
+	count := bytes.Count(data, []byte("() {"))
+	count += bytes.Count(data, []byte("\nfunction "))
+	return count
 }
 
 func repoFindings(report RepoReport) []Finding {

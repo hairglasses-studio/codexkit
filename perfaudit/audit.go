@@ -42,6 +42,7 @@ var ignoredDirNames = map[string]bool{
 	".pytest_cache": true,
 	".mypy_cache":   true,
 	".ruff_cache":   true,
+	".tools":        true,
 	"htmlcov":       true,
 	"_salvage":      true,
 	"bin":           true,
@@ -261,7 +262,7 @@ func readCodexConfig(repoPath string, report *RepoReport) {
 		command := stringValue(server["command"])
 		args := stringSlice(server["args"])
 		enabledTools := stringSlice(server["enabled_tools"])
-		if len(enabledTools) == 0 {
+		if len(enabledTools) == 0 && requiresEnabledTools(command, args, name) {
 			report.MissingEnabledTools = append(report.MissingEnabledTools, name)
 		}
 		if isShellWrapped(command, args) {
@@ -399,6 +400,9 @@ func shouldSkipDir(repoPath, path, name string) bool {
 	if ignoredDirNames[name] {
 		return true
 	}
+	if strings.HasPrefix(name, "s2f_") {
+		return true
+	}
 	rel, err := filepath.Rel(repoPath, path)
 	if err != nil {
 		return false
@@ -406,6 +410,9 @@ func shouldSkipDir(repoPath, path, name string) bool {
 	rel = filepath.ToSlash(rel)
 	return strings.HasPrefix(rel, ".claude/worktrees/") ||
 		strings.HasPrefix(rel, ".ralph/worktrees/") ||
+		strings.HasPrefix(rel, ".ralph/probe/") ||
+		strings.HasPrefix(rel, "agent-parity/") ||
+		strings.HasPrefix(rel, "docs/agent-parity/") ||
 		strings.HasPrefix(rel, ".github/docs/")
 }
 
@@ -720,6 +727,21 @@ func containsGoRun(command string, args []string) bool {
 		}
 	}
 	return false
+}
+
+func requiresEnabledTools(command string, args []string, serverName string) bool {
+	name := strings.ToLower(serverName)
+	if strings.HasPrefix(name, "sourcegraph_") {
+		return false
+	}
+	if strings.EqualFold(command, "npx") {
+		for _, arg := range args {
+			if strings.Contains(strings.ToLower(arg), "sourcegraph.com/.api/mcp") {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func extractScriptRefs(command string, args []string) []string {

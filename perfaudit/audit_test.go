@@ -137,6 +137,47 @@ func TestAudit_AllScopesIncludesNonActiveReposAndDocsArchivePrompts(t *testing.T
 	}
 }
 
+func TestAudit_SourcegraphRemoteWithoutEnabledToolsIsAllowed(t *testing.T) {
+	root := t.TempDir()
+	writeWorkspaceManifest(t, root, map[string]any{
+		"version": 1,
+		"repos": []map[string]any{
+			{
+				"name":            "ralphglasses",
+				"category":        "hub",
+				"scope":           "active_operator",
+				"language":        "go",
+				"baseline_target": true,
+				"go_work_member":  true,
+				"lifecycle":       "active",
+			},
+		},
+	})
+
+	writeFile(t, filepath.Join(root, "ralphglasses"), ".codex/config.toml", strings.Join([]string{
+		`approval_policy = "on-request"`,
+		`sandbox_mode = "workspace-write"`,
+		``,
+		`[mcp_servers.sourcegraph_research]`,
+		`command = "npx"`,
+		`args = ["-y", "mcp-remote", "https://sourcegraph.com/.api/mcp"]`,
+		``,
+		`[mcp_servers.demo]`,
+		`command = "bash"`,
+		`args = ["-lc", "exec ./scripts/run-demo.sh"]`,
+	}, "\n"))
+	writeFile(t, filepath.Join(root, "ralphglasses"), "scripts/run-demo.sh", "#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n")
+
+	report := Audit(root, Options{})
+	if len(report.Repos) != 1 {
+		t.Fatalf("expected one repo, got %d", len(report.Repos))
+	}
+	repo := report.Repos[0]
+	if len(repo.MissingEnabledTools) != 1 || repo.MissingEnabledTools[0] != "demo" {
+		t.Fatalf("expected only non-sourcegraph server to require enabled_tools, got %#v", repo.MissingEnabledTools)
+	}
+}
+
 func TestMarkdownIncludesPriorityTable(t *testing.T) {
 	root := t.TempDir()
 	writeWorkspaceManifest(t, root, map[string]any{
