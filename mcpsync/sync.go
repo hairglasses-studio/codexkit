@@ -520,12 +520,12 @@ func unifiedDiffString(before, after string) string {
 	if err != nil {
 		return fmt.Sprintf("--- before\n+++ after\n%s", after)
 	}
-	defer os.Remove(beforeFile.Name())
+	defer func() { _ = os.Remove(beforeFile.Name()) }()
 	afterFile, err := os.CreateTemp("", "codexkit-mcp-after-*.toml")
 	if err != nil {
 		return fmt.Sprintf("--- before\n+++ after\n%s", after)
 	}
-	defer os.Remove(afterFile.Name())
+	defer func() { _ = os.Remove(afterFile.Name()) }()
 	_, _ = beforeFile.WriteString(before)
 	_, _ = afterFile.WriteString(after)
 	_ = beforeFile.Close()
