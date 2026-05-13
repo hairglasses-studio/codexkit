@@ -448,9 +448,11 @@ func auditRepo(repo repoInput, now time.Time) (RepoReport, []string) {
 		}
 		if isHookFile(rel) {
 			hookData := readData()
-			metric := FileMetric{Path: rel, Lines: countLines(hookData), Bytes: len(hookData)}
-			report.HookFiles = append(report.HookFiles, metric)
-			report.HookLines += metric.Lines
+			if countLines(hookData) > 5 {
+				metric := FileMetric{Path: rel, Lines: countLines(hookData), Bytes: len(hookData)}
+				report.HookFiles = append(report.HookFiles, metric)
+				report.HookLines += metric.Lines
+			}
 		}
 		if likelyShellFile(rel, info.Mode()) {
 			shellData := readData()
@@ -664,6 +666,10 @@ func isSurfaceFile(rel string) bool {
 }
 
 func isHookFile(rel string) bool {
+	ext := strings.ToLower(filepath.Ext(rel))
+	if ext == ".md" || ext == ".yaml" || ext == ".yml" || ext == ".json" {
+		return false
+	}
 	return strings.HasPrefix(rel, ".claude/hooks/") ||
 		strings.HasPrefix(rel, ".clinerules/hooks/") ||
 		strings.Contains(rel, "/.claude/hooks/") ||

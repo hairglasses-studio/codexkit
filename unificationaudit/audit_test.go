@@ -31,6 +31,11 @@ sudo apt-get install -y jq
 systemctl --user daemon-reload
 `)
 	writeUnificationFile(t, root, "app/.claude/hooks/pre-tool.sh", `#!/usr/bin/env bash
+# line 2
+# line 3
+# line 4
+# line 5
+# line 6
 echo hook >> .state/hooks.log
 `)
 	writeUnificationFile(t, root, "app/config/python_fast_paths.tsv", "sync-plan\tsync-plan\nlocal-sync status\tlocal-sync status\n")
