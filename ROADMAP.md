@@ -1,6 +1,6 @@
 # codexkit Roadmap
 
-Last updated: 2026-05-11.
+Last updated: 2026-05-13.
 
 ## Current State
 
@@ -19,6 +19,7 @@ Codex fleet management toolkit for baseline validation, skill sync, and MCP prof
 - [x] Teach unification reports to display structured baseline remediation commands when the baseline queue is non-empty.
 - [x] Extend unification cycle notes to include the first baseline remediation command when the baseline queue is non-empty.
 - [x] Move workspace-global Claude/Codex/Gemini MCP overlay rendering into `codexkit workspace global-mcp-sync`, so `dotfiles` delegates provider overlay sync to one Go-owned contract.
+- [x] Align repo-local wrapper scripts with the shared workspace Go env contract, so `run-codexkit-mcp.sh`, `skill-surface-sync.sh`, and `codex-mcp-sync.sh` default to shared `GOCACHE` plus repo-scoped temp roots instead of `/tmp`.
 
 <!-- whiteclaw-rollout:start -->
 ## Whiteclaw-Derived Overhaul (2026-04-08)
