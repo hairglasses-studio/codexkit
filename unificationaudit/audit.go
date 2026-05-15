@@ -671,9 +671,7 @@ func isHookFile(rel string) bool {
 		return false
 	}
 	return strings.HasPrefix(rel, ".claude/hooks/") ||
-		strings.HasPrefix(rel, ".clinerules/hooks/") ||
-		strings.Contains(rel, "/.claude/hooks/") ||
-		strings.Contains(rel, "/.clinerules/hooks/")
+		strings.Contains(rel, "/.claude/hooks/")
 }
 
 func likelyShellFile(rel string, mode fs.FileMode) bool {
