@@ -83,6 +83,77 @@ func TestCheck_FailsOnMCPDrift(t *testing.T) {
 	}
 }
 
+func TestCheck_UsesRepoLocalSkillCheckWhenPresent(t *testing.T) {
+	root := t.TempDir()
+	writeSourceContractManifest(t, root, "app")
+	writeSourceContractSkill(t, root, "app")
+	writeSourceContractFile(t, root, "app/Makefile", "skill-surface-check:\n\t@echo local skill check\n")
+
+	report, err := Check(root, CheckOptions{
+		SkipRuntimeInventory: true,
+		SkillValidatorMode:   skillsync.ValidatorOff,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Passed {
+		t.Fatalf("expected repo-local skill check to satisfy source contract: %+v", report)
+	}
+	if len(report.Repos) != 1 || report.Repos[0].SkillSync == nil || report.Repos[0].SkillSync.PendingChanges {
+		t.Fatalf("expected successful repo-local skill report: %+v", report.Repos)
+	}
+}
+
+func TestCheck_FailsWhenRepoLocalSkillCheckFails(t *testing.T) {
+	root := t.TempDir()
+	writeSourceContractManifest(t, root, "app")
+	writeSourceContractSkill(t, root, "app")
+	writeSourceContractFile(t, root, "app/Makefile", "skill-surface-check:\n\t@echo local drift\n\t@exit 2\n")
+
+	report, err := Check(root, CheckOptions{
+		SkipRuntimeInventory: true,
+		SkillValidatorMode:   skillsync.ValidatorOff,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Passed {
+		t.Fatal("expected source contract to fail when repo-local skill check fails")
+	}
+	if len(report.Repos) != 1 || report.Repos[0].SkillSync == nil || len(report.Repos[0].SkillSync.Errors) == 0 {
+		t.Fatalf("expected repo-local skill error in repo report: %+v", report.Repos)
+	}
+}
+
+func TestCheck_UsesJobbRepoLocalMCPCheckWhenPresent(t *testing.T) {
+	root := t.TempDir()
+	writeSourceContractManifest(t, root, "jobb")
+	writeSourceContractMCP(t, root, "jobb")
+	writeSourceContractFile(t, root, "jobb/cmd/jobb-sync-surfaces/main.go", "package main\n")
+	writeSourceContractFile(t, root, "jobb/scripts/dev/go.sh", "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" > \"$PWD/local-check.args\"\n")
+	if err := os.Chmod(filepath.Join(root, "jobb/scripts/dev/go.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Check(root, CheckOptions{
+		ToolsOnly:            true,
+		SkipRuntimeInventory: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Passed {
+		t.Fatalf("expected repo-local MCP check to satisfy source contract: %+v", report)
+	}
+	args, err := os.ReadFile(filepath.Join(root, "jobb/local-check.args"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(args) != "run ./cmd/jobb-sync-surfaces --codex --check\n" {
+		t.Fatalf("repo-local MCP args = %q", string(args))
+	}
+}
+
 func TestCheck_FailsOnWorkspaceManifestDrift(t *testing.T) {
 	root := t.TempDir()
 	writeSourceContractManifest(t, root, "missing-app")

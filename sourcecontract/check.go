@@ -5,7 +5,9 @@ package sourcecontract
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 	"github.com/hairglasses-studio/codexkit/skillsync"
@@ -107,9 +109,12 @@ func Check(root string, opts CheckOptions) (Report, error) {
 		if !opts.ToolsOnly && fileExists(filepath.Join(repoPath, ".agents", "skills", "surface.yaml")) {
 			checked = true
 			report.Summary.SkillSurfaceReposChecked++
-			skillReport := skillsync.CheckWithOptions(repoPath, skillsync.Options{
-				ValidatorMode: opts.SkillValidatorMode,
-			})
+			skillReport, handledLocally := repoLocalSkillCheck(repoPath)
+			if !handledLocally {
+				skillReport = skillsync.CheckWithOptions(repoPath, skillsync.Options{
+					ValidatorMode: opts.SkillValidatorMode,
+				})
+			}
 			repoReport.SkillSync = &skillReport
 			repoReport.Warnings = append(repoReport.Warnings, skillReport.Warnings...)
 			if len(skillReport.Errors) > 0 || skillReport.PendingChanges {
@@ -120,7 +125,10 @@ func Check(root string, opts CheckOptions) (Report, error) {
 		if !opts.SkillsOnly && fileExists(filepath.Join(repoPath, ".mcp.json")) && fileExists(filepath.Join(repoPath, ".codex", "config.toml")) {
 			checked = true
 			report.Summary.MCPReposChecked++
-			mcpReport := mcpsync.Diff(repoPath)
+			mcpReport, handledLocally := repoLocalMCPCheck(repoPath)
+			if !handledLocally {
+				mcpReport = mcpsync.Diff(repoPath)
+			}
 			repoReport.MCPSync = &mcpReport
 			if len(mcpReport.Errors) > 0 || mcpReport.PendingChanges {
 				repoReport.Passed = false
@@ -169,6 +177,92 @@ func Check(root string, opts CheckOptions) (Report, error) {
 		report.Passed = false
 	}
 	return report, nil
+}
+
+func repoLocalSkillCheck(repoPath string) (skillsync.SyncReport, bool) {
+	if makeTargetExists(repoPath, "skill-surface-check") {
+		return runRepoLocalSkillCommand(repoPath, "make", "skill-surface-check"), true
+	}
+	return skillsync.SyncReport{}, false
+}
+
+func repoLocalMCPCheck(repoPath string) (mcpsync.SyncReport, bool) {
+	if fileExists(filepath.Join(repoPath, "cmd", "jobb-sync-surfaces", "main.go")) && fileExists(filepath.Join(repoPath, "scripts", "dev", "go.sh")) {
+		return runRepoLocalMCPCommand(repoPath, "./scripts/dev/go.sh", "run", "./cmd/jobb-sync-surfaces", "--codex", "--check"), true
+	}
+	return mcpsync.SyncReport{}, false
+}
+
+func runRepoLocalSkillCommand(repoPath string, argv ...string) skillsync.SyncReport {
+	report := skillsync.SyncReport{
+		RepoPath: repoPath,
+		DryRun:   true,
+	}
+	if output, err := runRepoLocalCommand(repoPath, argv...); err != nil {
+		report.PendingChanges = true
+		report.Errors = []string{fmt.Sprintf("repo-local skill contract check failed: %s: %v%s", strings.Join(argv, " "), err, formattedCommandOutput(output))}
+		return report
+	}
+	report.Actions = []skillsync.SyncAction{{
+		Action:  "unchanged",
+		Message: fmt.Sprintf("repo-local skill contract current: %s", strings.Join(argv, " ")),
+	}}
+	return report
+}
+
+func runRepoLocalMCPCommand(repoPath string, argv ...string) mcpsync.SyncReport {
+	report := mcpsync.SyncReport{
+		RepoPath: repoPath,
+		DryRun:   true,
+	}
+	if output, err := runRepoLocalCommand(repoPath, argv...); err != nil {
+		report.PendingChanges = true
+		report.Errors = []string{fmt.Sprintf("repo-local MCP contract check failed: %s: %v%s", strings.Join(argv, " "), err, formattedCommandOutput(output))}
+		return report
+	}
+	report.Actions = []mcpsync.SyncAction{{
+		Action:  "unchanged",
+		Message: fmt.Sprintf("repo-local MCP contract current: %s", strings.Join(argv, " ")),
+	}}
+	return report
+}
+
+func runRepoLocalCommand(repoPath string, argv ...string) (string, error) {
+	if len(argv) == 0 {
+		return "", fmt.Errorf("empty command")
+	}
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Dir = repoPath
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	output, err := cmd.CombinedOutput()
+	return strings.TrimSpace(string(output)), err
+}
+
+func formattedCommandOutput(output string) string {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return ""
+	}
+	const limit = 4000
+	if len(output) > limit {
+		output = output[:limit] + "\n... output truncated ..."
+	}
+	return "\n" + output
+}
+
+func makeTargetExists(repoPath, target string) bool {
+	data, err := os.ReadFile(filepath.Join(repoPath, "Makefile"))
+	if err != nil {
+		return false
+	}
+	prefix := target + ":"
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func fileExists(path string) bool {
