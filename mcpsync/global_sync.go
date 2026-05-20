@@ -81,12 +81,13 @@ type globalServerCard struct {
 }
 
 type globalPolicy struct {
-	Version  int                  `json:"version"`
-	Readme   []string             `json:"_readme,omitempty"`
-	Defaults globalPolicyDefaults `json:"defaults"`
-	Manifest globalManifestPolicy `json:"manifest"`
-	Repos    []globalRepoPolicy   `json:"repos,omitempty"`
-	Servers  []globalServerPolicy `json:"servers,omitempty"`
+	Version          int                          `json:"version"`
+	Readme           []string                     `json:"_readme,omitempty"`
+	Defaults         globalPolicyDefaults         `json:"defaults"`
+	Manifest         globalManifestPolicy         `json:"manifest"`
+	RuntimeInventory globalRuntimeInventoryPolicy `json:"runtime_inventory,omitempty"`
+	Repos            []globalRepoPolicy           `json:"repos,omitempty"`
+	Servers          []globalServerPolicy         `json:"servers,omitempty"`
 }
 
 type globalPolicyDefaults struct {
@@ -101,6 +102,10 @@ type globalManifestPolicy struct {
 	ExcludeScopes        []string `json:"exclude_scopes,omitempty"`
 	IncludeCategories    []string `json:"include_categories,omitempty"`
 	ExcludeCategories    []string `json:"exclude_categories,omitempty"`
+}
+
+type globalRuntimeInventoryPolicy struct {
+	AllowedSkipped []string `json:"allowed_skipped,omitempty"`
 }
 
 type globalRepoPolicy struct {
@@ -307,6 +312,9 @@ func defaultGlobalPolicy() globalPolicy {
 		Manifest: globalManifestPolicy{
 			UseWorkspaceManifest: true,
 			AllowUnlistedRepos:   true,
+		},
+		RuntimeInventory: globalRuntimeInventoryPolicy{
+			AllowedSkipped: append([]string{}, DefaultRuntimeInventoryAllowedSkipped...),
 		},
 	}
 }

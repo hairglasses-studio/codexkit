@@ -69,6 +69,7 @@ type RuntimePolicySummary struct {
 	AllowUnlistedRepos   bool     `json:"allow_unlisted_repos"`
 	IncludeScopes        []string `json:"include_scopes,omitempty"`
 	ExcludeScopes        []string `json:"exclude_scopes,omitempty"`
+	AllowedSkipped       []string `json:"allowed_skipped,omitempty"`
 }
 
 type RuntimeProjectionSummary struct {
@@ -231,7 +232,11 @@ func CheckRuntimeInventory(opts RuntimeInventoryCheckOptions) (RuntimeInventoryC
 		report.add("launcher_validation", false, strings.Join(invalidRuntimeServers(inventory.Servers), "; "))
 	}
 
-	unexpectedSkipped := unexpectedRuntimeSkipped(inventory.Skipped, opts.AllowSkipped, opts.AllowAnySkipped)
+	allowSkipped := opts.AllowSkipped
+	if allowSkipped == nil {
+		allowSkipped = inventory.Policy.AllowedSkipped
+	}
+	unexpectedSkipped := unexpectedRuntimeSkipped(inventory.Skipped, allowSkipped, opts.AllowAnySkipped)
 	if len(unexpectedSkipped) == 0 {
 		report.add("policy_skipped", true, fmt.Sprintf("%d skipped servers allowed", len(inventory.Skipped)))
 	} else {
@@ -395,6 +400,7 @@ func summarizePolicy(root, path string, loaded bool, policy globalPolicy) Runtim
 		AllowUnlistedRepos:   policy.Manifest.AllowUnlistedRepos,
 		IncludeScopes:        append([]string{}, policy.Manifest.IncludeScopes...),
 		ExcludeScopes:        append([]string{}, policy.Manifest.ExcludeScopes...),
+		AllowedSkipped:       append([]string{}, policy.RuntimeInventory.AllowedSkipped...),
 	}
 }
 

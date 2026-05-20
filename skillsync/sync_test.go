@@ -38,6 +38,110 @@ func setupSyncRepo(t *testing.T) string {
 	return dir
 }
 
+func TestParseSurfaceAcceptsVersion2(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, ".agents/skills/surface.yaml", `{
+  "version": 2,
+  "plugin_root": "demo",
+  "export_all_to_plugin": true,
+  "skills": [{"name": "myskill", "export_plugin": true}]
+}`)
+
+	surface, err := ParseSurface(dir)
+	if err != nil {
+		t.Fatalf("ParseSurface returned error: %v", err)
+	}
+	if surface.Version != 2 {
+		t.Fatalf("Version = %d, want 2", surface.Version)
+	}
+	if !surface.ExportAllToPlugin {
+		t.Fatal("ExportAllToPlugin = false, want true")
+	}
+	if len(surface.Skills) != 1 || surface.Skills[0].Name != "myskill" || !surface.Skills[0].ExportPlugin {
+		t.Fatalf("unexpected skills: %#v", surface.Skills)
+	}
+}
+
+func TestPortableFrontmatterAllowsMetadataAndBlockDescription(t *testing.T) {
+	content := []byte(`---
+name: block-desc
+description: >-
+  Run a long skill description that remains valid YAML while being folded
+  across multiple lines.
+allowed-tools:
+  - Bash
+metadata:
+  user-invocable: true
+  triggers:
+    - block description
+---
+# Body
+`)
+	if err := validatePortableFrontmatter("SKILL.md", content); err != nil {
+		t.Fatalf("validatePortableFrontmatter returned error: %v", err)
+	}
+	name, description, tools, _, err := parseSkill(content)
+	if err != nil {
+		t.Fatalf("parseSkill returned error: %v", err)
+	}
+	if name != "block-desc" {
+		t.Fatalf("name = %q, want block-desc", name)
+	}
+	if !strings.Contains(description, "folded across multiple lines") {
+		t.Fatalf("description was not folded correctly: %q", description)
+	}
+	if len(tools) != 1 || tools[0] != "Bash" {
+		t.Fatalf("tools = %#v, want Bash", tools)
+	}
+}
+
+func TestSync_PreservesPortableProjectionFrontmatter(t *testing.T) {
+	dir := t.TempDir()
+	surface, _ := json.Marshal(map[string]any{
+		"version":              2,
+		"plugin_root":          "demo",
+		"export_all_to_plugin": true,
+		"skills": []map[string]any{{
+			"name": "myskill",
+		}},
+	})
+	writeFile(t, dir, ".agents/skills/surface.yaml", string(surface))
+	writeFile(t, dir, ".agents/skills/myskill/SKILL.md", `---
+name: myskill
+description: Projection frontmatter should keep portable metadata.
+allowed-tools:
+  - Bash
+metadata:
+  user-invocable: true
+  argument-hint: "[repo]"
+---
+# My Skill
+`)
+
+	report := SyncWithOptions(dir, false, Options{ValidatorMode: ValidatorOff})
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".claude/skills/myskill/SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{
+		"metadata:",
+		"argument-hint: '[repo]'",
+		"user-invocable: true",
+		"allowed-tools:\n  - Bash",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("projected skill missing %q:\n%s", want, text)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "plugins/demo/skills/myskill/SKILL.md")); err != nil {
+		t.Fatalf("export_all_to_plugin did not create plugin mirror: %v", err)
+	}
+}
+
 func TestSync_CreatesClaudeMirror(t *testing.T) {
 	dir := setupSyncRepo(t)
 
@@ -304,6 +408,17 @@ func TestFilterPortableFrontmatter_PreservesReload(t *testing.T) {
 	result := FilterPortableFrontmatter(input)
 	if !strings.Contains(result, "reload: true") {
 		t.Error("reload key should be preserved in portable frontmatter")
+	}
+}
+
+func TestFilterValidatorFrontmatterUsesStrictAgentSkillsSubset(t *testing.T) {
+	input := "---\nname: test\ndescription: demo\nreload: true\ndisable-model-invocation: true\nmetadata:\n  user-invocable: true\n---\n# Content\n"
+	result := filterValidatorFrontmatter(input)
+	if strings.Contains(result, "reload: true") || strings.Contains(result, "disable-model-invocation") {
+		t.Fatalf("validator frontmatter should filter unsupported keys:\n%s", result)
+	}
+	if !strings.Contains(result, "metadata:") {
+		t.Fatalf("validator frontmatter should preserve metadata:\n%s", result)
 	}
 }
 

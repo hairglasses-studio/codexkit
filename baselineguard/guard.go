@@ -615,6 +615,10 @@ func (r *Report) addSkillSurface(repoPath string) {
 		content := string(data)
 		if strings.Contains(content, "version: 1") || strings.Contains(content, "\"version\": 1") {
 			surface.Version = 1
+		} else if strings.Contains(content, "version: 2") || strings.Contains(content, "\"version\": 2") {
+			surface.Version = 2
+		}
+		if surface.Version != 0 {
 			// Extract skill names from "- name: <value>" lines
 			for _, line := range strings.Split(content, "\n") {
 				trimmed := strings.TrimSpace(line)
@@ -631,8 +635,8 @@ func (r *Report) addSkillSurface(repoPath string) {
 			return
 		}
 	}
-	if surface.Version != 1 {
-		r.add("skill_surface", false, fmt.Sprintf("version=%d, want 1", surface.Version))
+	if surface.Version != 1 && surface.Version != 2 {
+		r.add("skill_surface", false, fmt.Sprintf("version=%d, want 1 or 2", surface.Version))
 		return
 	}
 	r.add("skill_surface", true, fmt.Sprintf("valid, %d skills", len(surface.Skills)))

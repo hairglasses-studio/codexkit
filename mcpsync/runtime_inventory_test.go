@@ -64,6 +64,34 @@ func TestCheckRuntimeInventoryPassesWithAllowedSkippedAndArtifacts(t *testing.T)
 	}
 }
 
+func TestCheckRuntimeInventoryUsesPolicyAllowedSkipped(t *testing.T) {
+	root := setupRuntimeInventoryWorkspace(t)
+	writeRuntimeTestFile(t, root, "workspace/mcp-global-policy.json", `{
+  "version": 1,
+  "defaults": {"include_root": false, "ready_only": false},
+  "manifest": {
+    "use_workspace_manifest": true,
+    "allow_unlisted_repos": false,
+    "include_scopes": ["active_first_party"],
+    "exclude_scopes": ["compatibility_only"]
+  },
+  "runtime_inventory": {
+    "allowed_skipped": ["legacy:legacy"]
+  }
+}`)
+
+	report, err := CheckRuntimeInventory(RuntimeInventoryCheckOptions{
+		WorkspaceRoot: root,
+		SkipArtifacts: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Passed {
+		t.Fatalf("check failed: %+v", report.Findings)
+	}
+}
+
 func TestCheckRuntimeInventoryFailsInvalidLauncher(t *testing.T) {
 	root := t.TempDir()
 	writeRuntimeTestFile(t, root, "workspace/manifest.json", `{

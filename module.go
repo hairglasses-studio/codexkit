@@ -51,10 +51,24 @@ func ToolAnnotations(readOnly, destructive, idempotent, openWorld bool) map[stri
 // PortableFrontmatterKeys are the only keys allowed in portable
 // skill frontmatter per the Agent Skills open standard (Dec 2025).
 var PortableFrontmatterKeys = map[string]bool{
-	"name":          true,
-	"description":   true,
-	"allowed-tools": true,
-	"reload":        true, // hot-reloading support (Jan 2026)
+	"name":                     true,
+	"description":              true,
+	"allowed-tools":            true,
+	"compatibility":            true,
+	"license":                  true,
+	"user-invocable":           true,
+	"argument-hint":            true,
+	"disable-model-invocation": true,
+	"reload":                   true, // hot-reloading support (Jan 2026)
+	"triggers":                 true,
+	"capabilities":             true,
+	"see_also":                 true,
+	"paths":                    true,
+	"context":                  true,
+	"metadata":                 true,
+	"agent":                    true,
+	"effort":                   true,
+	"model":                    true,
 }
 
 // SkillSourceFrontmatterKeys are allowed in canonical repo-owned skill sources.
@@ -63,6 +77,19 @@ var SkillSourceFrontmatterKeys = map[string]bool{
 	"name":                     true,
 	"description":              true,
 	"allowed-tools":            true,
+	"compatibility":            true,
+	"license":                  true,
+	"user-invocable":           true,
+	"argument-hint":            true,
+	"metadata":                 true,
 	"reload":                   true,
 	"disable-model-invocation": true,
+	"triggers":                 true,
+	"capabilities":             true,
+	"see_also":                 true,
+	"paths":                    true,
+	"context":                  true,
+	"agent":                    true,
+	"effort":                   true,
+	"model":                    true,
 }

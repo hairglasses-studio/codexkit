@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/hairglasses-studio/codexkit"
+	"gopkg.in/yaml.v3"
 )
 
 type syncMode string
@@ -74,19 +75,21 @@ type SkillEntry struct {
 
 // Surface is the parsed skill surface definition.
 type Surface struct {
-	Version       int          `json:"version"`
-	PluginRoot    string       `json:"plugin_root,omitempty"`
-	ClaudeManaged bool         `json:"claude_managed"`
-	PluginManaged bool         `json:"plugin_managed"`
-	Skills        []SkillEntry `json:"skills"`
+	Version           int          `json:"version"`
+	PluginRoot        string       `json:"plugin_root,omitempty"`
+	ExportAllToPlugin bool         `json:"export_all_to_plugin,omitempty"`
+	ClaudeManaged     bool         `json:"claude_managed"`
+	PluginManaged     bool         `json:"plugin_managed"`
+	Skills            []SkillEntry `json:"skills"`
 }
 
 type rawSurface struct {
-	Version       int             `json:"version"`
-	PluginRoot    string          `json:"plugin_root,omitempty"`
-	ClaudeManaged *bool           `json:"claude_managed,omitempty"`
-	PluginManaged *bool           `json:"plugin_managed,omitempty"`
-	Skills        []rawSkillEntry `json:"skills"`
+	Version           int             `json:"version"`
+	PluginRoot        string          `json:"plugin_root,omitempty"`
+	ExportAllToPlugin bool            `json:"export_all_to_plugin,omitempty"`
+	ClaudeManaged     *bool           `json:"claude_managed,omitempty"`
+	PluginManaged     *bool           `json:"plugin_managed,omitempty"`
+	Skills            []rawSkillEntry `json:"skills"`
 }
 
 type rawSkillEntry struct {
@@ -94,6 +97,41 @@ type rawSkillEntry struct {
 	ExportPlugin           *bool             `json:"export_plugin,omitempty"`
 	ClaudeIncludeCanonical *bool             `json:"claude_include_canonical,omitempty"`
 	ClaudeAliases          []json.RawMessage `json:"claude_aliases,omitempty"`
+}
+
+var projectedFrontmatterKeyOrder = []string{
+	"compatibility",
+	"license",
+	"user-invocable",
+	"argument-hint",
+	"disable-model-invocation",
+	"reload",
+	"triggers",
+	"capabilities",
+	"see_also",
+	"paths",
+	"context",
+	"metadata",
+	"agent",
+	"effort",
+	"model",
+}
+
+type skillProjection struct {
+	Name         string
+	Description  string
+	AllowedTools []string
+	Frontmatter  map[string]any
+	Body         string
+}
+
+var agentSkillsValidatorFrontmatterKeys = map[string]bool{
+	"name":          true,
+	"description":   true,
+	"allowed-tools": true,
+	"compatibility": true,
+	"license":       true,
+	"metadata":      true,
 }
 
 // ParseSurface reads and parses the surface definition.
@@ -116,15 +154,16 @@ func ParseSurface(repoPath string) (*Surface, error) {
 }
 
 func normalizeSurface(raw rawSurface, defaultPluginRoot string) (*Surface, error) {
-	if raw.Version != 1 {
+	if !supportedSurfaceVersion(raw.Version) {
 		return nil, fmt.Errorf("unsupported surface version: %d", raw.Version)
 	}
 	surface := &Surface{
-		Version:       raw.Version,
-		PluginRoot:    raw.PluginRoot,
-		ClaudeManaged: true,
-		PluginManaged: true,
-		Skills:        make([]SkillEntry, 0, len(raw.Skills)),
+		Version:           raw.Version,
+		PluginRoot:        raw.PluginRoot,
+		ExportAllToPlugin: raw.ExportAllToPlugin,
+		ClaudeManaged:     true,
+		PluginManaged:     true,
+		Skills:            make([]SkillEntry, 0, len(raw.Skills)),
 	}
 	if surface.PluginRoot == "" {
 		surface.PluginRoot = defaultPluginRoot
@@ -141,7 +180,7 @@ func normalizeSurface(raw rawSurface, defaultPluginRoot string) (*Surface, error
 		}
 		normalized := SkillEntry{
 			Name:                   entry.Name,
-			ExportPlugin:           false,
+			ExportPlugin:           surface.ExportAllToPlugin,
 			ClaudeIncludeCanonical: true,
 			ClaudeAliases:          make([]SkillAlias, 0, len(entry.ClaudeAliases)),
 		}
@@ -177,6 +216,10 @@ func normalizeSurface(raw rawSurface, defaultPluginRoot string) (*Surface, error
 	return surface, nil
 }
 
+func supportedSurfaceVersion(version int) bool {
+	return version == 1 || version == 2
+}
+
 func parseSimpleYAMLSurface(data []byte) (*Surface, error) {
 	lines := strings.Split(string(data), "\n")
 	surface := &Surface{
@@ -188,8 +231,12 @@ func parseSimpleYAMLSurface(data []byte) (*Surface, error) {
 		switch {
 		case trimmed == "version: 1":
 			surface.Version = 1
+		case trimmed == "version: 2":
+			surface.Version = 2
 		case strings.HasPrefix(trimmed, "plugin_root:"):
 			surface.PluginRoot = strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "plugin_root:")), `"'`)
+		case trimmed == "export_all_to_plugin: true":
+			surface.ExportAllToPlugin = true
 		case trimmed == "claude_managed: false":
 			surface.ClaudeManaged = false
 		case trimmed == "plugin_managed: false":
@@ -198,11 +245,12 @@ func parseSimpleYAMLSurface(data []byte) (*Surface, error) {
 			name := strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "- name:")), `"'`)
 			surface.Skills = append(surface.Skills, SkillEntry{
 				Name:                   name,
+				ExportPlugin:           surface.ExportAllToPlugin,
 				ClaudeIncludeCanonical: true,
 			})
 		}
 	}
-	if surface.Version != 1 {
+	if !supportedSurfaceVersion(surface.Version) {
 		return nil, fmt.Errorf("unsupported surface version: %d", surface.Version)
 	}
 	return surface, nil
@@ -211,6 +259,14 @@ func parseSimpleYAMLSurface(data []byte) (*Surface, error) {
 // FilterPortableFrontmatter keeps only the portable keys used by managed
 // plugin mirrors.
 func FilterPortableFrontmatter(content string) string {
+	return filterFrontmatter(content, codexkit.PortableFrontmatterKeys)
+}
+
+func filterValidatorFrontmatter(content string) string {
+	return filterFrontmatter(content, agentSkillsValidatorFrontmatterKeys)
+}
+
+func filterFrontmatter(content string, allowedKeys map[string]bool) string {
 	lines, bodyStart, ok := splitFrontmatter([]byte(content))
 	if !ok {
 		return content
@@ -218,12 +274,31 @@ func FilterPortableFrontmatter(content string) string {
 	var b strings.Builder
 	b.WriteString("---\n")
 	inTools := false
+	inMetadata := false
+	inBlock := false
 	wroteTools := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
+		if lineHasIndent(line) {
+			if inTools && strings.HasPrefix(trimmed, "- ") {
+				if !wroteTools {
+					b.WriteString("allowed-tools:\n")
+					wroteTools = true
+				}
+				b.WriteString("  ")
+				b.WriteString(trimmed)
+				b.WriteString("\n")
+			} else if inMetadata || inBlock {
+				b.WriteString(line)
+				b.WriteString("\n")
+			}
+			continue
+		}
+		inMetadata = false
+		inBlock = false
 		if strings.HasPrefix(trimmed, "- ") {
 			if inTools {
 				if !wroteTools {
@@ -242,13 +317,26 @@ func FilterPortableFrontmatter(content string) string {
 			continue
 		}
 		key := strings.TrimSpace(parts[0])
-		if !codexkit.PortableFrontmatterKeys[key] {
+		if !allowedKeys[key] {
 			continue
 		}
 		if key == "allowed-tools" {
 			inTools = true
+			if tools := parseInlineTools(strings.TrimSpace(parts[1])); len(tools) > 0 {
+				if !wroteTools {
+					b.WriteString("allowed-tools:\n")
+					wroteTools = true
+				}
+				for _, tool := range tools {
+					b.WriteString("  - ")
+					b.WriteString(tool)
+					b.WriteString("\n")
+				}
+			}
 			continue
 		}
+		inMetadata = key == "metadata"
+		inBlock = isYAMLBlockScalar(strings.TrimSpace(parts[1]))
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
@@ -270,6 +358,14 @@ func Sync(repoPath string, dryRun bool) SyncReport {
 		return run(repoPath, modeDryRun, Options{})
 	}
 	return run(repoPath, modeWrite, Options{})
+}
+
+// SyncWithOptions writes managed skill mirrors with explicit options.
+func SyncWithOptions(repoPath string, dryRun bool, opts Options) SyncReport {
+	if dryRun {
+		return run(repoPath, modeDryRun, opts)
+	}
+	return run(repoPath, modeWrite, opts)
 }
 
 // Diff returns the dry-run report.
@@ -352,13 +448,13 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 			}
 		}
 
-		name, description, tools, body, err := parseSkill(content)
+		projection, err := parseSkillProjection(content)
 		if err != nil {
 			report.Errors = append(report.Errors, fmt.Sprintf("%s: %v", canonicalPath, err))
 			continue
 		}
-		if name != skill.Name {
-			report.Errors = append(report.Errors, fmt.Sprintf("canonical skill name mismatch in %s (expected %s, found %s)", canonicalPath, skill.Name, name))
+		if projection.Name != skill.Name {
+			report.Errors = append(report.Errors, fmt.Sprintf("canonical skill name mismatch in %s (expected %s, found %s)", canonicalPath, skill.Name, projection.Name))
 			continue
 		}
 
@@ -366,7 +462,7 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 			if err := registerDir(claudeDirs, skill.Name, "managed Claude skill"); err != nil {
 				report.Errors = append(report.Errors, err.Error())
 			} else {
-				rendered := renderSkill(skill.Name, description, skill.Name, tools, body, fmt.Sprintf("Compatibility mirror of the canonical `%s` skill.", skill.Name))
+				rendered := renderSkill(skill.Name, projection.Description, skill.Name, projection, fmt.Sprintf("Compatibility mirror of the canonical `%s` skill.", skill.Name))
 				target := filepath.Join(absRepoPath, ".claude", "skills", skill.Name, "SKILL.md")
 				syncContent(&report, mode, canonicalPath, target, rendered, "Claude skill")
 			}
@@ -392,7 +488,7 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 				report.Errors = append(report.Errors, err.Error())
 				continue
 			}
-			rendered := renderSkill(alias.Name, alias.Description, skill.Name, tools, body, fmt.Sprintf("Compatibility alias for the canonical `%s` skill.", skill.Name))
+			rendered := renderSkill(alias.Name, alias.Description, skill.Name, projection, fmt.Sprintf("Compatibility alias for the canonical `%s` skill.", skill.Name))
 			target := filepath.Join(absRepoPath, ".claude", "skills", alias.Name, "SKILL.md")
 			syncContent(&report, mode, canonicalPath, target, rendered, "Claude skill")
 		}
@@ -401,7 +497,7 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 			if err := registerDir(pluginDirs, skill.Name, "managed plugin skill"); err != nil {
 				report.Errors = append(report.Errors, err.Error())
 			} else {
-				rendered := renderSkill(skill.Name, description, skill.Name, tools, body, "")
+				rendered := renderSkill(skill.Name, projection.Description, skill.Name, projection, "")
 				target := filepath.Join(absRepoPath, "plugins", surface.PluginRoot, "skills", skill.Name, "SKILL.md")
 				syncContent(&report, mode, canonicalPath, target, rendered, "plugin skill")
 			}
@@ -503,11 +599,24 @@ func validatePortableFrontmatter(path string, content []byte) error {
 		return fmt.Errorf("missing frontmatter in %s", path)
 	}
 	inTools := false
+	inMetadata := false
+	inBlock := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
+		if lineHasIndent(line) {
+			if inTools && strings.HasPrefix(trimmed, "- ") {
+				continue
+			}
+			if inMetadata || inBlock {
+				continue
+			}
+			return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
+		}
+		inMetadata = false
+		inBlock = false
 		if strings.HasPrefix(trimmed, "- ") {
 			if !inTools {
 				return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
@@ -522,56 +631,94 @@ func validatePortableFrontmatter(path string, content []byte) error {
 		if !codexkit.SkillSourceFrontmatterKeys[key] {
 			return fmt.Errorf("non-portable frontmatter in %s: %s", path, key)
 		}
+		value := strings.TrimSpace(parts[1])
+		if key == "allowed-tools" && value != "" {
+			return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
+		}
 		inTools = key == "allowed-tools"
+		inMetadata = key == "metadata"
+		inBlock = isYAMLBlockScalar(value)
 	}
 	return nil
 }
 
-func parseSkill(content []byte) (name, description string, tools []string, body string, err error) {
-	lines, bodyStart, ok := splitFrontmatter(content)
-	if !ok {
-		return "", "", nil, "", fmt.Errorf("missing SKILL frontmatter")
-	}
-	inTools := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		if strings.HasPrefix(trimmed, "- ") {
-			if inTools {
-				tools = append(tools, strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))
-			}
-			continue
-		}
-		inTools = false
-		parts := strings.SplitN(trimmed, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		key := strings.TrimSpace(parts[0])
-		value := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
-		switch key {
-		case "name":
-			name = value
-		case "description":
-			description = value
-		case "allowed-tools":
-			inTools = true
-		}
-	}
-	if strings.TrimSpace(name) == "" {
-		return "", "", nil, "", fmt.Errorf("missing name frontmatter")
-	}
-	if strings.TrimSpace(description) == "" {
-		return "", "", nil, "", fmt.Errorf("missing description frontmatter")
-	}
-	body = string(content[bodyStart:])
-	body = strings.TrimLeft(body, "\n")
-	return name, description, tools, body, nil
+func lineHasIndent(line string) bool {
+	return strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")
 }
 
-func renderSkill(name, description, canonicalName string, tools []string, body, banner string) string {
+func isYAMLBlockScalar(value string) bool {
+	return value == "|" || value == "|-" || value == "|+" || value == ">" || value == ">-" || value == ">+"
+}
+
+func parseInlineTools(value string) []string {
+	if !strings.HasPrefix(value, "[") || !strings.HasSuffix(value, "]") {
+		return nil
+	}
+	value = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(value, "["), "]"))
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	tools := make([]string, 0, len(parts))
+	for _, part := range parts {
+		tool := strings.Trim(strings.TrimSpace(part), `"'`)
+		if tool != "" {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+func parseSkill(content []byte) (name, description string, tools []string, body string, err error) {
+	projection, err := parseSkillProjection(content)
+	if err != nil {
+		return "", "", nil, "", err
+	}
+	return projection.Name, projection.Description, projection.AllowedTools, projection.Body, nil
+}
+
+func parseSkillProjection(content []byte) (skillProjection, error) {
+	text := strings.ReplaceAll(string(content), "\r\n", "\n")
+	if !strings.HasPrefix(text, "---\n") {
+		return skillProjection{}, fmt.Errorf("missing SKILL frontmatter")
+	}
+	end := strings.Index(text[len("---\n"):], "\n---")
+	if end < 0 {
+		return skillProjection{}, fmt.Errorf("unterminated frontmatter")
+	}
+	frontmatterEnd := len("---\n") + end
+	bodyStart := frontmatterEnd + len("\n---")
+	if bodyStart < len(text) && text[bodyStart] == '\n' {
+		bodyStart++
+	}
+	frontmatter := text[len("---\n"):frontmatterEnd]
+
+	var raw map[string]any
+	if err := yaml.Unmarshal([]byte(frontmatter), &raw); err != nil {
+		return skillProjection{}, fmt.Errorf("parse frontmatter: %w", err)
+	}
+	name := yamlString(raw["name"])
+	description := yamlString(raw["description"])
+	tools := yamlStringList(raw["allowed-tools"])
+	if len(tools) == 0 {
+		tools = yamlStringList(raw["tools"])
+	}
+	if name == "" {
+		return skillProjection{}, fmt.Errorf("missing name frontmatter")
+	}
+	if description == "" {
+		return skillProjection{}, fmt.Errorf("missing description frontmatter")
+	}
+	return skillProjection{
+		Name:         name,
+		Description:  description,
+		AllowedTools: tools,
+		Frontmatter:  raw,
+		Body:         strings.TrimLeft(text[bodyStart:], "\n"),
+	}, nil
+}
+
+func renderSkill(name, description, canonicalName string, projection skillProjection, banner string) string {
 	var b strings.Builder
 	b.WriteString("---\n")
 	b.WriteString("name: ")
@@ -580,9 +727,16 @@ func renderSkill(name, description, canonicalName string, tools []string, body, 
 	b.WriteString("description: ")
 	b.WriteString(yamlQuote(description))
 	b.WriteString("\n")
-	if len(tools) > 0 {
+	for _, key := range projectedFrontmatterKeyOrder {
+		value, ok := projection.Frontmatter[key]
+		if !ok || !codexkit.PortableFrontmatterKeys[key] {
+			continue
+		}
+		writeYAMLFrontmatterValue(&b, key, value)
+	}
+	if len(projection.AllowedTools) > 0 {
 		b.WriteString("allowed-tools:\n")
-		for _, tool := range tools {
+		for _, tool := range projection.AllowedTools {
 			if strings.TrimSpace(tool) == "" {
 				continue
 			}
@@ -602,8 +756,8 @@ func renderSkill(name, description, canonicalName string, tools []string, body, 
 	} else {
 		b.WriteString("\n")
 	}
-	b.WriteString(body)
-	if !strings.HasSuffix(body, "\n") {
+	b.WriteString(projection.Body)
+	if !strings.HasSuffix(projection.Body, "\n") {
 		b.WriteString("\n")
 	}
 	return b.String()
@@ -611,6 +765,89 @@ func renderSkill(name, description, canonicalName string, tools []string, body, 
 
 func yamlQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+}
+
+func writeYAMLFrontmatterValue(b *strings.Builder, key string, value any) {
+	switch typed := value.(type) {
+	case string:
+		if s := strings.TrimSpace(typed); s != "" {
+			b.WriteString(key)
+			b.WriteString(": ")
+			b.WriteString(yamlQuote(s))
+			b.WriteString("\n")
+		}
+	case bool:
+		b.WriteString(key)
+		b.WriteString(": ")
+		if typed {
+			b.WriteString("true\n")
+		} else {
+			b.WriteString("false\n")
+		}
+	case []any:
+		if len(typed) == 0 {
+			return
+		}
+		b.WriteString(key)
+		b.WriteString(":\n")
+		for _, item := range typed {
+			if s := yamlString(item); s != "" {
+				b.WriteString("  - ")
+				b.WriteString(yamlQuote(s))
+				b.WriteString("\n")
+			}
+		}
+	case []string:
+		if len(typed) == 0 {
+			return
+		}
+		b.WriteString(key)
+		b.WriteString(":\n")
+		for _, item := range typed {
+			if s := strings.TrimSpace(item); s != "" {
+				b.WriteString("  - ")
+				b.WriteString(yamlQuote(s))
+				b.WriteString("\n")
+			}
+		}
+	default:
+		data, err := yaml.Marshal(map[string]any{key: value})
+		if err == nil {
+			b.Write(data)
+		}
+	}
+}
+
+func yamlString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	default:
+		return ""
+	}
+}
+
+func yamlStringList(value any) []string {
+	switch typed := value.(type) {
+	case []any:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if s := yamlString(item); s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	case []string:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if s := strings.TrimSpace(item); s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }
 
 func splitFrontmatter(content []byte) ([]string, int, bool) {
@@ -664,7 +901,7 @@ func prepareSkillsRefValidationDir(canonicalName, canonicalDir string, canonical
 		cleanup()
 		return "", func() {}, fmt.Errorf("prepare skills-ref copy for %s: %w", canonicalName, err)
 	}
-	content := FilterPortableFrontmatter(string(canonicalSkill))
+	content := filterValidatorFrontmatter(string(canonicalSkill))
 	if compatName != canonicalName {
 		content = strings.Replace(content, "name: "+canonicalName, "name: "+compatName, 1)
 	}

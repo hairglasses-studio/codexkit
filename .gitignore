@@ -1,6 +1,9 @@
 # Build artifacts
 .codex/bin/
 
+# Ralph runtime state
+.ralph/handoffs/
+
 # Local secrets
 .env
 .env.*

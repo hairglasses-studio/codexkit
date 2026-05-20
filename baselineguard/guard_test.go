@@ -350,6 +350,22 @@ func TestCheck_NoSurface(t *testing.T) {
 	}
 }
 
+func TestCheck_SkillSurfaceAcceptsVersion2(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, ".agents/skills/surface.yaml", `{"version":2,"skills":[{"name":"test_skill"}]}`)
+
+	report := Check(dir)
+	for _, f := range report.Findings {
+		if f.Check == "skill_surface" {
+			if !f.Passed {
+				t.Fatalf("skill_surface failed: %s", f.Message)
+			}
+			return
+		}
+	}
+	t.Fatal("skill_surface finding missing")
+}
+
 func TestCheck_SkillSyncAllowsGeneratedClaudeMirror(t *testing.T) {
 	dir := setupCompliantRepo(t)
 	writeFile(t, dir, ".agents/skills/surface.yaml", `{"version":1,"skills":[{"name":"test_skill","claude_include_canonical":true}]}`)
