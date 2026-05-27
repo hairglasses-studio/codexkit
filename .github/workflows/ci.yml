@@ -1,10 +1,12 @@
 name: Go CI
 
+# Automatic triggers are paused while this public org repo is constrained to the
+# Internal-Arch runner path. Use manual dispatch after runner access is healthy.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,10 +19,10 @@ jobs:
       group: Internal-Arch
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true

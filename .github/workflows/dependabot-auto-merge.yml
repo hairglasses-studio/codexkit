@@ -1,6 +1,9 @@
 name: Dependabot Auto-Merge
 
-on: pull_request
+# Automatic triggers are paused while this public org repo is constrained to the
+# Internal-Arch runner path. Re-enable pull_request after runner access is healthy.
+on:
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -8,7 +11,7 @@ permissions:
 
 jobs:
   auto-merge:
-    if: github.actor == 'dependabot[bot]'
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
     runs-on:
       group: Internal-Arch
     steps:

@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest a public, portable codexkit capability
+title: "feature: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests should fit the sanitized public scope. Do not include private repo inventory, tenant data, credentials, or host-specific operational details.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What public, portable use case should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the change and how it would be used.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional notes about other designs or existing tools.

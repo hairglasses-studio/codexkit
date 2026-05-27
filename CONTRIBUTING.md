@@ -16,6 +16,8 @@ go test -count=1 -race ./...
 - Follow existing code conventions (Go 1.26+, `ToolModule` interface)
 - Add tests for new functionality
 - Run the full test suite before submitting
+- Do not add credentials, private repo inventory, host-specific state, tenant data, or personal data
+- Run `gitleaks detect --source . --no-git --redact` for changes touching examples, fixtures, workflow files, or generated artifacts
 
 ## Issues
 

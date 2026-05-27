@@ -1,6 +1,6 @@
 # codexkit Roadmap
 
-Last updated: 2026-05-13.
+Last updated: 2026-05-27.
 
 ## Current State
 
@@ -9,7 +9,14 @@ Codex fleet management toolkit for baseline validation, skill sync, and MCP prof
 - Tier: `tier-1`
 - Lifecycle: `active`
 - Language profile: `Go`
-- Visibility / sensitivity: `PRIVATE` / `internal`
+- Visibility / sensitivity: `PUBLIC` / `sanitized`
+
+## Public Portfolio Readiness
+
+- [x] Keep README examples generic so public readers can evaluate the tool without seeing private workspace paths.
+- [x] Add repository-local community, security, issue, and pull request templates because the organization `.github` defaults are private.
+- [x] Pause automatic GitHub Actions triggers while the public org repo is constrained to the private `Internal-Arch` runner path.
+- [ ] Re-enable automatic pull request and push checks after organization Actions billing and runner access are healthy.
 
 ## Unification Loop Improvements
 
@@ -18,7 +25,7 @@ Codex fleet management toolkit for baseline validation, skill sync, and MCP prof
 - [x] Make `codexkit baseline check --json` suppress human text by default so automation receives machine-readable JSON.
 - [x] Teach unification reports to display structured baseline remediation commands when the baseline queue is non-empty.
 - [x] Extend unification cycle notes to include the first baseline remediation command when the baseline queue is non-empty.
-- [x] Move workspace-global Claude/Codex/Gemini MCP overlay rendering into `codexkit workspace global-mcp-sync`, so `dotfiles` delegates provider overlay sync to one Go-owned contract.
+- [x] Move workspace-global Claude/Codex/Gemini MCP overlay rendering into `codexkit workspace global-mcp-sync`, so desktop/workspace automation repos delegate provider overlay sync to one Go-owned contract.
 - [x] Align repo-local wrapper scripts with the shared workspace Go env contract, so `run-codexkit-mcp.sh`, `skill-surface-sync.sh`, and `codex-mcp-sync.sh` default to shared `GOCACHE` plus repo-scoped temp roots instead of `/tmp`.
 
 <!-- whiteclaw-rollout:start -->
@@ -41,7 +48,7 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 ### Rationale Snapshot
 - Tier / lifecycle: `tier-1` / `active`
 - Language profile: `Go`
-- Visibility / sensitivity: `PRIVATE` / `internal`
+- Visibility / sensitivity: `PUBLIC` / `sanitized`
 - Surface baseline: AGENTS=yes, skills=yes, codex=yes, mcp_manifest=configured, ralph=no, roadmap=yes
 - Whiteclaw transfers in scope: typed handler core, self-explorer contract, profile telemetry, prompt/runbook pack
 - Live repo notes: AGENTS, skills, Codex config, configured .mcp.json, 9 workflow(s)
@@ -51,12 +58,12 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 
 ## Crosspollinate Suggestion: Adopt go-mcp-server pattern
 
-> **Source:** `~/hairglasses-studio/crosspollinate/patterns/go-mcp-server.md`
+> **Source:** private workspace pattern note, summarized here for the public roadmap.
 > **Proposed:** 2026-05-07 (cycle 0, refined cycle 13)
 > **How to dismiss:** delete this section. Future crosspollinate cycles will detect the deletion and downgrade the recommendation.
-> **Updated 2026-05-08:** cluster members reduced post-cycle-28 consolidate-repos: go-mcp-servers (was 12-member; now 8 active after process-mcp/geminikit/mcp-catalog/terraform-docs hard-deleted, systemd-mcp/tmux-mcp archive-only). See `crosspollinate/patterns/<topic>.md` for the current canonical active list.
+> **Updated 2026-05-08:** internal workspace consolidation reduced the source cluster; only the public, reusable recommendation is retained here.
 
-The crosspollinate loop synthesized a canonical pattern for Go MCP servers across the 12-member cluster (hg-mcp, process-mcp, github-runner-mcp, systemd-mcp, tmux-mcp, codexkit, geminikit, jobb, mcp-catalog, terraform-docs, jellyfin-mcp-deluxe, mcpkit) based on context7 docs (mcp-go + official Go SDK + MCP spec) and exemplar code in ralphglasses.
+The crosspollinate loop synthesized a canonical pattern for Go MCP servers across the internal workspace based on context7 docs, MCP SDK behavior, and private control-plane exemplars. The public recommendations below are the reusable subset that fits this repository.
 
 Key recommendations relevant to this repo:
 

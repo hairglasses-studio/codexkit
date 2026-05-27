@@ -6,7 +6,7 @@
 
 Fleet management toolkit for AI agent repos — baseline validation, skill surface sync, and MCP profile management.
 
-> **Engineering context:** codexkit automates the operational overhead of maintaining consistent agent configurations across a fleet of repositories. The same patterns that production platforms need for fleet-wide config validation, drift detection, and automated remediation.
+> **Public portfolio context:** codexkit is the sanitized public slice of a larger private fleet-management workflow. It shows the reusable validation, sync, and projection patterns without publishing private repo inventory, workstation state, credentials, or tenant details.
 
 ## What It Does
 
@@ -27,7 +27,7 @@ go install github.com/hairglasses-studio/codexkit/cmd/codexkit@latest
 go install github.com/hairglasses-studio/codexkit/cmd/codexkit-mcp@latest
 ```
 
-Repo-local wrapper scripts (`scripts/run-codexkit-mcp.sh`, `scripts/skill-surface-sync.sh`, `scripts/codex-mcp-sync.sh`) now source `~/hairglasses-studio/scripts/go-workspace-env.sh` when it is available. By default they reuse the shared `~/.cache/go-build` and stage temp work under the short repo roots at `~/.gt/<repo-id>` instead of `/tmp`.
+Repo-local wrapper scripts (`scripts/run-codexkit-mcp.sh`, `scripts/skill-surface-sync.sh`, `scripts/codex-mcp-sync.sh`) use a shared workspace Go environment when one is available. By default they reuse the shared `~/.cache/go-build` and stage temp work under short repo roots at `~/.gt/<repo-id>` instead of `/tmp`.
 
 ## Usage
 
@@ -35,51 +35,51 @@ Repo-local wrapper scripts (`scripts/run-codexkit-mcp.sh`, `scripts/skill-surfac
 
 ```bash
 # Validate a single repo
-codexkit baseline check ~/hairglasses-studio/mcpkit
+codexkit baseline check /path/to/workspace/example-repo
 
 # Audit the entire fleet
-codexkit fleet audit ~/hairglasses-studio
+codexkit fleet audit /path/to/workspace
 
 # Show skill drift without applying
-codexkit skills diff ~/hairglasses-studio/ralphglasses
+codexkit skills diff /path/to/workspace/example-repo
 
 # Sync MCP configs
-codexkit mcp sync ~/hairglasses-studio/dotfiles
+codexkit mcp sync /path/to/workspace/example-repo
 
 # Validate all repo-controlled workspace source contracts
-codexkit workspace source-contract-check ~/hairglasses-studio
+codexkit workspace source-contract-check /path/to/workspace
 
 # Write and later verify a diffable source-contract artifact
-codexkit workspace source-contract-check ~/hairglasses-studio \
+codexkit workspace source-contract-check /path/to/workspace \
   --skill-validator=off \
-  --json-out ~/hairglasses-studio/docs/inventory/workspace-source-contract-2026-05-10.json
-codexkit workspace source-contract-check ~/hairglasses-studio \
+  --json-out /path/to/artifacts/workspace-source-contract-2026-05-10.json
+codexkit workspace source-contract-check /path/to/workspace \
   --skill-validator=off \
-  --json-path ~/hairglasses-studio/docs/inventory/workspace-source-contract-2026-05-10.json
+  --json-path /path/to/artifacts/workspace-source-contract-2026-05-10.json
 
 # Generate and verify the baseline repo surface index
-codexkit workspace surface-index ~/hairglasses-studio \
+codexkit workspace surface-index /path/to/workspace \
   --skill-validator=off \
-  --json-out ~/hairglasses-studio/docs/inventory/repo-surface-index-2026-05-10.json \
-  --markdown-out ~/hairglasses-studio/docs/inventory/repo-surface-index-2026-05-10.md
-codexkit workspace surface-index-check ~/hairglasses-studio --skill-validator=off
+  --json-out /path/to/artifacts/repo-surface-index-2026-05-10.json \
+  --markdown-out /path/to/artifacts/repo-surface-index-2026-05-10.md
+codexkit workspace surface-index-check /path/to/workspace --skill-validator=off
 
 # Generate and verify the workspace-global MCP provider projection
-codexkit workspace global-mcp-projection ~/hairglasses-studio \
-  --json-out ~/hairglasses-studio/docs/inventory/workspace-global-mcp-projection-2026-05-10.json \
-  --markdown-out ~/hairglasses-studio/docs/inventory/workspace-global-mcp-projection-2026-05-10.md
-codexkit workspace global-mcp-projection-check ~/hairglasses-studio
+codexkit workspace global-mcp-projection /path/to/workspace \
+  --json-out /path/to/artifacts/workspace-global-mcp-projection-2026-05-10.json \
+  --markdown-out /path/to/artifacts/workspace-global-mcp-projection-2026-05-10.md
+codexkit workspace global-mcp-projection-check /path/to/workspace
 
 # Generate and verify the wider agent primitive index
-codexkit workspace primitive-index ~/hairglasses-studio \
-  --json-out ~/hairglasses-studio/docs/inventory/workspace-agent-primitives-2026-05-10.json \
-  --markdown-out ~/hairglasses-studio/docs/inventory/workspace-agent-primitives-2026-05-10.md
-codexkit workspace primitive-index-check ~/hairglasses-studio
+codexkit workspace primitive-index /path/to/workspace \
+  --json-out /path/to/artifacts/workspace-agent-primitives-2026-05-10.json \
+  --markdown-out /path/to/artifacts/workspace-agent-primitives-2026-05-10.md
+codexkit workspace primitive-index-check /path/to/workspace
 ```
 
 ### Workspace Source Contract
 
-`codexkit workspace source-contract-check` validates the studio-wide repo-controlled source contract from a full workspace checkout, not from this repository alone. On self-hosted CI, set `HG_STUDIO_ROOT` or keep the canonical checkout at `~/hairglasses-studio`; the path must contain `codexkit/`, `workspace/manifest.json`, and `workspace/mcp-global-policy.json`.
+`codexkit workspace source-contract-check` validates the repo-controlled source contract from a full workspace checkout, not from this repository alone. On self-hosted CI, set `HG_STUDIO_ROOT` to that checkout; the path must contain `codexkit/`, `workspace/manifest.json`, and `workspace/mcp-global-policy.json`.
 
 For stricter skill checks, install either the npm `skills-ref` CLI or the PyPI `skills-ref` package, which provides the `agentskills` CLI. `codexkit skills check` and `codexkit workspace source-contract-check` detect both validator entrypoints. Use `--skill-validator=host` to require an installed validator, `--skill-validator=pinned` to use pinned `uvx`/`npx` fallback commands, or `--skill-validator=off` to suppress external validation.
 
@@ -100,7 +100,7 @@ Codex workspace-global overlays are intentionally opt-in: repo profiles must set
   "mcpServers": {
     "codexkit": {
       "command": "codexkit-mcp",
-      "args": ["--workspace", "~/hairglasses-studio"]
+      "args": ["--workspace", "/path/to/workspace"]
     }
   }
 }
