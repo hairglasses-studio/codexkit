@@ -89,6 +89,8 @@ Use `--json-out <path>` to write the stable JSON source-contract artifact, and `
 
 `codexkit workspace global-mcp-projection` generates `workspace-global-mcp-projection-*.json` and `.md`. It records the runtime MCP source set plus Codex, Claude, and Gemini provider overlay entries derived from `.mcp.json` and `.codex/mcp-profile-policy.json`. The companion `global-mcp-projection-check` command fails when those generated artifacts drift.
 
+Codex workspace-global overlays are intentionally opt-in: repo profiles must set `global_codex: true` or come from workspace-root foundational servers before they are written to user-scope Codex config. Claude and Gemini continue to project review/research profiles by default, so a zero Codex entry count can be a valid policy state when repo-local `.codex/config.toml` files are the Codex source of truth.
+
 `codexkit workspace primitive-index` generates `workspace-agent-primitives-*.json` and `.md`. It records Claude hooks/settings, local overlays, provider agents, output styles, plugin manifests, nested MCP files, and instruction files that are outside the narrower skill/MCP source contract. Canonical and generated hook wiring failures fail `primitive-index-check`; local overlays remain audit-visible warnings.
 
 ### MCP Server

@@ -289,6 +289,9 @@ func RenderRuntimeInventoryMarkdown(inventory RuntimeInventory) string {
 	fmt.Fprintf(&b, "Generated: %s\n\n", inventory.GeneratedAt)
 	fmt.Fprintf(&b, "Source: `%s`, `%s`, and `%s`.\n\n", inventory.GeneratedBy, inventory.Manifest.Path, inventory.Policy.Path)
 	fmt.Fprintf(&b, "## Method\n\n%s\n\n", inventory.RuntimeProbe.Note)
+	if hasRemoteTransportSkipped(inventory.Skipped) {
+		fmt.Fprintf(&b, "Remote-transport servers are kept visible in the skipped set because this audit validates local launcher commands and does not probe HTTP or SSE endpoints.\n\n")
+	}
 	fmt.Fprintf(&b, "The source of truth is:\n\n")
 	fmt.Fprintf(&b, "- `%s`\n", inventory.Manifest.Path)
 	fmt.Fprintf(&b, "- `%s`\n", inventory.Policy.Path)
@@ -365,6 +368,15 @@ func RenderRuntimeInventoryMarkdown(inventory RuntimeInventory) string {
 	fmt.Fprintf(&b, "go run ./cmd/codexkit workspace runtime-inventory-check ~/hairglasses-studio\n")
 	fmt.Fprintf(&b, "```\n")
 	return b.String()
+}
+
+func hasRemoteTransportSkipped(skipped []RuntimeSkippedServer) bool {
+	for _, item := range skipped {
+		if runtimeSkippedAllowedByReason(item) {
+			return true
+		}
+	}
+	return false
 }
 
 type runtimeServerGroup struct {

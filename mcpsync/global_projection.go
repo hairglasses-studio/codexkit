@@ -266,6 +266,9 @@ func RenderGlobalProjectionMarkdown(projection GlobalProjection) string {
 	fmt.Fprintf(&b, "| Codex entries | %d |\n", projection.Provider.CodexEntries)
 	fmt.Fprintf(&b, "| Claude entries | %d |\n", projection.Provider.ClaudeEntries)
 	fmt.Fprintf(&b, "| Gemini entries | %d |\n\n", projection.Provider.GeminiEntries)
+	if projection.Provider.CodexEntries == 0 {
+		fmt.Fprintf(&b, "Codex workspace-global provider entries are opt-in. A zero Codex count means no repo profile sets `global_codex: true`; repo-local `.codex/config.toml` files and project launchers remain the Codex source of truth.\n\n")
+	}
 
 	fmt.Fprintf(&b, "## Runtime Servers\n\n")
 	fmt.Fprintf(&b, "| Alias | Source | Scope | Status |\n|---|---|---|---|\n")
@@ -284,6 +287,9 @@ func RenderGlobalProjectionMarkdown(projection GlobalProjection) string {
 		fmt.Fprintf(&b, "## %s Overlay\n\n", providerDisplayName(provider.Provider))
 		if len(provider.Entries) == 0 {
 			fmt.Fprintf(&b, "No managed entries.\n\n")
+			if provider.Provider == "codex" {
+				fmt.Fprintf(&b, "Codex entries are projected only from profiles that explicitly set `global_codex: true` or from workspace-root foundational servers.\n\n")
+			}
 			continue
 		}
 		fmt.Fprintf(&b, "| Name | Source | Type | Tools |\n|---|---|---|---:|\n")

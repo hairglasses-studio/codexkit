@@ -83,6 +83,41 @@ func TestCheckGlobalProjectionArtifacts(t *testing.T) {
 	}
 }
 
+func TestRenderGlobalProjectionExplainsCodexOptIn(t *testing.T) {
+	root := setupGlobalProjectionWorkspace(t)
+	writeRuntimeTestFile(t, root, "app/.codex/mcp-profile-policy.json", `{
+  "version": 1,
+  "profiles": [
+    {
+      "name": "app_review",
+      "from": "app",
+      "mode": "review",
+      "enabled_tools": ["app_search"]
+    }
+  ]
+}`)
+
+	projection, err := BuildGlobalProjection(GlobalProjectionOptions{
+		WorkspaceRoot: root,
+		GeneratedAt:   "2026-05-10T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projection.Provider.CodexEntries != 0 {
+		t.Fatalf("CodexEntries = %d, want 0", projection.Provider.CodexEntries)
+	}
+	markdown := RenderGlobalProjectionMarkdown(projection)
+	for _, want := range []string{
+		"Codex workspace-global provider entries are opt-in.",
+		"explicitly set `global_codex: true`",
+	} {
+		if !strings.Contains(markdown, want) {
+			t.Fatalf("markdown missing %q:\n%s", want, markdown)
+		}
+	}
+}
+
 func TestSyncGlobalProviderOverlaysWritesProviderTargets(t *testing.T) {
 	root := setupGlobalProjectionWorkspace(t)
 	home := t.TempDir()
