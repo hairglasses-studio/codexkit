@@ -7,6 +7,8 @@
 Fleet management toolkit for AI agent repos — baseline validation, skill surface sync, and MCP profile management.
 
 > **Public portfolio context:** codexkit is the sanitized public slice of a larger private fleet-management workflow. It shows the reusable validation, sync, and projection patterns without publishing private repo inventory, workstation state, credentials, or tenant details.
+>
+> See [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) for the explicit include/exclude contract.
 
 ## What It Does
 
