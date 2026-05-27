@@ -260,6 +260,92 @@ func TestSync_RejectsNonPortableFrontmatter(t *testing.T) {
 	}
 }
 
+func TestSync_AllowsSourceOnlyFrontmatterAndBlockDescription(t *testing.T) {
+	dir := t.TempDir()
+	surface, _ := json.Marshal(map[string]any{
+		"version": 1,
+		"skills": []map[string]any{{
+			"name": "myskill",
+		}},
+	})
+	writeFile(t, dir, ".agents/skills/surface.yaml", string(surface))
+	writeFile(t, dir, ".agents/skills/myskill/SKILL.md", `---
+name: myskill
+description: >-
+  Multi-line skill description
+  for source-authored skills.
+allowed-tools:
+  - Bash
+user-invocable: true
+argument-hint: "[--dry-run]"
+triggers:
+  - test trigger
+see_also:
+  - other-skill
+---
+# My Skill
+`)
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".claude/skills/myskill/SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "Multi-line skill description for source-authored skills.") {
+		t.Fatalf("expected folded description in generated mirror, got: %s", text)
+	}
+	if strings.Contains(text, "user-invocable") || strings.Contains(text, "triggers:") {
+		t.Fatalf("source-only keys should not be emitted to generated mirror: %s", text)
+	}
+}
+
+func TestSync_Version2EmitsSourceFrontmatter(t *testing.T) {
+	dir := t.TempDir()
+	surface, _ := json.Marshal(map[string]any{
+		"version": 2,
+		"skills": []map[string]any{{
+			"name": "myskill",
+		}},
+	})
+	writeFile(t, dir, ".agents/skills/surface.yaml", string(surface))
+	writeFile(t, dir, ".agents/skills/myskill/SKILL.md", `---
+name: myskill
+description: test skill
+allowed-tools:
+  - Bash
+user-invocable: true
+argument-hint: "[run]"
+triggers:
+  - run skill
+---
+# My Skill
+`)
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".claude/skills/myskill/SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{
+		"user-invocable: true",
+		"argument-hint: '[run]'",
+		"triggers:\n  - 'run skill'",
+		"allowed-tools:\n  - Bash",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("generated mirror missing %q: %s", want, text)
+		}
+	}
+}
+
 func TestSync_UsesAgentskillsValidatorFallback(t *testing.T) {
 	dir := setupSyncRepo(t)
 	binDir := t.TempDir()
@@ -432,6 +518,37 @@ func TestParseSurface_YAML(t *testing.T) {
 	}
 	if len(surface.Skills) != 2 {
 		t.Errorf("expected 2 skills, got %d", len(surface.Skills))
+	}
+}
+
+func TestParseSurface_Version2DefaultsExportAllToPlugin(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, ".agents/skills/surface.yaml", `{
+  "version": 2,
+  "plugin_root": "demo",
+  "export_all_to_plugin": true,
+  "skills": [
+    {"name": "alpha", "type": "workflow"},
+    {"name": "beta", "export_plugin": false}
+  ]
+}
+`)
+
+	surface, err := ParseSurface(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if surface.Version != 2 {
+		t.Fatalf("Version = %d, want 2", surface.Version)
+	}
+	if len(surface.Skills) != 2 {
+		t.Fatalf("expected 2 skills, got %d", len(surface.Skills))
+	}
+	if !surface.Skills[0].ExportPlugin {
+		t.Fatal("expected export_all_to_plugin to default alpha export_plugin=true")
+	}
+	if surface.Skills[1].ExportPlugin {
+		t.Fatal("expected explicit beta export_plugin=false to override export_all_to_plugin")
 	}
 }
 

@@ -27,6 +27,8 @@ go install github.com/hairglasses-studio/codexkit/cmd/codexkit@latest
 go install github.com/hairglasses-studio/codexkit/cmd/codexkit-mcp@latest
 ```
 
+Repo-local wrapper scripts (`scripts/run-codexkit-mcp.sh`, `scripts/skill-surface-sync.sh`, `scripts/codex-mcp-sync.sh`) now source `~/hairglasses-studio/scripts/go-workspace-env.sh` when it is available. By default they reuse the shared `~/.cache/go-build` and stage temp work under the short repo roots at `~/.gt/<repo-id>` instead of `/tmp`.
+
 ## Usage
 
 ### CLI

@@ -13,6 +13,15 @@ type metaModule struct {
 	info     ServerInfo
 }
 
+type toolSearchParams struct {
+	Query string `json:"query"`
+	Limit int    `json:"limit"`
+}
+
+type toolSchemaParams struct {
+	Name string `json:"name"`
+}
+
 func Module(registry *codexkit.Registry, info ServerInfo) codexkit.ToolModule {
 	return &metaModule{registry: registry, info: info}
 }
@@ -46,12 +55,10 @@ func (m *metaModule) Tools() []codexkit.ToolDef {
 					"limit": map[string]any{"type": "integer", "description": "Maximum matches to return. Defaults to 20."},
 				},
 			},
-			Handler: func(params map[string]any) (any, error) {
-				query, _ := params["query"].(string)
-				limit := numericParam(params["limit"], 20)
-				matches := m.searchTools(query, limit)
-				return map[string]any{"query": query, "tools": matches}, nil
-			},
+			Handler: codexkit.TypedHandler(func(params toolSearchParams) (any, error) {
+				matches := m.searchTools(params.Query, params.Limit)
+				return map[string]any{"query": params.Query, "tools": matches}, nil
+			}),
 		},
 		{
 			Name:        "tool_schema",
@@ -64,11 +71,10 @@ func (m *metaModule) Tools() []codexkit.ToolDef {
 				},
 				"required": []string{"name"},
 			},
-			Handler: func(params map[string]any) (any, error) {
-				name, _ := params["name"].(string)
-				tool, ok := m.registry.GetTool(name)
+			Handler: codexkit.TypedHandler(func(params toolSchemaParams) (any, error) {
+				tool, ok := m.registry.GetTool(params.Name)
 				if !ok {
-					return nil, fmt.Errorf("unknown tool: %s", name)
+					return nil, fmt.Errorf("unknown tool: %s", params.Name)
 				}
 				return map[string]any{
 					"name":        tool.Name,
@@ -76,7 +82,7 @@ func (m *metaModule) Tools() []codexkit.ToolDef {
 					"annotations": tool.Annotations,
 					"inputSchema": tool.Schema,
 				}, nil
-			},
+			}),
 		},
 		{
 			Name:        "server_health",
@@ -157,17 +163,4 @@ func (m *metaModule) searchTools(query string, limit int) []map[string]any {
 
 func readOnlyAnnotations() map[string]any {
 	return codexkit.ToolAnnotations(true, false, true, false)
-}
-
-func numericParam(value any, fallback int) int {
-	switch typed := value.(type) {
-	case int:
-		return typed
-	case int64:
-		return int(typed)
-	case float64:
-		return int(typed)
-	default:
-		return fallback
-	}
 }

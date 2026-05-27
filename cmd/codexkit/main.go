@@ -174,20 +174,12 @@ func runBaseline(args []string) {
 	if len(args) > 1 && args[1] == "--all" {
 		home, _ := os.UserHomeDir()
 		studioDir := filepath.Join(home, "hairglasses-studio")
-		entries, err := os.ReadDir(studioDir)
+		discovered, err := baselineguard.DiscoverWorkspaceTargets(studioDir)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error reading %s: %v\n", studioDir, err)
+			fmt.Fprintf(os.Stderr, "error discovering baseline targets in %s: %v\n", studioDir, err)
 			os.Exit(1)
 		}
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-			repoPath := filepath.Join(studioDir, entry.Name())
-			if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
-				paths = append(paths, repoPath)
-			}
-		}
+		paths = append(paths, discovered...)
 	} else if len(args) > 1 && args[1] != "--json" {
 		paths = append(paths, args[1])
 	} else {

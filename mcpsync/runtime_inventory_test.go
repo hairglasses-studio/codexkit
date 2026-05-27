@@ -92,6 +92,24 @@ func TestCheckRuntimeInventoryUsesPolicyAllowedSkipped(t *testing.T) {
 	}
 }
 
+func TestCheckRuntimeInventoryAllowsPolicyAndRemoteSkippedByReason(t *testing.T) {
+	report := unexpectedRuntimeSkipped([]RuntimeSkippedServer{
+		{
+			SourceRepo:   "legacy",
+			SourceServer: "legacy",
+			Reason:       `repo scope "compatibility_only" excluded by policy`,
+		},
+		{
+			SourceRepo:   "app",
+			SourceServer: "openai-developer-docs",
+			Reason:       "server not ready: remote transport; command not validated",
+		},
+	}, nil, false)
+	if len(report) != 0 {
+		t.Fatalf("expected policy/remote skipped entries to be allowed, got %v", report)
+	}
+}
+
 func TestCheckRuntimeInventoryFailsInvalidLauncher(t *testing.T) {
 	root := t.TempDir()
 	writeRuntimeTestFile(t, root, "workspace/manifest.json", `{

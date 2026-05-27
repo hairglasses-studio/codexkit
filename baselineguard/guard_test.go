@@ -62,6 +62,41 @@ func TestCheck_CompliantRepo(t *testing.T) {
 	}
 }
 
+func TestDiscoverWorkspaceTargetsUsesManifestAndSkipsNonGitRepos(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "workspace/manifest.json", `{
+  "version": 2,
+  "repos": [
+    {"name": "active", "category": "application", "scope": "active_first_party", "language": "Go", "baseline_target": true, "go_work_member": false, "lifecycle": "canonical"},
+    {"name": "operator", "category": "hub", "scope": "active_operator", "language": "Shell", "baseline_target": false, "go_work_member": false, "lifecycle": "canonical"},
+    {"name": "compat", "category": "supporting", "scope": "compatibility_only", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "compatibility"},
+    {"name": "missing", "category": "application", "scope": "active_first_party", "language": "Go", "baseline_target": true, "go_work_member": false, "lifecycle": "canonical"}
+  ]
+}
+`)
+	if err := os.MkdirAll(filepath.Join(root, "active", ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "operator", ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "compat", ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "missing"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	targets, err := DiscoverWorkspaceTargets(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{filepath.Join(root, "active"), filepath.Join(root, "operator")}
+	if !equalStrings(targets, want) {
+		t.Fatalf("targets = %#v, want %#v", targets, want)
+	}
+}
+
 func TestCheck_MissingAgentsMd(t *testing.T) {
 	dir := setupCompliantRepo(t)
 	os.Remove(filepath.Join(dir, "AGENTS.md"))
@@ -335,6 +370,23 @@ func TestCheck_MissingSkillFile(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected skill_file failure for missing SKILL.md")
+	}
+}
+
+func TestCheck_SkillSurfaceVersion2(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, ".agents/skills/surface.yaml", `{
+  "version": 2,
+  "plugin_root": "demo",
+  "export_all_to_plugin": true,
+  "skills": [{"name": "test_skill", "type": "workflow"}]
+}`)
+
+	report := Check(dir)
+	for _, f := range report.Findings {
+		if f.Check == "skill_surface" && !f.Passed {
+			t.Fatalf("version 2 surface should pass, got finding: %+v", f)
+		}
 	}
 }
 

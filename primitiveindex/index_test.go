@@ -14,6 +14,10 @@ func TestBuildIndexesHooksOverlaysPluginsAndNestedMCP(t *testing.T) {
 	if err := os.Chmod(filepath.Join(root, ".claude/hooks/good.sh"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	writePrimitiveTestFile(t, root, "docs/fleet/.claude/hooks/good.sh", "#!/usr/bin/env bash\nexit 0\n")
+	if err := os.Chmod(filepath.Join(root, "docs/fleet/.claude/hooks/good.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	writePrimitiveTestFile(t, root, "docs/fleet/.claude/settings.json", `{
   "hooks": {
     "SessionStart": [
@@ -92,11 +96,40 @@ func TestBuildFailsOnMissingCanonicalHookTarget(t *testing.T) {
 	}
 }
 
+func TestBuildResolvesClaudeProjectDirPerRepo(t *testing.T) {
+	root := t.TempDir()
+	writePrimitiveTestManifest(t, root)
+	writePrimitiveTestFile(t, root, "app/.claude/hooks/good.sh", "#!/usr/bin/env bash\nexit 0\n")
+	if err := os.Chmod(filepath.Join(root, "app/.claude/hooks/good.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writePrimitiveTestFile(t, root, "app/.claude/settings.json", `{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/good.sh"}
+        ]
+      }
+    ]
+  }
+}`)
+
+	index, err := Build(Options{WorkspaceRoot: root, GeneratedAt: "2026-05-09T00:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if index.Summary.BlockingPrimitiveFailures != 0 {
+		t.Fatalf("unexpected blocking failures: %+v", attentionPrimitives(index.Primitives))
+	}
+}
+
 func TestBuildExcludesArchiveAndVendorPaths(t *testing.T) {
 	root := t.TempDir()
 	writePrimitiveTestManifest(t, root)
 	writePrimitiveTestFile(t, root, "vault/old/.codex/agents/reviewer.toml", "name = \"reviewer\"\n")
 	writePrimitiveTestFile(t, root, "app/node_modules/pkg/.claude/settings.json", "{}")
+	writePrimitiveTestFile(t, root, "app/third_party/import/.claude/settings.json", "{}")
 	writePrimitiveTestFile(t, root, "docs/research/example/.mcp.json", `{"mcpServers":{}}`)
 	writePrimitiveTestFile(t, root, "app/.codex/agents/reviewer.toml", "name = \"reviewer\"\n")
 
@@ -107,6 +140,7 @@ func TestBuildExcludesArchiveAndVendorPaths(t *testing.T) {
 	for _, primitive := range index.Primitives {
 		if strings.HasPrefix(primitive.Path, "vault/") ||
 			strings.Contains(primitive.Path, "/node_modules/") ||
+			strings.Contains(primitive.Path, "/third_party/") ||
 			strings.HasPrefix(primitive.Path, "docs/research/") {
 			t.Fatalf("excluded path appeared in index: %+v", primitive)
 		}

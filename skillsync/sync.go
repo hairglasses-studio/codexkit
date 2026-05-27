@@ -73,6 +73,11 @@ type SkillEntry struct {
 	ClaudeAliases          []SkillAlias `json:"claude_aliases,omitempty"`
 }
 
+type skillFrontmatter struct {
+	Values map[string]string
+	Lists  map[string][]string
+}
+
 // Surface is the parsed skill surface definition.
 type Surface struct {
 	Version           int          `json:"version"`
@@ -462,7 +467,7 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 			if err := registerDir(claudeDirs, skill.Name, "managed Claude skill"); err != nil {
 				report.Errors = append(report.Errors, err.Error())
 			} else {
-				rendered := renderSkill(skill.Name, projection.Description, skill.Name, projection, fmt.Sprintf("Compatibility mirror of the canonical `%s` skill.", skill.Name))
+				rendered := renderSkill(skill.Name, projection.Description, skill.Name, projection, surface.Version >= 2, fmt.Sprintf("Compatibility mirror of the canonical `%s` skill.", skill.Name))
 				target := filepath.Join(absRepoPath, ".claude", "skills", skill.Name, "SKILL.md")
 				syncContent(&report, mode, canonicalPath, target, rendered, "Claude skill")
 			}
@@ -488,7 +493,7 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 				report.Errors = append(report.Errors, err.Error())
 				continue
 			}
-			rendered := renderSkill(alias.Name, alias.Description, skill.Name, projection, fmt.Sprintf("Compatibility alias for the canonical `%s` skill.", skill.Name))
+			rendered := renderSkill(alias.Name, alias.Description, skill.Name, projection, surface.Version >= 2, fmt.Sprintf("Compatibility alias for the canonical `%s` skill.", skill.Name))
 			target := filepath.Join(absRepoPath, ".claude", "skills", alias.Name, "SKILL.md")
 			syncContent(&report, mode, canonicalPath, target, rendered, "Claude skill")
 		}
@@ -497,7 +502,7 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 			if err := registerDir(pluginDirs, skill.Name, "managed plugin skill"); err != nil {
 				report.Errors = append(report.Errors, err.Error())
 			} else {
-				rendered := renderSkill(skill.Name, projection.Description, skill.Name, projection, "")
+				rendered := renderSkill(skill.Name, projection.Description, skill.Name, projection, surface.Version >= 2, "")
 				target := filepath.Join(absRepoPath, "plugins", surface.PluginRoot, "skills", skill.Name, "SKILL.md")
 				syncContent(&report, mode, canonicalPath, target, rendered, "plugin skill")
 			}
@@ -598,7 +603,7 @@ func validatePortableFrontmatter(path string, content []byte) error {
 	if !ok {
 		return fmt.Errorf("missing frontmatter in %s", path)
 	}
-	inTools := false
+	inList := false
 	inMetadata := false
 	inBlock := false
 	for _, line := range lines {
@@ -607,7 +612,7 @@ func validatePortableFrontmatter(path string, content []byte) error {
 			continue
 		}
 		if lineHasIndent(line) {
-			if inTools && strings.HasPrefix(trimmed, "- ") {
+			if inList && strings.HasPrefix(trimmed, "- ") {
 				continue
 			}
 			if inMetadata || inBlock {
@@ -618,7 +623,7 @@ func validatePortableFrontmatter(path string, content []byte) error {
 		inMetadata = false
 		inBlock = false
 		if strings.HasPrefix(trimmed, "- ") {
-			if !inTools {
+			if !inList {
 				return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
 			}
 			continue
@@ -635,7 +640,7 @@ func validatePortableFrontmatter(path string, content []byte) error {
 		if key == "allowed-tools" && value != "" {
 			return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
 		}
-		inTools = key == "allowed-tools"
+		inList = value == "" && isYAMLListFrontmatterKey(key)
 		inMetadata = key == "metadata"
 		inBlock = isYAMLBlockScalar(value)
 	}
@@ -648,6 +653,15 @@ func lineHasIndent(line string) bool {
 
 func isYAMLBlockScalar(value string) bool {
 	return value == "|" || value == "|-" || value == "|+" || value == ">" || value == ">-" || value == ">+"
+}
+
+func isYAMLListFrontmatterKey(key string) bool {
+	switch key {
+	case "allowed-tools", "triggers", "see_also", "capabilities", "paths":
+		return true
+	default:
+		return false
+	}
 }
 
 func parseInlineTools(value string) []string {
@@ -718,7 +732,7 @@ func parseSkillProjection(content []byte) (skillProjection, error) {
 	}, nil
 }
 
-func renderSkill(name, description, canonicalName string, projection skillProjection, banner string) string {
+func renderSkill(name, description, canonicalName string, projection skillProjection, includeSourceKeys bool, banner string) string {
 	var b strings.Builder
 	b.WriteString("---\n")
 	b.WriteString("name: ")
@@ -727,12 +741,14 @@ func renderSkill(name, description, canonicalName string, projection skillProjec
 	b.WriteString("description: ")
 	b.WriteString(yamlQuote(description))
 	b.WriteString("\n")
-	for _, key := range projectedFrontmatterKeyOrder {
-		value, ok := projection.Frontmatter[key]
-		if !ok || !codexkit.PortableFrontmatterKeys[key] {
-			continue
+	if includeSourceKeys {
+		for _, key := range projectedFrontmatterKeyOrder {
+			value, ok := projection.Frontmatter[key]
+			if !ok || !codexkit.PortableFrontmatterKeys[key] {
+				continue
+			}
+			writeYAMLFrontmatterValue(&b, key, value)
 		}
-		writeYAMLFrontmatterValue(&b, key, value)
 	}
 	if len(projection.AllowedTools) > 0 {
 		b.WriteString("allowed-tools:\n")
@@ -761,6 +777,38 @@ func renderSkill(name, description, canonicalName string, projection skillProjec
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func writeSourceFrontmatterValue(b *strings.Builder, frontmatter skillFrontmatter, key string) {
+	value, ok := frontmatter.Values[key]
+	if !ok || strings.TrimSpace(value) == "" {
+		return
+	}
+	b.WriteString(key)
+	b.WriteString(": ")
+	if value == "true" || value == "false" {
+		b.WriteString(value)
+	} else {
+		b.WriteString(yamlQuote(value))
+	}
+	b.WriteString("\n")
+}
+
+func writeSourceFrontmatterList(b *strings.Builder, frontmatter skillFrontmatter, key string) {
+	values := frontmatter.Lists[key]
+	if len(values) == 0 {
+		return
+	}
+	b.WriteString(key)
+	b.WriteString(":\n")
+	for _, value := range values {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		b.WriteString("  - ")
+		b.WriteString(yamlQuote(value))
+		b.WriteString("\n")
+	}
 }
 
 func yamlQuote(value string) string {

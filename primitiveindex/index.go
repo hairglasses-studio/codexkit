@@ -5,6 +5,7 @@ package primitiveindex
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -129,6 +130,9 @@ func Build(opts Options) (Index, error) {
 
 	if err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
+			if errors.Is(err, fs.ErrPermission) {
+				return nil
+			}
 			return err
 		}
 		rel := relPath(root, path)
@@ -326,8 +330,14 @@ func buildPrimitivesForPath(root string, repos map[string]repoMeta, rel string) 
 		out = append(out, newPrimitive(root, repos, "claude_output_style", rel, "claude", metadataFromFrontmatter(root, rel)))
 	case isClaudeSkill(rel):
 		out = append(out, newPrimitive(root, repos, "claude_skill", rel, "claude", metadataFromFrontmatter(root, rel)))
+	case isCodexSkill(rel):
+		out = append(out, newPrimitive(root, repos, "codex_skill", rel, "codex", metadataFromFrontmatter(root, rel)))
+	case isCodexSkillMetadata(rel):
+		out = append(out, buildJSONOrYAMLPrimitive(root, repos, "codex_skill_metadata", rel, "codex"))
 	case isCodexAgent(rel):
 		out = append(out, newPrimitive(root, repos, "codex_agent", rel, "codex", nil))
+	case isCodexHooks(rel):
+		out = append(out, buildJSONPrimitive(root, repos, "codex_hooks", rel, "codex", "object"))
 	case isGeminiCommand(rel):
 		out = append(out, newPrimitive(root, repos, "gemini_command", rel, "gemini", nil))
 	case isGeminiExtension(rel):
@@ -429,6 +439,25 @@ func buildJSONPrimitive(root string, repos map[string]repoMeta, kind, rel, provi
 			primitive.Metadata = ensureMetadata(primitive.Metadata)
 			primitive.Metadata["name"] = name
 		}
+	}
+	finalizePrimitive(&primitive)
+	return primitive
+}
+
+func buildJSONOrYAMLPrimitive(root string, repos map[string]repoMeta, kind, rel, provider string) Primitive {
+	if strings.HasSuffix(rel, ".json") {
+		return buildJSONPrimitive(root, repos, kind, rel, provider, "object")
+	}
+	primitive := newPrimitive(root, repos, kind, rel, provider, nil)
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		addIssue(&primitive, fmt.Sprintf("reading metadata: %v", err))
+		finalizePrimitive(&primitive)
+		return primitive
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		addIssue(&primitive, "metadata file is empty")
 	}
 	finalizePrimitive(&primitive)
 	return primitive
@@ -588,9 +617,15 @@ func resolveCommandPath(root, baseDir, command string) (string, bool) {
 	candidate = strings.Trim(candidate, `"'`)
 	switch {
 	case strings.HasPrefix(candidate, "$CLAUDE_PROJECT_DIR/"):
-		return filepath.Join(root, strings.TrimPrefix(candidate, "$CLAUDE_PROJECT_DIR/")), viaShell
+		if baseDir == "" {
+			baseDir = root
+		}
+		return filepath.Join(baseDir, strings.TrimPrefix(candidate, "$CLAUDE_PROJECT_DIR/")), viaShell
 	case strings.HasPrefix(candidate, "${CLAUDE_PROJECT_DIR}/"):
-		return filepath.Join(root, strings.TrimPrefix(candidate, "${CLAUDE_PROJECT_DIR}/")), viaShell
+		if baseDir == "" {
+			baseDir = root
+		}
+		return filepath.Join(baseDir, strings.TrimPrefix(candidate, "${CLAUDE_PROJECT_DIR}/")), viaShell
 	case filepath.IsAbs(candidate):
 		return candidate, viaShell
 	case strings.HasPrefix(candidate, "./") || strings.HasPrefix(candidate, "../"):
@@ -604,14 +639,13 @@ func resolveCommandPath(root, baseDir, command string) (string, bool) {
 }
 
 func hookCommandBase(root, settingsRel string) string {
-	if strings.HasPrefix(settingsRel, ".claude/") || strings.HasPrefix(settingsRel, "docs/fleet/.claude/") {
+	if strings.HasPrefix(settingsRel, ".claude/") {
 		return root
 	}
-	repo := repoForRel(settingsRel)
-	if repo == "" || repo == "workspace" {
-		return root
+	if idx := strings.Index(settingsRel, "/.claude/"); idx >= 0 {
+		return filepath.Join(root, filepath.FromSlash(settingsRel[:idx]))
 	}
-	return filepath.Join(root, filepath.FromSlash(repo))
+	return root
 }
 
 func summarize(primitives []Primitive) Summary {
@@ -658,13 +692,16 @@ func shouldSkipDir(rel string) bool {
 	}
 	base := pathBase(rel)
 	switch base {
-	case ".git", ".tools", "node_modules", ".venv", "vendor":
+	case ".git", ".tools", "node_modules", ".venv", "vendor", "third_party", ".graveyard", ".codex-worktrees", ".scratch":
 		return true
 	}
 	if strings.HasPrefix(base, "s2f_") {
 		return true
 	}
 	return rel == "vault" ||
+		rel == ".config" ||
+		rel == "docs/_site" ||
+		strings.Contains(rel, "/data/appdata") ||
 		rel == "docs/repo-claude" ||
 		rel == "docs/research" ||
 		rel == "docs/agent-parity" ||
@@ -679,7 +716,15 @@ func shouldSkipFile(rel string) bool {
 	return strings.Contains(rel, "/node_modules/") ||
 		strings.Contains(rel, "/.tools/") ||
 		strings.Contains(rel, "/.venv/") ||
+		strings.Contains(rel, "/third_party/") ||
+		strings.Contains(rel, "/.claude/worktrees/") ||
+		strings.Contains(rel, "/.codex-worktrees/") ||
+		strings.Contains(rel, "/.scratch/") ||
 		strings.HasPrefix(rel, "vault/") ||
+		strings.HasPrefix(rel, ".config/") ||
+		strings.HasPrefix(rel, ".graveyard/") ||
+		strings.HasPrefix(rel, "docs/_site/") ||
+		strings.Contains(rel, "/data/appdata/") ||
 		strings.HasPrefix(rel, "docs/repo-claude/") ||
 		strings.HasPrefix(rel, "docs/research/") ||
 		strings.HasPrefix(rel, "docs/agent-parity/") ||
@@ -711,8 +756,32 @@ func isClaudeSkill(rel string) bool {
 	return strings.Contains(rel, ".claude/skills/") && strings.HasSuffix(rel, "/SKILL.md")
 }
 
+func isCodexSkill(rel string) bool {
+	parts := strings.Split(rel, "/")
+	if len(parts) >= 4 && parts[1] == "skills" && parts[len(parts)-1] == "SKILL.md" {
+		return true
+	}
+	return strings.Contains(rel, ".codex/skills/") && strings.HasSuffix(rel, "/SKILL.md")
+}
+
+func isCodexSkillMetadata(rel string) bool {
+	parts := strings.Split(rel, "/")
+	if len(parts) >= 5 && parts[1] == "skills" && parts[len(parts)-2] == "agents" && parts[len(parts)-1] == "openai.yaml" {
+		return true
+	}
+	return strings.Contains(rel, ".codex/skills/") && strings.HasSuffix(rel, "/agents/openai.yaml")
+}
+
 func isCodexAgent(rel string) bool {
 	return strings.Contains(rel, ".codex/agents/") && strings.HasSuffix(rel, ".toml")
+}
+
+func isCodexHooks(rel string) bool {
+	parts := strings.Split(rel, "/")
+	if len(parts) == 2 && parts[1] == "hooks.json" {
+		return true
+	}
+	return strings.HasSuffix(rel, "/.codex/hooks.json")
 }
 
 func isGeminiCommand(rel string) bool {
@@ -734,7 +803,8 @@ func isInstructionFile(rel string) bool {
 
 func isAgentPrimitive(rel string) bool {
 	return isClaudeSettings(rel) || isClaudeHookScript(rel) || isClaudeAgent(rel) ||
-		isClaudeOutputStyle(rel) || isClaudeSkill(rel) || isCodexAgent(rel) ||
+		isClaudeOutputStyle(rel) || isClaudeSkill(rel) || isCodexSkill(rel) ||
+		isCodexSkillMetadata(rel) || isCodexAgent(rel) || isCodexHooks(rel) ||
 		isGeminiCommand(rel) || isGeminiExtension(rel) ||
 		strings.HasSuffix(rel, ".codex-plugin/plugin.json") ||
 		strings.HasSuffix(rel, ".mcp.json") ||
@@ -819,7 +889,11 @@ func repoForRel(rel string) string {
 
 func isHookEvent(value string) bool {
 	switch value {
-	case "PreToolUse", "PostToolUse", "Stop", "StopFailure", "SessionStart", "UserPromptSubmit", "PreCompact", "Notification", "SubagentStop":
+	case "PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest",
+		"Stop", "StopFailure", "SessionStart", "SessionEnd", "UserPromptSubmit",
+		"PreCompact", "Notification", "SubagentStart", "SubagentStop",
+		"TaskStart", "TaskFinish", "TaskError", "ConfigChange", "DirectoryChange",
+		"FileChange", "Elicitation":
 		return true
 	default:
 		return false

@@ -2,6 +2,11 @@
 // used by all codexkit packages.
 package codexkit
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // ToolModule is the interface that all codexkit packages implement.
 // It is modeled after claudekit's ToolModule pattern: each package
 // registers itself as a named module exposing a set of typed tool
@@ -36,6 +41,33 @@ type ToolDef struct {
 	// Handler executes the tool with the given parameters and returns
 	// a result or error.
 	Handler func(params map[string]any) (any, error) `json:"-"`
+}
+
+// DecodeParams decodes a loose MCP argument map into a typed request struct.
+func DecodeParams[T any](params map[string]any) (T, error) {
+	var out T
+	if params == nil {
+		params = map[string]any{}
+	}
+	data, err := json.Marshal(params)
+	if err != nil {
+		return out, fmt.Errorf("encode tool params: %w", err)
+	}
+	if err := json.Unmarshal(data, &out); err != nil {
+		return out, fmt.Errorf("decode tool params: %w", err)
+	}
+	return out, nil
+}
+
+// TypedHandler adapts a typed request handler to the ToolDef map boundary.
+func TypedHandler[T any](fn func(T) (any, error)) func(map[string]any) (any, error) {
+	return func(params map[string]any) (any, error) {
+		typed, err := DecodeParams[T](params)
+		if err != nil {
+			return nil, err
+		}
+		return fn(typed)
+	}
 }
 
 // ToolAnnotations builds MCP behavior hints for tool definitions.

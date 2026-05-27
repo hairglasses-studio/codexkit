@@ -557,10 +557,18 @@ func unexpectedRuntimeSkipped(skipped []RuntimeSkippedServer, allowList []string
 		if _, ok := allowed[key]; ok {
 			continue
 		}
+		if runtimeSkippedAllowedByReason(item) {
+			continue
+		}
 		unexpected = append(unexpected, fmt.Sprintf("%s skipped unexpectedly: %s", key, item.Reason))
 	}
 	sort.Strings(unexpected)
 	return unexpected
+}
+
+func runtimeSkippedAllowedByReason(skipped RuntimeSkippedServer) bool {
+	return strings.Contains(skipped.Reason, `repo scope "compatibility_only" excluded by policy`) ||
+		strings.Contains(skipped.Reason, "server not ready: remote transport; command not validated")
 }
 
 func runtimeSkippedKey(skipped RuntimeSkippedServer) string {

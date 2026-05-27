@@ -16,6 +16,7 @@ import (
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 	"github.com/hairglasses-studio/codexkit/skillsync"
+	"github.com/hairglasses-studio/codexkit/workspace"
 	toml "github.com/pelletier/go-toml/v2"
 )
 
@@ -93,6 +94,57 @@ func Check(repoPath string) Report {
 	}
 	report.Passed = report.Failed == 0
 	return report
+}
+
+// DiscoverWorkspaceTargets returns the active/baseline repo paths that should
+// participate in fleet baseline checks. Compatibility/reference repos remain
+// visible to workspace checks, but they should not fail the active baseline.
+func DiscoverWorkspaceTargets(scanPath string) ([]string, error) {
+	scanPath = filepath.Clean(scanPath)
+	manifest, err := workspace.LoadManifest(scanPath)
+	if err == nil {
+		paths := make([]string, 0, len(manifest.Repos))
+		for _, repo := range manifest.Repos {
+			if !repo.BaselineTarget && !strings.HasPrefix(repo.Scope, "active_") {
+				continue
+			}
+			repoPath := filepath.Join(scanPath, repo.Name)
+			if isGitRepoPath(repoPath) {
+				paths = append(paths, repoPath)
+			}
+		}
+		return paths, nil
+	}
+
+	entries, readErr := os.ReadDir(scanPath)
+	if readErr != nil {
+		return nil, fmt.Errorf("reading %s: %w", scanPath, readErr)
+	}
+	paths := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() || shouldSkipWorkspaceChild(entry.Name()) {
+			continue
+		}
+		repoPath := filepath.Join(scanPath, entry.Name())
+		if isGitRepoPath(repoPath) {
+			paths = append(paths, repoPath)
+		}
+	}
+	return paths, nil
+}
+
+func isGitRepoPath(path string) bool {
+	_, err := os.Stat(filepath.Join(path, ".git"))
+	return err == nil
+}
+
+func shouldSkipWorkspaceChild(name string) bool {
+	switch name {
+	case ".graveyard", ".codex-worktrees", ".claude", ".config", ".ralph", "vault":
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *Report) add(check string, passed bool, msg string) {
@@ -573,12 +625,26 @@ func (r *Report) addSkillPortability(repoPath string) {
 		}
 		frontmatter := content[4 : 4+endIdx]
 		nonPortable := []string{}
+		inBlock := false
+		inList := false
 		for _, line := range strings.Split(frontmatter, "\n") {
-			line = strings.TrimSpace(line)
-			if line == "" {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" {
 				continue
 			}
-			parts := strings.SplitN(line, ":", 2)
+			if inBlock {
+				if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+					continue
+				}
+				inBlock = false
+			}
+			if inList {
+				if strings.HasPrefix(trimmed, "- ") {
+					continue
+				}
+				inList = false
+			}
+			parts := strings.SplitN(trimmed, ":", 2)
 			if len(parts) < 2 {
 				continue
 			}
@@ -586,6 +652,9 @@ func (r *Report) addSkillPortability(repoPath string) {
 			if !codexkit.SkillSourceFrontmatterKeys[key] {
 				nonPortable = append(nonPortable, key)
 			}
+			value := strings.TrimSpace(parts[1])
+			inBlock = value == "|" || value == "|-" || value == "|+" || value == ">" || value == ">-" || value == ">+"
+			inList = value == "" && (key == "allowed-tools" || key == "triggers" || key == "see_also")
 		}
 		if len(nonPortable) > 0 {
 			r.add("skill_portability", false, fmt.Sprintf("%s: non-portable keys: %s", entry.Name(), strings.Join(nonPortable, ", ")))
@@ -618,7 +687,7 @@ func (r *Report) addSkillSurface(repoPath string) {
 		} else if strings.Contains(content, "version: 2") || strings.Contains(content, "\"version\": 2") {
 			surface.Version = 2
 		}
-		if surface.Version != 0 {
+		if surface.Version == 1 || surface.Version == 2 {
 			// Extract skill names from "- name: <value>" lines
 			for _, line := range strings.Split(content, "\n") {
 				trimmed := strings.TrimSpace(line)
@@ -699,19 +768,13 @@ func (m *module) Tools() []codexkit.ToolDef {
 					home, _ := os.UserHomeDir()
 					scanPath = filepath.Join(home, "hairglasses-studio")
 				}
-				entries, err := os.ReadDir(scanPath)
+				paths, err := DiscoverWorkspaceTargets(scanPath)
 				if err != nil {
-					return nil, fmt.Errorf("reading %s: %w", scanPath, err)
+					return nil, err
 				}
 				var reports []Report
-				for _, entry := range entries {
-					if !entry.IsDir() {
-						continue
-					}
-					repoPath := filepath.Join(scanPath, entry.Name())
-					if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
-						reports = append(reports, Check(repoPath))
-					}
+				for _, repoPath := range paths {
+					reports = append(reports, Check(repoPath))
 				}
 				return reports, nil
 			},
