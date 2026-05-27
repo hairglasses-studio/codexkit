@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "codexkit": {
+      "command": "/home/hg/hairglasses-studio/codexkit/scripts/run-codexkit-mcp.sh"
+    }
+  },
+  "permissions": {
+    "allow": [
+      "mcp__codexkit__baseline_check",
+      "mcp__codexkit__baseline_check_all",
+      "mcp__codexkit__fleet_audit",
+      "mcp__codexkit__fleet_report",
+      "mcp__codexkit__mcp_diff",
+      "mcp__codexkit__mcp_list",
+      "mcp__codexkit__skill_diff",
+      "mcp__codexkit__skill_list"
+    ]
+  }
+}
