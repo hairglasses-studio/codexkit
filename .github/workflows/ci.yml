@@ -1,8 +1,11 @@
 name: Go CI
 
-# Automatic triggers are paused while this public org repo is constrained to the
-# Internal-Arch runner path. Use manual dispatch after runner access is healthy.
+# Public fork PRs are not run on self-hosted runners. Push and manual dispatch
+# provide hosted evidence for portfolio-facing changes.
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
