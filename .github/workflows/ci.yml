@@ -12,6 +12,28 @@ concurrency:
 
 jobs:
   test:
-    uses: hairglasses-studio/.github/.github/workflows/go-test.yml@main
-    with:
-      lane: ${{ github.event_name == 'pull_request' && 'fast' || 'standard' }}
+    name: Go test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Check go.mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Vet
+        run: GOWORK=off go vet ./...
+
+      - name: Test
+        run: GOWORK=off go test -race ./...
