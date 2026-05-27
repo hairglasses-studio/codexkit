@@ -9,7 +9,8 @@ permissions:
 jobs:
   auto-merge:
     if: github.actor == 'dependabot[bot]'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: Internal-Arch
     steps:
       - uses: dependabot/fetch-metadata@v2
         id: meta
