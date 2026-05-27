@@ -13,7 +13,6 @@
   },
   "mcpServers": {
     "codexkit": {
-      "args": [],
       "command": "/home/hg/hairglasses-studio/codexkit/scripts/run-codexkit-mcp.sh"
     }
   }
