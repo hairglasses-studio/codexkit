@@ -1,6 +1,7 @@
 # codexkit
 
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Public CI](https://github.com/hairglasses-studio/codexkit/actions/workflows/public-ci.yml/badge.svg)](https://github.com/hairglasses-studio/codexkit/actions/workflows/public-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25-blue)](https://modelcontextprotocol.io/specification/2025-11-25)
 
@@ -30,6 +31,30 @@ go install github.com/hairglasses-studio/codexkit/cmd/codexkit-mcp@latest
 ```
 
 Repo-local wrapper scripts (`scripts/run-codexkit-mcp.sh`, `scripts/skill-surface-sync.sh`, `scripts/codex-mcp-sync.sh`) use a shared workspace Go environment when one is available. By default they reuse the shared `~/.cache/go-build` and stage temp work under short repo roots at `~/.gt/<repo-id>` instead of `/tmp`.
+
+## 5-Minute Public Quickstart
+
+Use this path to validate the public toolkit without any private workspace,
+host-specific runner, or local operator state.
+
+```bash
+git clone https://github.com/hairglasses-studio/codexkit.git
+cd codexkit
+
+# Build confidence in the published module surface.
+GOWORK=off go mod download
+GOWORK=off go vet ./...
+GOWORK=off go test ./...
+
+# Run the repo-local baseline checker against this checkout.
+GOWORK=off go run ./cmd/codexkit baseline check .
+```
+
+Expected result:
+
+```text
+.                    PASS (31 checks)
+```
 
 ## Usage
 
