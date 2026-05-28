@@ -1,7 +1,12 @@
 {
   "mcpServers": {
     "codexkit": {
-      "command": "/home/hg/hairglasses-studio/codexkit/scripts/run-codexkit-mcp.sh"
+      "args": [
+        "bash",
+        "-lc",
+        "exec \"$PWD/scripts/run-codexkit-mcp.sh\""
+      ],
+      "command": "/usr/bin/env"
     }
   },
   "permissions": {

@@ -33,8 +33,11 @@ Run these before increasing visibility or cutting a public release:
 go test -race ./...
 go vet ./...
 go build ./...
+scripts/check-public-boundary.sh
 gitleaks detect --source . --no-git --redact
 ```
 
 The CLI examples should stay generic. If a new example needs real-looking data,
-use synthetic names and paths instead of local workspace details.
+use synthetic names and paths instead of local workspace details. Keep tracked
+provider config portable; do not commit absolute workstation paths or symlinks
+that point outside the repository.

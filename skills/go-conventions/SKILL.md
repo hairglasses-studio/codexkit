@@ -7,7 +7,7 @@ description: Go coding conventions for hairglasses-studio projects. Use when rev
 
 # Go Conventions — hairglasses-studio
 
-Standards enforced across mcpkit, hg-mcp, mesmer, cobb, claudekit, and ralphglasses.
+Standards enforced across Go MCP repositories, agent tooling, and provider integrations.
 
 ## Error Handling
 

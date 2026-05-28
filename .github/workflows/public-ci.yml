@@ -43,3 +43,6 @@ jobs:
 
       - name: Baseline check
         run: GOWORK=off go run ./cmd/codexkit baseline check .
+
+      - name: Public boundary check
+        run: bash scripts/check-public-boundary.sh

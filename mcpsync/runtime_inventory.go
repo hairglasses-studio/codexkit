@@ -15,7 +15,8 @@ import (
 
 const RuntimeInventoryKind = "manifest-backed MCP runtime projection"
 
-var DefaultRuntimeInventoryAllowedSkipped = []string{"secretstudios-mcp:secretstudios-mcp"}
+// Repos with intentional runtime skips should declare them in workspace policy.
+var DefaultRuntimeInventoryAllowedSkipped []string
 
 type RuntimeInventoryOptions struct {
 	WorkspaceRoot string

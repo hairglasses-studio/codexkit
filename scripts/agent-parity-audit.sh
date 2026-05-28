@@ -98,9 +98,6 @@ build_repo_rg_args() {
     jobb)
       REPO_RG_ARGS+=("--glob=!python/**")
       ;;
-    ralphglasses)
-      REPO_RG_ARGS+=("--glob=!cmd/runmylife/**")
-      ;;
   esac
 }
 
