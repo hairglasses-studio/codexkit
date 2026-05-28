@@ -905,7 +905,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default ~/hairglasses-studio)"},
+					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default workspace root)"},
 					"all_scopes": map[string]any{"type": "boolean", "description": "Include inactive and compatibility-only repos"},
 				},
 			},
@@ -925,7 +925,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default ~/hairglasses-studio)"},
+					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default workspace root)"},
 					"all_scopes": map[string]any{"type": "boolean", "description": "Include inactive and compatibility-only repos"},
 				},
 			},

@@ -10,8 +10,13 @@
 !.env.example
 .secrets/
 secrets/
+private-markers.txt
+*.private-markers
 *.pem
 *.key
 credentials.json
 auth.json
 token.json
+
+# Generated private skill mirrors stay out of the public tree.
+skills/

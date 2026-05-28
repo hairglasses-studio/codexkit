@@ -363,10 +363,10 @@ func RenderRuntimeInventoryMarkdown(inventory RuntimeInventory) string {
 
 	fmt.Fprintf(&b, "## Regenerate\n\n")
 	fmt.Fprintf(&b, "```bash\n")
-	fmt.Fprintf(&b, "cd ~/hairglasses-studio/codexkit\n")
-	fmt.Fprintf(&b, "go run ./cmd/codexkit workspace generate-manifest ~/hairglasses-studio --write\n")
-	fmt.Fprintf(&b, "go run ./cmd/codexkit workspace runtime-inventory ~/hairglasses-studio --json-out ../docs/inventory/mcp-runtime-inventory-%s.json --markdown-out ../docs/inventory/mcp-runtime-inventory-%s.md\n", generatedDate, generatedDate)
-	fmt.Fprintf(&b, "go run ./cmd/codexkit workspace runtime-inventory-check ~/hairglasses-studio\n")
+	fmt.Fprintf(&b, "cd /path/to/workspace/codexkit\n")
+	fmt.Fprintf(&b, "go run ./cmd/codexkit workspace generate-manifest /path/to/workspace --write\n")
+	fmt.Fprintf(&b, "go run ./cmd/codexkit workspace runtime-inventory /path/to/workspace --json-out ../docs/inventory/mcp-runtime-inventory-%s.json --markdown-out ../docs/inventory/mcp-runtime-inventory-%s.md\n", generatedDate, generatedDate)
+	fmt.Fprintf(&b, "go run ./cmd/codexkit workspace runtime-inventory-check /path/to/workspace\n")
 	fmt.Fprintf(&b, "```\n")
 	return b.String()
 }

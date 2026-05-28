@@ -728,7 +728,7 @@ func capabilityCardCandidates(workspaceRoot, repoPath, serverName string) []stri
 		filepath.Join(repoPath, ".well-known", "mcp.json"),
 		filepath.Join(repoPath, "mcp", serverName+"-mcp", ".well-known", "mcp.json"),
 		filepath.Join(workspaceRoot, serverName+"-mcp", ".well-known", "mcp.json"),
-		filepath.Join(workspaceRoot, "dotfiles", "mcp", serverName+"-mcp", ".well-known", "mcp.json"),
+		filepath.Join(workspaceRoot, "tools", "mcp", serverName+"-mcp", ".well-known", "mcp.json"),
 	}
 }
 

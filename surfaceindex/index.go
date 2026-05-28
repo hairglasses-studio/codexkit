@@ -420,9 +420,9 @@ func RenderMarkdown(index Index) string {
 
 	fmt.Fprintf(&b, "## Regenerate\n\n")
 	fmt.Fprintf(&b, "```bash\n")
-	fmt.Fprintf(&b, "cd ~/hairglasses-studio/codexkit\n")
-	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace surface-index ~/hairglasses-studio --skill-validator=off --json-out ../docs/inventory/repo-surface-index-%s.json --markdown-out ../docs/inventory/repo-surface-index-%s.md\n", artifactDate(index.GeneratedAt), artifactDate(index.GeneratedAt))
-	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace surface-index-check ~/hairglasses-studio --skill-validator=off\n")
+	fmt.Fprintf(&b, "cd /path/to/workspace/codexkit\n")
+	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace surface-index /path/to/workspace --skill-validator=off --json-out ../docs/inventory/repo-surface-index-%s.json --markdown-out ../docs/inventory/repo-surface-index-%s.md\n", artifactDate(index.GeneratedAt), artifactDate(index.GeneratedAt))
+	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace surface-index-check /path/to/workspace --skill-validator=off\n")
 	fmt.Fprintf(&b, "```\n")
 	return b.String()
 }

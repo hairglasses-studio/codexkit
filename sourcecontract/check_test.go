@@ -125,13 +125,13 @@ func TestCheck_FailsWhenRepoLocalSkillCheckFails(t *testing.T) {
 	}
 }
 
-func TestCheck_UsesJobbRepoLocalMCPCheckWhenPresent(t *testing.T) {
+func TestCheck_UsesRepoLocalMCPCheckWhenPresent(t *testing.T) {
 	root := t.TempDir()
-	writeSourceContractManifest(t, root, "jobb")
-	writeSourceContractMCP(t, root, "jobb")
-	writeSourceContractFile(t, root, "jobb/cmd/jobb-sync-surfaces/main.go", "package main\n")
-	writeSourceContractFile(t, root, "jobb/scripts/dev/go.sh", "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" > \"$PWD/local-check.args\"\n")
-	if err := os.Chmod(filepath.Join(root, "jobb/scripts/dev/go.sh"), 0o755); err != nil {
+	writeSourceContractManifest(t, root, "sample-app")
+	writeSourceContractMCP(t, root, "sample-app")
+	writeSourceContractFile(t, root, "sample-app/cmd/sample-sync-surfaces/main.go", "package main\n")
+	writeSourceContractFile(t, root, "sample-app/scripts/dev/go.sh", "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" > \"$PWD/local-check.args\"\n")
+	if err := os.Chmod(filepath.Join(root, "sample-app/scripts/dev/go.sh"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -145,12 +145,26 @@ func TestCheck_UsesJobbRepoLocalMCPCheckWhenPresent(t *testing.T) {
 	if !report.Passed {
 		t.Fatalf("expected repo-local MCP check to satisfy source contract: %+v", report)
 	}
-	args, err := os.ReadFile(filepath.Join(root, "jobb/local-check.args"))
+	args, err := os.ReadFile(filepath.Join(root, "sample-app/local-check.args"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(args) != "run ./cmd/jobb-sync-surfaces --codex --check\n" {
+	if string(args) != "run ./cmd/sample-sync-surfaces --codex --check\n" {
 		t.Fatalf("repo-local MCP args = %q", string(args))
+	}
+}
+
+func TestRepoLocalMCPCheckSkipsAmbiguousSyncSurfaceCommands(t *testing.T) {
+	root := t.TempDir()
+	writeSourceContractFile(t, root, "scripts/dev/go.sh", "#!/usr/bin/env bash\nexit 99\n")
+	writeSourceContractFile(t, root, "cmd/alpha-sync-surfaces/main.go", "package main\n")
+	writeSourceContractFile(t, root, "cmd/beta-sync-surfaces/main.go", "package main\n")
+	if err := os.Chmod(filepath.Join(root, "scripts/dev/go.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := repoLocalMCPCheck(root); ok {
+		t.Fatal("expected ambiguous repo-local sync-surface commands to be ignored")
 	}
 }
 

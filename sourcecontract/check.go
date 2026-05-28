@@ -187,10 +187,18 @@ func repoLocalSkillCheck(repoPath string) (skillsync.SyncReport, bool) {
 }
 
 func repoLocalMCPCheck(repoPath string) (mcpsync.SyncReport, bool) {
-	if fileExists(filepath.Join(repoPath, "cmd", "jobb-sync-surfaces", "main.go")) && fileExists(filepath.Join(repoPath, "scripts", "dev", "go.sh")) {
-		return runRepoLocalMCPCommand(repoPath, "./scripts/dev/go.sh", "run", "./cmd/jobb-sync-surfaces", "--codex", "--check"), true
+	if !fileExists(filepath.Join(repoPath, "scripts", "dev", "go.sh")) {
+		return mcpsync.SyncReport{}, false
 	}
-	return mcpsync.SyncReport{}, false
+	matches, _ := filepath.Glob(filepath.Join(repoPath, "cmd", "*-sync-surfaces", "main.go"))
+	if len(matches) != 1 {
+		return mcpsync.SyncReport{}, false
+	}
+	cmdDir, err := filepath.Rel(repoPath, filepath.Dir(matches[0]))
+	if err != nil {
+		return mcpsync.SyncReport{}, false
+	}
+	return runRepoLocalMCPCommand(repoPath, "./scripts/dev/go.sh", "run", "./"+filepath.ToSlash(cmdDir), "--codex", "--check"), true
 }
 
 func runRepoLocalSkillCommand(repoPath string, argv ...string) skillsync.SyncReport {

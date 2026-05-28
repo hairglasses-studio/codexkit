@@ -58,7 +58,7 @@ elif _hg_core_codexkit_is_valid "$_hg_core_codexkit"; then
   HG_STUDIO_ROOT="$_hg_core_studio"
   HG_CODEXKIT="$_hg_core_codexkit"
 else
-  HG_STUDIO_ROOT="$HOME/hairglasses-studio"
+  HG_STUDIO_ROOT="$_hg_core_studio"
   HG_CODEXKIT="$HG_STUDIO_ROOT/codexkit"
 fi
 

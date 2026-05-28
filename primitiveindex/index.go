@@ -310,9 +310,9 @@ func RenderMarkdown(index Index) string {
 
 	fmt.Fprintf(&b, "## Regenerate\n\n")
 	fmt.Fprintf(&b, "```bash\n")
-	fmt.Fprintf(&b, "cd ~/hairglasses-studio/codexkit\n")
-	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace primitive-index ~/hairglasses-studio --json-out ../docs/inventory/workspace-agent-primitives-%s.json --markdown-out ../docs/inventory/workspace-agent-primitives-%s.md\n", artifactDate(index.GeneratedAt), artifactDate(index.GeneratedAt))
-	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace primitive-index-check ~/hairglasses-studio\n")
+	fmt.Fprintf(&b, "cd /path/to/workspace/codexkit\n")
+	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace primitive-index /path/to/workspace --json-out ../docs/inventory/workspace-agent-primitives-%s.json --markdown-out ../docs/inventory/workspace-agent-primitives-%s.md\n", artifactDate(index.GeneratedAt), artifactDate(index.GeneratedAt))
+	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace primitive-index-check /path/to/workspace\n")
 	fmt.Fprintf(&b, "```\n")
 	return b.String()
 }

@@ -754,12 +754,12 @@ func (m *module) Tools() []codexkit.ToolDef {
 		},
 		{
 			Name:        "baseline_check_all",
-			Description: "Run baseline-guard validation on all repos in ~/hairglasses-studio",
+			Description: "Run baseline-guard validation on all repos in the default workspace root",
 			Annotations: codexkit.ToolAnnotations(true, false, true, true),
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"scan_path": map[string]any{"type": "string", "description": "Directory to scan (default ~/hairglasses-studio)"},
+					"scan_path": map[string]any{"type": "string", "description": "Directory to scan (default workspace root)"},
 				},
 			},
 			Handler: func(params map[string]any) (any, error) {

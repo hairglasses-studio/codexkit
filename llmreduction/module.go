@@ -19,7 +19,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 	baseSchema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default ~/hairglasses-studio)"},
+			"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default workspace root)"},
 			"all_scopes": map[string]any{"type": "boolean", "description": "Include inactive and compatibility-only repos"},
 		},
 	}
@@ -46,7 +46,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default ~/hairglasses-studio)"},
+					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default workspace root)"},
 					"all_scopes": map[string]any{"type": "boolean", "description": "Include inactive and compatibility-only repos"},
 					"limit":      map[string]any{"type": "integer", "description": "Max candidates to return (default 25)"},
 				},
@@ -68,7 +68,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default ~/hairglasses-studio)"},
+					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default workspace root)"},
 					"all_scopes": map[string]any{"type": "boolean", "description": "Include inactive and compatibility-only repos"},
 					"max_repos":  map[string]any{"type": "integer", "description": "Max repos in plan (default 8)"},
 				},
@@ -90,7 +90,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default ~/hairglasses-studio)"},
+					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default workspace root)"},
 					"all_scopes": map[string]any{"type": "boolean", "description": "Include inactive and compatibility-only repos"},
 					"max_repos":  map[string]any{"type": "integer", "description": "Max repos in plan (default 8)"},
 					"execute":    map[string]any{"type": "boolean", "description": "When true, apply actions instead of dry-run"},
@@ -124,7 +124,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default ~/hairglasses-studio)"},
+					"scan_path":  map[string]any{"type": "string", "description": "Workspace root to scan (default workspace root)"},
 					"all_scopes": map[string]any{"type": "boolean", "description": "Include inactive and compatibility-only repos"},
 					"baseline": map[string]any{
 						"type": "array",

@@ -23,7 +23,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"root":  map[string]any{"type": "string", "description": "Workspace root. Defaults to ~/hairglasses-studio."},
+					"root":  map[string]any{"type": "string", "description": "Workspace root. Defaults to the default workspace root."},
 					"write": map[string]any{"type": "boolean", "description": "Write workspace/manifest.json when true."},
 				},
 			},
@@ -52,7 +52,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"root": map[string]any{"type": "string", "description": "Workspace root. Defaults to ~/hairglasses-studio."},
+					"root": map[string]any{"type": "string", "description": "Workspace root. Defaults to the default workspace root."},
 				},
 			},
 			Handler: func(params map[string]any) (any, error) {

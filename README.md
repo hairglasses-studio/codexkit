@@ -22,6 +22,10 @@ For a quick review path:
 4. Check [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) before adding examples or generated artifacts.
 5. Use the workspace commands only against paths you control.
 
+For dry-run sync demos, use the synthetic fixture in
+[`examples/minimal-agent-repo`](examples/minimal-agent-repo/) instead of a
+private workspace checkout.
+
 ## What It Does
 
 - **Baseline validation** — checks ensuring every repo has canonical agent configs, valid project-local Codex config, valid skill surfaces, and protocol compliance

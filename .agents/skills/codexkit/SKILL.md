@@ -18,7 +18,7 @@ Codex-native entrypoint for fleet management operations.
 - Baseline: validate repo Codex readiness (canonical patterns, profiles, agents, skills).
 - Skills: sync canonical `.agents/skills/` to `.claude/skills/` and `plugins/` mirrors.
 - MCP: sync `.mcp.json` into `.codex/config.toml` server blocks.
-- Fleet: audit and sync across all repos in ~/hairglasses-studio.
+- Fleet: audit and sync across caller-provided workspace paths.
 - Unification cycle: run a repeatable audit -> improvement-note gate -> one-slice migration -> verification -> next-note loop.
 
 ## Unification cycle loop
@@ -26,15 +26,15 @@ Codex-native entrypoint for fleet management operations.
 Use this loop for codebase-wide consolidation, Bash-to-Go/Python migrations, hook unification, skill-surface work, and Rust performance pilot planning.
 
 1. Generate or inspect the current cycle note:
-   `GOWORK=off go run ./cmd/codexkit unification cycle ~/hairglasses-studio --write`
+   `GOWORK=off go run ./cmd/codexkit unification cycle /path/to/workspace --write`
 2. Before migration work, enforce the carry-forward gate:
-   `GOWORK=off go run ./cmd/codexkit unification cycle ~/hairglasses-studio --require-notes-applied`
+   `GOWORK=off go run ./cmd/codexkit unification cycle /path/to/workspace --require-notes-applied`
 3. The guard uses the latest note in `docs/strategy/unification-cycles/` unless `--previous-notes` is set. If it fails, apply the previous note's improvement item. Use `--ack-carry-forward <reason>` only when the item is intentionally deferred and the reason belongs in the work log.
 4. Run the live audit:
-   `GOWORK=off go run ./cmd/codexkit unification report ~/hairglasses-studio`
+   `GOWORK=off go run ./cmd/codexkit unification report /path/to/workspace`
 5. Pick exactly one slice from the recommendations and move behavior behind an existing canonical command surface before deleting shell.
 6. Run focused repo checks plus:
-   `GOWORK=off go run ./cmd/codexkit workspace primitive-index-check ~/hairglasses-studio --skip-artifacts`
+   `GOWORK=off go run ./cmd/codexkit workspace primitive-index-check /path/to/workspace --skip-artifacts`
 7. Update the cycle note work log and add improvement notes for the next cycle.
 
 For library/API research inside a cycle, use Context7 first. If it is unavailable, use official primary docs and record the fallback in the cycle note.

@@ -10,31 +10,37 @@ mark_failed() {
   failed=1
 }
 
-echo "== tracked private markers =="
-# Encoded so the guard does not match itself.
-private_markers=(
-  L2hvbWUvaGc=
-  YXJjaGdsYXNzZXM=
-  c2VjcmV0c3R1ZGlvcw==
-  cnVubXlsaWZl
-  bWVzbWVy
-  Y29iYg==
-  b3BlcmF0b3JjaGF0
-  aGFpcmdsYXNzZXMtc3R1ZGlvL2pvYmI=
-  bWl0Y2htaXRjaGVsbA==
-  bWl0Y2hAaGFpcmdsYXNzZXMuc3R1ZGlv
-  bWl0Y2htaXRjaGVsbHdvcmtpbnF1aXJpZXM=
-  Z21haWwuY29t
-  bGlua2VkaW4uY29tL2lu
-  bGlua2VkaW4uY29tL21lc3NhZ2luZw==
-)
-
-for encoded in "${private_markers[@]}"; do
-  marker="$(printf '%s' "$encoded" | base64 -d)"
-  if git grep -n -i --fixed-strings -e "$marker" -- . ':!scripts/check-public-boundary.sh'; then
+echo "== local denylist =="
+if [[ -n "${CODEXKIT_PRIVATE_MARKERS_FILE:-}" ]]; then
+  if [[ ! -f "$CODEXKIT_PRIVATE_MARKERS_FILE" ]]; then
+    echo "CODEXKIT_PRIVATE_MARKERS_FILE does not exist: $CODEXKIT_PRIVATE_MARKERS_FILE" >&2
     mark_failed
+  else
+    while IFS= read -r marker || [[ -n "$marker" ]]; do
+      [[ -z "$marker" || "$marker" =~ ^[[:space:]]*# ]] && continue
+      if git grep -n -i --fixed-strings -e "$marker" -- . ':!scripts/check-public-boundary.sh'; then
+        mark_failed
+      fi
+    done <"$CODEXKIT_PRIVATE_MARKERS_FILE"
   fi
-done
+else
+  echo "CODEXKIT_PRIVATE_MARKERS_FILE not set; running tracked generic checks only"
+fi
+
+echo "== absolute user paths =="
+if git grep -n -E -e '(/home/[A-Za-z0-9._-]+|/Users/[A-Za-z0-9._-]+|[A-Za-z]:\\Users\\[^[:space:]]+)' -- . ':!scripts/check-public-boundary.sh'; then
+  mark_failed
+fi
+
+echo "== private workspace path examples =="
+if git grep -n -E -e '(~|\$HOME)/hairglasses-studio' -- . ':!scripts/check-public-boundary.sh'; then
+  mark_failed
+fi
+
+echo "== live account URLs =="
+if git grep -n -E -e 'linkedin\.com/(in|messaging|jobs)' -- . ':!scripts/check-public-boundary.sh'; then
+  mark_failed
+fi
 
 echo "== non-example emails =="
 email_hits="$(mktemp)"

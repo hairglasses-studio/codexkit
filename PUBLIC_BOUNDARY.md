@@ -14,6 +14,8 @@ mechanics while excluding private workspace state.
 - Workspace source-contract, surface-index, primitive-index, and fleet-audit
   commands that operate on caller-provided paths.
 - Public examples that use generic paths such as `/path/to/workspace`.
+- Synthetic fixtures under `examples/` that contain no credentials, private
+  repository inventory, host state, account data, or live connector settings.
 
 ## Excluded
 
@@ -24,6 +26,8 @@ mechanics while excluding private workspace state.
   agent worktrees.
 - Private policy details that only make sense inside a single operator's
   workstation or organization.
+- Generated private skill mirrors. The public tree keeps only sanitized
+  codexkit skill docs under `.agents/`, `.claude/`, and `plugins/`.
 
 ## Publication Checks
 
@@ -35,6 +39,17 @@ go vet ./...
 go build ./...
 scripts/check-public-boundary.sh
 gitleaks detect --source . --no-git --redact
+```
+
+The default script is CI-safe and enforces generic public-boundary checks for
+absolute user paths, private workspace path examples, non-example email
+addresses, live account URLs, non-portable symlinks, and gitleaks findings.
+
+For additional operator-specific marker scans, keep private markers in an
+untracked file and run:
+
+```bash
+CODEXKIT_PRIVATE_MARKERS_FILE=/path/to/private-markers.txt scripts/check-public-boundary.sh
 ```
 
 The CLI examples should stay generic. If a new example needs real-looking data,

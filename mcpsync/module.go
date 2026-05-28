@@ -82,7 +82,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"workspace_root": map[string]any{"type": "string", "description": "Workspace root. Defaults to ~/hairglasses-studio."},
+					"workspace_root": map[string]any{"type": "string", "description": "Workspace root. Defaults to the default workspace root."},
 					"policy_path":    map[string]any{"type": "string", "description": "Optional global MCP policy path."},
 				},
 			},
@@ -102,7 +102,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"workspace_root": map[string]any{"type": "string", "description": "Workspace root. Defaults to ~/hairglasses-studio."},
+					"workspace_root": map[string]any{"type": "string", "description": "Workspace root. Defaults to the default workspace root."},
 					"policy_path":    map[string]any{"type": "string", "description": "Optional global MCP policy path."},
 				},
 			},

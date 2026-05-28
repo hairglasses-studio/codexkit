@@ -1,5 +1,5 @@
 // Package fleetaudit runs aggregate validation across all repos
-// in a scan directory (default ~/hairglasses-studio).
+// in a scan directory (default workspace root).
 //
 // It combines baselineguard, skillsync, and mcpsync checks into
 // a unified fleet health report.
@@ -97,7 +97,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"scan_path": map[string]any{"type": "string", "description": "Directory to scan (default ~/hairglasses-studio)"},
+					"scan_path": map[string]any{"type": "string", "description": "Directory to scan (default workspace root)"},
 				},
 			},
 			Handler: func(params map[string]any) (any, error) {
@@ -116,7 +116,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 			Schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"scan_path": map[string]any{"type": "string", "description": "Directory to scan (default ~/hairglasses-studio)"},
+					"scan_path": map[string]any{"type": "string", "description": "Directory to scan (default workspace root)"},
 				},
 			},
 			Handler: func(params map[string]any) (any, error) {

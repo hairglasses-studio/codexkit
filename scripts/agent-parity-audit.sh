@@ -377,7 +377,6 @@ is_owned_mcp_entry() {
   combined="${command} ${args}"
 
   if [[ "$combined" == *"./"* ||
-        "$combined" == *"\$HOME/hairglasses-studio/${repo_name}/"* ||
         "$combined" == *"${repo}/"* ||
         "$combined" == *"go run ."* ||
         "$combined" == *"go run ./"* ]]; then

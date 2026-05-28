@@ -4,16 +4,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BIN_PATH="${XDG_CACHE_HOME:-$HOME/.cache}/codexkit-mcp/bin/codexkit-mcp"
-workspace_go_env="${HAIRGLASSES_STUDIO_ROOT:-$HOME/hairglasses-studio}/scripts/go-workspace-env.sh"
+workspace_root="${CODEXKIT_WORKSPACE_ROOT:-${HAIRGLASSES_STUDIO_ROOT:-}}"
+workspace_go_env=""
+if [[ -n "$workspace_root" ]]; then
+  workspace_go_env="$workspace_root/scripts/go-workspace-env.sh"
+fi
 
-if [[ -f "$workspace_go_env" ]]; then
+if [[ -n "$workspace_go_env" && -f "$workspace_go_env" ]]; then
   # shellcheck source=/dev/null
   source "$workspace_go_env"
   hg_go_apply_env "$ROOT"
 else
   export GOWORK="${GOWORK:-off}"
   export GOCACHE="${GOCACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/go-build}"
-  fallback_tmp="${XDG_CACHE_HOME:-$HOME/.cache}/hairglasses-studio/go-tmp/$(basename "$ROOT")"
+  fallback_tmp="${XDG_CACHE_HOME:-$HOME/.cache}/codexkit/go-tmp/$(basename "$ROOT")"
   mkdir -p "$GOCACHE" "$fallback_tmp"
   export GOTMPDIR="${GOTMPDIR:-$fallback_tmp}"
   export TMPDIR="${TMPDIR:-$fallback_tmp}"

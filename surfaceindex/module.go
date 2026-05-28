@@ -26,7 +26,7 @@ func (m *module) Tools() []codexkit.ToolDef {
 				"properties": map[string]any{
 					"root": map[string]any{
 						"type":        "string",
-						"description": "Workspace root. Defaults to ~/hairglasses-studio.",
+						"description": "Workspace root. Defaults to the default workspace root.",
 					},
 					"skill_validator": map[string]any{
 						"type":        "string",

@@ -42,7 +42,10 @@ The review path is intentionally self-contained. Workspace-wide commands require
 ## Walkthrough Or Demo Plan
 
 1. Run `baseline check .` and show the check categories.
-2. Run a dry-run sync command such as `skills diff` or `mcp diff` against a small sample repo.
+2. Run a dry-run sync command against the included fixture:
+   `GOWORK=off go run ./cmd/codexkit skills diff examples/minimal-agent-repo`
+   or
+   `GOWORK=off go run ./cmd/codexkit mcp diff examples/minimal-agent-repo`.
 3. Show how source-contract and index commands produce diffable artifacts.
 4. Show the MCP server exposing the same command families.
 5. Close by pointing to `PUBLIC_BOUNDARY.md` and the CI badge.

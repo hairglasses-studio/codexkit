@@ -1004,7 +1004,7 @@ func buildRecommendations(report Report) []Recommendation {
 			"shell_migration",
 			top.Repo,
 			"Move the highest-scoring stateful or structured shell workflow behind the repo's canonical command surface before migrating small wrappers.",
-			"cd ~/hairglasses-studio/codexkit && GOWORK=off go run ./cmd/codexkit unification report ~/hairglasses-studio --all-scopes",
+			"cd /path/to/workspace/codexkit && GOWORK=off go run ./cmd/codexkit unification report /path/to/workspace --all-scopes",
 			[]string{fmt.Sprintf("%s has %d migratable shell LOC", top.Repo, top.MigratableShellLines)},
 		)
 	}
@@ -1014,7 +1014,7 @@ func buildRecommendations(report Report) []Recommendation {
 			"hook_surface",
 			"",
 			"Consolidate hook scripts under one validated runner contract and keep repo hooks as thin declarations.",
-			"cd ~/hairglasses-studio/codexkit && GOWORK=off go run ./cmd/codexkit workspace primitive-index-check ~/hairglasses-studio --skip-artifacts",
+			"cd /path/to/workspace/codexkit && GOWORK=off go run ./cmd/codexkit workspace primitive-index-check /path/to/workspace --skip-artifacts",
 			[]string{fmt.Sprintf("%d hook files across %d repos", report.Summary.HookFiles, report.Summary.ReposWithHookFiles)},
 		)
 	}
@@ -1024,7 +1024,7 @@ func buildRecommendations(report Report) []Recommendation {
 			"skill_contract",
 			"",
 			"Normalize canonical skill sources so each source skill has SKILL.md and each repo skill source has surface.yaml.",
-			"cd ~/hairglasses-studio/codexkit && GOWORK=off go run ./cmd/codexkit workspace source-contract-check ~/hairglasses-studio --skills-only",
+			"cd /path/to/workspace/codexkit && GOWORK=off go run ./cmd/codexkit workspace source-contract-check /path/to/workspace --skills-only",
 			[]string{
 				fmt.Sprintf("%d repos missing skill surfaces", report.Summary.ReposMissingSkillSurface),
 				fmt.Sprintf("%d source skill dirs missing SKILL.md", report.Summary.SourceSkillDirsMissingEntry),
@@ -1037,7 +1037,7 @@ func buildRecommendations(report Report) []Recommendation {
 			"generated_surface",
 			"",
 			"Replace generated-only Claude skill mirrors with canonical repo-owned skill sources or remove the stale mirrors.",
-			"cd ~/hairglasses-studio/codexkit && GOWORK=off go run ./cmd/codexkit workspace surface-index ~/hairglasses-studio",
+			"cd /path/to/workspace/codexkit && GOWORK=off go run ./cmd/codexkit workspace surface-index /path/to/workspace",
 			[]string{fmt.Sprintf("%d repos have generated mirrors without canonical sources", report.Summary.GeneratedMirrorsWithoutSource)},
 		)
 	}
@@ -1047,7 +1047,7 @@ func buildRecommendations(report Report) []Recommendation {
 			"baseline_contract",
 			"",
 			"Fix failing codexkit baseline_target repos before adding more repos to the baseline fleet.",
-			"cd ~/hairglasses-studio/codexkit && GOWORK=off go run ./cmd/codexkit unification report ~/hairglasses-studio",
+			"cd /path/to/workspace/codexkit && GOWORK=off go run ./cmd/codexkit unification report /path/to/workspace",
 			[]string{
 				fmt.Sprintf("%d baseline_target repos failing", report.Summary.BaselineFailingRepos),
 				fmt.Sprintf("%d failed baseline findings", report.Summary.BaselineFailedFindings),
@@ -1060,7 +1060,7 @@ func buildRecommendations(report Report) []Recommendation {
 			"mutation_readiness",
 			"",
 			"Run the cleanup-first queue before autonomous roadmap work: clean worktrees, sync branches, and repair failing baselines.",
-			"cd ~/hairglasses-studio/codexkit && GOWORK=off go run ./cmd/codexkit repo-readiness score ~/hairglasses-studio --all-scopes",
+			"cd /path/to/workspace/codexkit && GOWORK=off go run ./cmd/codexkit repo-readiness score /path/to/workspace --all-scopes",
 			[]string{fmt.Sprintf("%d repos are cleanup-first", report.Readiness.Summary.CleanupFirst)},
 		)
 	}
@@ -1070,7 +1070,7 @@ func buildRecommendations(report Report) []Recommendation {
 			"roadmap_coverage",
 			"",
 			"Keep repo-local ROADMAP.md files present, fresh, and included in the workspace inventory when they become active work surfaces.",
-			"cd ~/hairglasses-studio/codexkit && GOWORK=off go run ./cmd/codexkit unification report ~/hairglasses-studio",
+			"cd /path/to/workspace/codexkit && GOWORK=off go run ./cmd/codexkit unification report /path/to/workspace",
 			[]string{
 				fmt.Sprintf("%d scanned repos missing roadmaps", report.Summary.ReposMissingRoadmap),
 				fmt.Sprintf("%d stale scanned roadmaps", report.Summary.StaleRoadmaps),
@@ -1084,7 +1084,7 @@ func buildRecommendations(report Report) []Recommendation {
 			"maintenance",
 			"",
 			"Keep running the unification audit with source-contract checks after generated-surface or shell workflow changes.",
-			"cd ~/hairglasses-studio/codexkit && GOWORK=off go run ./cmd/codexkit unification audit ~/hairglasses-studio --json",
+			"cd /path/to/workspace/codexkit && GOWORK=off go run ./cmd/codexkit unification audit /path/to/workspace --json",
 			nil,
 		)
 	}

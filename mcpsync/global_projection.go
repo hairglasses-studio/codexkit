@@ -318,9 +318,9 @@ func RenderGlobalProjectionMarkdown(projection GlobalProjection) string {
 
 	fmt.Fprintf(&b, "## Regenerate\n\n")
 	fmt.Fprintf(&b, "```bash\n")
-	fmt.Fprintf(&b, "cd ~/hairglasses-studio/codexkit\n")
-	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace global-mcp-projection ~/hairglasses-studio --json-out ../docs/inventory/workspace-global-mcp-projection-%s.json --markdown-out ../docs/inventory/workspace-global-mcp-projection-%s.md\n", generatedDate, generatedDate)
-	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace global-mcp-projection-check ~/hairglasses-studio\n")
+	fmt.Fprintf(&b, "cd /path/to/workspace/codexkit\n")
+	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace global-mcp-projection /path/to/workspace --json-out ../docs/inventory/workspace-global-mcp-projection-%s.json --markdown-out ../docs/inventory/workspace-global-mcp-projection-%s.md\n", generatedDate, generatedDate)
+	fmt.Fprintf(&b, "GOWORK=off go run ./cmd/codexkit workspace global-mcp-projection-check /path/to/workspace\n")
 	fmt.Fprintf(&b, "```\n")
 	return b.String()
 }

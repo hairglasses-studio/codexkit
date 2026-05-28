@@ -27,6 +27,19 @@ func writeExecutableWorkspaceFile(t *testing.T, base, name, content string) {
 	}
 }
 
+func TestCapabilityCardCandidatesIncludesGenericToolsMCPPath(t *testing.T) {
+	workspaceRoot := filepath.Join("workspace-root")
+	repoPath := filepath.Join(workspaceRoot, "service-app")
+	candidates := capabilityCardCandidates(workspaceRoot, repoPath, "systemd")
+	want := filepath.Join(workspaceRoot, "tools", "mcp", "systemd-mcp", ".well-known", "mcp.json")
+	for _, candidate := range candidates {
+		if candidate == want {
+			return
+		}
+	}
+	t.Fatalf("expected capability card candidates to include %q, got %#v", want, candidates)
+}
+
 func setupGlobalWorkspace(t *testing.T) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -34,14 +47,14 @@ func setupGlobalWorkspace(t *testing.T) (string, string, string) {
 	workspaceRoot := filepath.Join(root, "studio")
 	t.Setenv("HOME", home)
 
-	writeExecutableWorkspaceFile(t, home, "hairglasses-studio/dotfiles/mcp/systemd-mcp/systemd-mcp", "#!/bin/sh\nexit 0\n")
-	writeExecutableWorkspaceFile(t, workspaceRoot, "jobb/bin/jobb-mcp", "#!/bin/sh\nexit 0\n")
+	writeExecutableWorkspaceFile(t, home, "public-workspace/system-tools/mcp/systemd-mcp/systemd-mcp", "#!/bin/sh\nexit 0\n")
+	writeExecutableWorkspaceFile(t, workspaceRoot, "service-app/bin/service-app-mcp", "#!/bin/sh\nexit 0\n")
 
 	writeWorkspaceFile(t, workspaceRoot, ".mcp.json", `{
   "mcpServers": {
     "systemd": {
       "command": "./systemd-mcp",
-      "cwd": "${HOME}/hairglasses-studio/dotfiles/mcp/systemd-mcp"
+      "cwd": "${HOME}/public-workspace/system-tools/mcp/systemd-mcp"
     }
   }
 }`)
@@ -50,23 +63,23 @@ func setupGlobalWorkspace(t *testing.T) (string, string, string) {
   "categories": ["service-management", "devops"],
   "capabilities": {"tools": true, "resources": true, "prompts": true}
 }`)
-	writeWorkspaceFile(t, workspaceRoot, "jobb/.mcp.json", `{
+	writeWorkspaceFile(t, workspaceRoot, "service-app/.mcp.json", `{
   "mcpServers": {
-    "jobb": {
-      "command": "./bin/jobb-mcp"
+    "service-app": {
+      "command": "./bin/service-app-mcp"
     }
   }
 }`)
-	writeWorkspaceFile(t, workspaceRoot, "ralphglasses/.mcp.json", `{
+	writeWorkspaceFile(t, workspaceRoot, "agent-hub/.mcp.json", `{
   "mcpServers": {
-    "ralphglasses": {
+    "agent-hub": {
       "command": "bash",
-      "args": ["./scripts/dev/run-mcp.sh", "--scan-path", "~/hairglasses-studio"],
+      "args": ["./scripts/dev/run-mcp.sh", "--scan-path", "~/public-workspace"],
       "cwd": "."
     }
   }
 }`)
-	writeWorkspaceFile(t, workspaceRoot, "chromecast4k-libre/.mcp.json", `{
+	writeWorkspaceFile(t, workspaceRoot, "media-device/.mcp.json", `{
   "mcpServers": {
     "kirkwood": {
       "command": "bash",
@@ -74,7 +87,7 @@ func setupGlobalWorkspace(t *testing.T) (string, string, string) {
     }
   }
 }`)
-	writeWorkspaceFile(t, workspaceRoot, "hg-android/.mcp.json", `{
+	writeWorkspaceFile(t, workspaceRoot, "mobile-app/.mcp.json", `{
   "mcpServers": {
     "kirkwood": {
       "command": "bash",
@@ -105,8 +118,8 @@ func TestSyncGlobal_WritesNormalizedWorkspaceServers(t *testing.T) {
 	if validations["systemd"] != "ready" {
 		t.Fatalf("expected systemd validation ready, got %q", validations["systemd"])
 	}
-	if validations["jobb"] != "ready" {
-		t.Fatalf("expected jobb validation ready, got %q", validations["jobb"])
+	if validations["service-app"] != "ready" {
+		t.Fatalf("expected service-app validation ready, got %q", validations["service-app"])
 	}
 
 	data, err := os.ReadFile(configPath)
@@ -120,23 +133,23 @@ func TestSyncGlobal_WritesNormalizedWorkspaceServers(t *testing.T) {
 	if !strings.Contains(content, "[mcp_servers.systemd]") {
 		t.Fatal("expected systemd block")
 	}
-	wantSystemdCWD := filepath.Join(home, "hairglasses-studio", "dotfiles", "mcp", "systemd-mcp")
+	wantSystemdCWD := filepath.Join(home, "public-workspace", "system-tools", "mcp", "systemd-mcp")
 	if !strings.Contains(content, `cwd = "`+wantSystemdCWD+`"`) {
 		t.Fatalf("expected expanded systemd cwd %q", wantSystemdCWD)
 	}
-	wantJobbCWD := filepath.Join(workspaceRoot, "jobb")
-	if !strings.Contains(content, `cwd = "`+wantJobbCWD+`"`) {
-		t.Fatalf("expected jobb cwd %q", wantJobbCWD)
+	wantServiceAppCWD := filepath.Join(workspaceRoot, "service-app")
+	if !strings.Contains(content, `cwd = "`+wantServiceAppCWD+`"`) {
+		t.Fatalf("expected service-app cwd %q", wantServiceAppCWD)
 	}
-	wantRalphPath := filepath.Join(home, "hairglasses-studio")
-	if !strings.Contains(content, `--scan-path", "`+wantRalphPath+`"`) {
-		t.Fatalf("expected expanded ralphglasses scan path %q", wantRalphPath)
+	wantAgentHubPath := filepath.Join(home, "public-workspace")
+	if !strings.Contains(content, `--scan-path", "`+wantAgentHubPath+`"`) {
+		t.Fatalf("expected expanded agent-hub scan path %q", wantAgentHubPath)
 	}
-	if !strings.Contains(content, "[mcp_servers.chromecast4k-libre-kirkwood]") {
-		t.Fatal("expected prefixed collision alias for chromecast kirkwood")
+	if !strings.Contains(content, "[mcp_servers.media-device-kirkwood]") {
+		t.Fatal("expected prefixed collision alias for media-device kirkwood")
 	}
-	if !strings.Contains(content, "[mcp_servers.hg-android-kirkwood]") {
-		t.Fatal("expected prefixed collision alias for hg-android kirkwood")
+	if !strings.Contains(content, "[mcp_servers.mobile-app-kirkwood]") {
+		t.Fatal("expected prefixed collision alias for mobile-app kirkwood")
 	}
 	if !strings.Contains(content, "10 tools; tools/resources/prompts; service-management, devops") {
 		t.Fatal("expected capability summary from server card")
@@ -173,10 +186,10 @@ func TestSyncGlobal_RespectsPolicyAndManifest(t *testing.T) {
 	writeWorkspaceFile(t, workspaceRoot, "workspace/manifest.json", `{
   "version": 1,
   "repos": [
-    {"name": "chromecast4k-libre", "category": "device", "scope": "active_first_party"},
-    {"name": "hg-android", "category": "device", "scope": "active_first_party"},
-    {"name": "jobb", "category": "application", "scope": "active_operator"},
-    {"name": "ralphglasses", "category": "hub", "scope": "active_operator"},
+    {"name": "media-device", "category": "device", "scope": "active_first_party"},
+    {"name": "mobile-app", "category": "device", "scope": "active_first_party"},
+    {"name": "service-app", "category": "application", "scope": "active_operator"},
+    {"name": "agent-hub", "category": "hub", "scope": "active_operator"},
     {"name": "prompt-improver", "category": "tooling", "scope": "compatibility_only"}
   ]
 }`)
@@ -192,8 +205,8 @@ func TestSyncGlobal_RespectsPolicyAndManifest(t *testing.T) {
     "exclude_scopes": ["compatibility_only"]
   },
   "servers": [
-    {"repo": "chromecast4k-libre", "server": "kirkwood", "alias": "cast-kirkwood"},
-    {"repo": "hg-android", "server": "kirkwood", "enabled": false}
+    {"repo": "media-device", "server": "kirkwood", "alias": "cast-kirkwood"},
+    {"repo": "mobile-app", "server": "kirkwood", "enabled": false}
   ]
 }`)
 
@@ -215,7 +228,7 @@ func TestSyncGlobal_RespectsPolicyAndManifest(t *testing.T) {
 	if !names["cast-kirkwood"] {
 		t.Fatal("expected explicit alias from policy")
 	}
-	if names["hg-android-kirkwood"] {
+	if names["mobile-app-kirkwood"] {
 		t.Fatal("expected disabled server to be skipped")
 	}
 	if names["prompt-improver"] {
@@ -226,8 +239,8 @@ func TestSyncGlobal_RespectsPolicyAndManifest(t *testing.T) {
 	for _, skipped := range report.Skipped {
 		reasons[skipped.SourceRepo+":"+skipped.SourceServer] = skipped.Reason
 	}
-	if reasons["hg-android:kirkwood"] != "server disabled by policy" {
-		t.Fatalf("unexpected disabled-server reason: %q", reasons["hg-android:kirkwood"])
+	if reasons["mobile-app:kirkwood"] != "server disabled by policy" {
+		t.Fatalf("unexpected disabled-server reason: %q", reasons["mobile-app:kirkwood"])
 	}
 	if reasons["prompt-improver:prompt-improver"] != `repo scope "compatibility_only" excluded by policy` {
 		t.Fatalf("unexpected manifest-skip reason: %q", reasons["prompt-improver:prompt-improver"])
