@@ -11,6 +11,15 @@ Fleet management toolkit for AI agent repos — baseline validation, skill surfa
 >
 > See [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) for the explicit include/exclude contract.
 
+## Start Here
+
+For a quick review path:
+
+1. Run the self-contained commands in [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md).
+2. Review the data flow in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+3. Check [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) before adding examples or generated artifacts.
+4. Use the workspace commands only against paths you control.
+
 ## What It Does
 
 - **Baseline validation** — checks ensuring every repo has canonical agent configs, valid project-local Codex config, valid skill surfaces, and protocol compliance
@@ -180,9 +189,9 @@ All packages implement the `ToolModule` interface for uniform registration and a
 ## Build
 
 ```bash
-go build ./...           # Build all
-go vet ./...             # Lint
-go test -count=1 -race ./...  # Test
+GOWORK=off go build ./...                 # Build all
+GOWORK=off go vet ./...                   # Lint
+GOWORK=off go test -count=1 -race ./...   # Test
 ```
 
 ## License
