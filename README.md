@@ -17,8 +17,10 @@ For a quick review path:
 
 1. Run the self-contained commands in [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md).
 2. Review the data flow in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-3. Check [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) before adding examples or generated artifacts.
-4. Use the workspace commands only against paths you control.
+3. Use [docs/PORTFOLIO_PROOF.md](docs/PORTFOLIO_PROOF.md) for the architecture
+   diagram, walkthrough plan, tradeoffs, and interview prompts.
+4. Check [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) before adding examples or generated artifacts.
+5. Use the workspace commands only against paths you control.
 
 ## What It Does
 
