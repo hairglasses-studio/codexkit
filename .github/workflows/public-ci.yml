@@ -1,9 +1,6 @@
 name: Public CI
 
 on:
-  pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
@@ -19,7 +16,11 @@ concurrency:
 jobs:
   public-go-checks:
     name: Public Go checks
-    runs-on: ubuntu-latest
+    # Public fork PRs are intentionally not run on self-hosted runners.
+    # This job is push/manual only and stays limited to public checkout-local
+    # checks; the README quickstart is the outsider-verifiable path.
+    runs-on:
+      group: Internal-Arch
     timeout-minutes: 20
     steps:
       - name: Checkout
