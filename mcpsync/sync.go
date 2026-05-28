@@ -199,10 +199,11 @@ func buildPlan(repoPath string) (*plan, error) {
 		return nil, fmt.Errorf("unmanaged [mcp_servers.*] blocks already exist in %s; add markers first or clean them up before syncing", configPath)
 	}
 
-	profiles, err := resolveProfiles(absRepoPath, mcpFile)
+	allProfiles, err := resolveProfiles(absRepoPath, mcpFile)
 	if err != nil {
 		return nil, err
 	}
+	profiles := filterCodexCompatible(allProfiles)
 
 	var output string
 	if len(profiles) == 0 {
@@ -371,6 +372,23 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 		profiles = append(profiles, resolved)
 	}
 	return profiles, nil
+}
+
+// filterCodexCompatible drops profiles that use transports Codex CLI cannot
+// load (e.g. HTTP). Codex validates every entry — even disabled ones — and
+// rejects the `url` field outright.
+func filterCodexCompatible(profiles []resolvedProfile) []resolvedProfile {
+	out := make([]resolvedProfile, 0, len(profiles))
+	for _, p := range profiles {
+		if p.Transport != "" && p.Transport != "stdio" {
+			continue
+		}
+		if p.URL != "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func renderBlock(repoPath string, profiles []resolvedProfile) (string, error) {
