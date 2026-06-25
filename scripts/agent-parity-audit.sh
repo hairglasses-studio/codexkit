@@ -104,7 +104,7 @@ build_repo_rg_args() {
 inventory_csv=""
 inventory_json_rows=""
 json_separator=""
-inventory_md=$'| Repo | `claude mcp` | `.claude/settings.json` refs | `claude_desktop_config.json` | `AGENTS.md` | `AGENTS.override.md` | `CLAUDE.md` | `GEMINI.md` | `copilot-instructions.md` | `.codex/config.toml` | project-local profiles | `.agents/skills/surface.yaml` | canonical `.agents/skills/*` | generated `.claude/skills/*` | generated plugin skills | `skills` | `roadmap` | `.ralph` | `.mcp.json` | repo MCP servers | MCP discovery contract | MCP resources | MCP prompts | MCP server health | full MCP contract | MCP policy files | generated MCP configs | unmanaged MCP blocks | example-only `.mcp.json` | Codex MCP servers | curated Codex MCP servers | raw Codex MCP servers | legacy `gpt-5.4-xhigh` | `.mcp.json` without policy | `.mcp.json` without curated Codex | `.codex/agents/*.toml` | `.codex-plugin` | Codex workflows | `codex_hooks = true` | root `.claude/settings.json` | root `.gemini/settings.json` | legacy `.gemini/config.yaml` | generated `.gemini/settings.json` | Gemini MCP servers | Gemini translated hooks | Claude-only hook gaps | Gemini extensions | provider MCP bridge | provider hook bridge | provider drift | provider runtime drift |\n|------|--------------:|-----------------------------:|-----------------------------:|-----------:|--------------------:|-----------:|-----------:|--------------------------:|---------------------:|--------------:|-------------------------------:|----------------------------:|----------------------------:|------------------------:|-----------:|-----------------:|-----------------------:|----------------:|--------------:|--------------------:|--------------------:|-----------------:|----------------------:|---------------------:|----------------------:|------------------:|--------------------------:|---------------------:|------------------------:|--------------------------:|-------------------------------:|-------------------------:|----------------:|----------------:|----------------------:|------------------------------:|------------------------------:|-------------------------------:|---------------------------------:|-------------------:|------------------------:|----------------------:|------------------:|--------------------:|---------------------:|----------------------:|-----------------------:|--------------------:|-------------------------:|\n'
+inventory_md=$'| Repo | `claude mcp` | `.claude/settings.json` refs | `claude_desktop_config.json` | `AGENTS.md` | `AGENTS.override.md` | `CLAUDE.md` | `GEMINI.md` | `copilot-instructions.md` | `.codex/config.toml` | project-local profiles | `.agents/skills/surface.yaml` | canonical `.agents/skills/*` | generated `.claude/skills/*` | generated plugin skills | `skills` | `roadmap` | `.ralph` | `.mcp.json` | repo MCP servers | MCP discovery contract | MCP resources | MCP prompts | MCP server health | full MCP contract | MCP policy files | generated MCP configs | unmanaged MCP blocks | example-only `.mcp.json` | Codex MCP servers | curated Codex MCP servers | raw Codex MCP servers | legacy pre-`gpt-5.5` GPT | `.mcp.json` without policy | `.mcp.json` without curated Codex | `.codex/agents/*.toml` | `.codex-plugin` | Codex workflows | `codex_hooks = true` | root `.claude/settings.json` | root `.gemini/settings.json` | legacy `.gemini/config.yaml` | generated `.gemini/settings.json` | Gemini MCP servers | Gemini translated hooks | Claude-only hook gaps | Gemini extensions | provider MCP bridge | provider hook bridge | provider drift | provider runtime drift |\n|------|--------------:|-----------------------------:|-----------------------------:|-----------:|--------------------:|-----------:|-----------:|--------------------------:|---------------------:|--------------:|-------------------------------:|----------------------------:|----------------------------:|------------------------:|-----------:|-----------------:|-----------------------:|----------------:|--------------:|--------------------:|--------------------:|-----------------:|----------------------:|---------------------:|----------------------:|------------------:|--------------------------:|---------------------:|------------------------:|--------------------------:|-------------------------------:|-------------------------:|----------------:|----------------:|----------------------:|------------------------------:|------------------------------:|-------------------------------:|---------------------------------:|-------------------:|------------------------:|----------------------:|------------------:|--------------------:|---------------------:|----------------------:|-----------------------:|--------------------:|-------------------------:|\n'
 
 count_matches() {
   local repo="$1"
@@ -753,7 +753,7 @@ for repo in "${repos[@]}"; do
   codex_raw_mcp_servers=$((codex_mcp_servers - codex_curated_mcp_servers))
   codex_unmanaged_mcp_servers=$(count_unmanaged_codex_mcp_servers "$repo")
   generated_mcp_configs=$(count_generated_mcp_config_files "$repo")
-  legacy_model_tokens=$(count_matches_in_codex_configs "$repo" 'gpt-5\.4-xhigh')
+  legacy_model_tokens=$(count_matches_in_codex_configs "$repo" 'gpt-5\.[0-4][A-Za-z0-9._-]*')
   mcp_without_policy=0
   if [[ "$repo_mcp_servers" -gt 0 && "$mcp_policy" -eq 0 ]]; then
     mcp_without_policy=1
@@ -1083,8 +1083,8 @@ repos with MCP resource contract: $total_repos_with_mcp_resource_contract
 repos with MCP prompt contract: $total_repos_with_mcp_prompt_contract
 repos with MCP server health tool: $total_repos_with_mcp_server_health
 repos with full MCP server contract: $total_repos_with_full_mcp_contract
-legacy gpt-5.4-xhigh token matches: $total_legacy_model_tokens
-repos with legacy gpt-5.4-xhigh tokens: $total_repos_with_legacy_model_tokens
+legacy pre-gpt-5.5 GPT token matches: $total_legacy_model_tokens
+repos with legacy pre-gpt-5.5 GPT tokens: $total_repos_with_legacy_model_tokens
 repos with .mcp.json but no MCP policy file: $total_repos_with_mcp_without_policy
 repos with .mcp.json but no curated Codex MCP servers: $total_repos_with_mcp_without_curated_codex
 repos with .codex/agents/*.toml: $total_with_codex_agents
@@ -1290,8 +1290,8 @@ Summary from the latest audit:
 - Repos with MCP prompt contract: ${total_repos_with_mcp_prompt_contract}
 - Repos with MCP server health tool: ${total_repos_with_mcp_server_health}
 - Repos with full MCP server contract: ${total_repos_with_full_mcp_contract}
-- Legacy \`gpt-5.4-xhigh\` token matches: ${total_legacy_model_tokens}
-- Repos with legacy \`gpt-5.4-xhigh\` tokens: ${total_repos_with_legacy_model_tokens}
+- Legacy pre-\`gpt-5.5\` GPT token matches: ${total_legacy_model_tokens}
+- Repos with legacy pre-\`gpt-5.5\` GPT tokens: ${total_repos_with_legacy_model_tokens}
 - Repos with \`.mcp.json\` but no MCP policy file: ${total_repos_with_mcp_without_policy}
 - Repos with \`.mcp.json\` but no curated Codex MCP servers: ${total_repos_with_mcp_without_curated_codex}
 - Repos with \`.codex/agents/*.toml\`: ${total_with_codex_agents}
@@ -1394,8 +1394,8 @@ Summary from the latest audit:
 - Repos with MCP prompt contract: ${total_repos_with_mcp_prompt_contract}
 - Repos with MCP server health tool: ${total_repos_with_mcp_server_health}
 - Repos with full MCP server contract: ${total_repos_with_full_mcp_contract}
-- Legacy \`gpt-5.4-xhigh\` token matches: ${total_legacy_model_tokens}
-- Repos with legacy \`gpt-5.4-xhigh\` tokens: ${total_repos_with_legacy_model_tokens}
+- Legacy pre-\`gpt-5.5\` GPT token matches: ${total_legacy_model_tokens}
+- Repos with legacy pre-\`gpt-5.5\` GPT tokens: ${total_repos_with_legacy_model_tokens}
 - Repos with \`.mcp.json\` but no MCP policy file: ${total_repos_with_mcp_without_policy}
 - Repos with \`.mcp.json\` but no curated Codex MCP servers: ${total_repos_with_mcp_without_curated_codex}
 - Repos with \`.codex/agents/*.toml\`: ${total_with_codex_agents}

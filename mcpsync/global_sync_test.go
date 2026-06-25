@@ -97,7 +97,7 @@ func setupGlobalWorkspace(t *testing.T) (string, string, string) {
 }`)
 
 	configPath := filepath.Join(home, ".codex", "config.toml")
-	writeWorkspaceFile(t, home, ".codex/config.toml", "model = \"gpt-5.4\"\n")
+	writeWorkspaceFile(t, home, ".codex/config.toml", "model = \"gpt-5.5\"\n")
 	return workspaceRoot, configPath, home
 }
 

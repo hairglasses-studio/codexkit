@@ -125,7 +125,7 @@ func TestSyncGlobalProviderOverlaysWritesProviderTargets(t *testing.T) {
 	codexPath := filepath.Join(home, ".codex", "config.toml")
 	geminiPath := filepath.Join(home, ".gemini", "settings.json")
 	writeRuntimeTestFile(t, home, ".claude.json", `{"projects":{"keep":{"mcpServers":{"manual":{"command":"manual"}}}}}`)
-	writeRuntimeTestFile(t, home, ".codex/config.toml", "model = \"gpt-5.4\"\n")
+	writeRuntimeTestFile(t, home, ".codex/config.toml", "model = \"gpt-5.5\"\n")
 	writeRuntimeTestFile(t, home, ".gemini/settings.json", `{"mcpServers":{"manual":{"command":"manual"}}}`)
 
 	report, err := SyncGlobalProviderOverlays(GlobalOverlaySyncOptions{
