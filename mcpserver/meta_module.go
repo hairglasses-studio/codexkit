@@ -117,7 +117,7 @@ func (m *metaModule) healthPayload() map[string]any {
 		"module_count":   len(m.registry.ListModules()),
 		"tool_count":     len(m.registry.ListTools()),
 		"resource_count": 2,
-		"prompt_count":   1,
+		"prompt_count":   codexkitPromptCount,
 	}
 }
 

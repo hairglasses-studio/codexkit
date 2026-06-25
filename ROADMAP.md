@@ -43,7 +43,7 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 - [ ] [Self-hosting] Keep `.mcp.json`, CLI entrypoints, and any server front door aligned so the repo can introspect itself consistently.
 - [ ] [Explorer] Add a discovery-first contract front door for commands, profiles, skills, providers, and generated config artifacts.
 - [ ] [Telemetry] Record routing, model/profile selection, and verification outcomes in a searchable store instead of transient CLI output only.
-- [ ] [Prompt packs] Add a small prompt/runbook pack for config generation, baseline validation, and recovery flows.
+- [x] [Prompt packs] Add a small prompt/runbook pack for config generation, baseline validation, and recovery flows.
 
 ### Rationale Snapshot
 - Tier / lifecycle: `tier-1` / `active`
