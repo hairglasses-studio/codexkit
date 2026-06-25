@@ -283,8 +283,23 @@ func TestPromptsListAndGet(t *testing.T) {
 	}
 	listResult := listResp.Result.(map[string]any)
 	prompts := listResult["prompts"].([]any)
-	if len(prompts) != 1 {
-		t.Fatalf("expected one prompt, got %+v", listResult)
+	if len(prompts) != codexkitPromptCount {
+		t.Fatalf("expected %d prompts, got %+v", codexkitPromptCount, listResult)
+	}
+	promptNames := map[string]bool{}
+	for _, raw := range prompts {
+		prompt := raw.(map[string]any)
+		promptNames[prompt["name"].(string)] = true
+	}
+	for _, name := range []string{
+		"codexkit-rollout",
+		"codexkit-baseline-runbook",
+		"codexkit-config-runbook",
+		"codexkit-recovery-runbook",
+	} {
+		if !promptNames[name] {
+			t.Fatalf("expected prompt %q in %+v", name, listResult)
+		}
 	}
 
 	getResp := sendRequest(t, s, "prompts/get", 10, map[string]any{
@@ -301,6 +316,60 @@ func TestPromptsListAndGet(t *testing.T) {
 	if !strings.Contains(content["text"].(string), "demo") {
 		t.Fatalf("expected repo-specific prompt text, got %+v", getResult)
 	}
+
+	baselineResp := sendRequest(t, s, "prompts/get", 11, map[string]any{
+		"name":      "codexkit-baseline-runbook",
+		"arguments": map[string]any{"repo": "/tmp/demo"},
+	})
+	if baselineResp.Error != nil {
+		t.Fatalf("unexpected error: %v", baselineResp.Error.Message)
+	}
+	baselineText := promptResponseText(t, baselineResp)
+	for _, want := range []string{"baseline check /tmp/demo --json", "skills diff /tmp/demo", "mcp diff /tmp/demo"} {
+		if !strings.Contains(baselineText, want) {
+			t.Fatalf("expected baseline prompt to contain %q, got %q", want, baselineText)
+		}
+	}
+
+	configResp := sendRequest(t, s, "prompts/get", 12, map[string]any{
+		"name": "codexkit-config-runbook",
+		"arguments": map[string]any{
+			"repo":      "/tmp/demo",
+			"workspace": "/tmp/studio",
+		},
+	})
+	if configResp.Error != nil {
+		t.Fatalf("unexpected error: %v", configResp.Error.Message)
+	}
+	configText := promptResponseText(t, configResp)
+	for _, want := range []string{"mcp diff /tmp/demo", "provider diff /tmp/demo", "global-mcp-sync /tmp/studio --dry-run --json"} {
+		if !strings.Contains(configText, want) {
+			t.Fatalf("expected config prompt to contain %q, got %q", want, configText)
+		}
+	}
+
+	recoveryResp := sendRequest(t, s, "prompts/get", 13, map[string]any{
+		"name":      "codexkit-recovery-runbook",
+		"arguments": map[string]any{"repo": "demo"},
+	})
+	if recoveryResp.Error != nil {
+		t.Fatalf("unexpected error: %v", recoveryResp.Error.Message)
+	}
+	recoveryText := promptResponseText(t, recoveryResp)
+	for _, want := range []string{"git --no-pager status --short --branch", "fresh feature branch", "stage only intentional files"} {
+		if !strings.Contains(recoveryText, want) {
+			t.Fatalf("expected recovery prompt to contain %q, got %q", want, recoveryText)
+		}
+	}
+}
+
+func promptResponseText(t *testing.T, resp JSONRPCResponse) string {
+	t.Helper()
+	result := resp.Result.(map[string]any)
+	messages := result["messages"].([]any)
+	message := messages[0].(map[string]any)
+	content := message["content"].(map[string]any)
+	return content["text"].(string)
 }
 
 func TestMetaModuleAddsHealthTool(t *testing.T) {
@@ -319,7 +388,7 @@ func TestMetaModuleAddsHealthTool(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := result.(map[string]any)
-	if payload["resource_count"] != 2 || payload["prompt_count"] != 1 {
+	if payload["resource_count"] != 2 || payload["prompt_count"] != codexkitPromptCount {
 		t.Fatalf("unexpected health payload %+v", payload)
 	}
 }

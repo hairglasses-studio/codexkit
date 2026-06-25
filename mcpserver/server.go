@@ -92,6 +92,8 @@ type MCPPromptArgInfo struct {
 	Required    bool   `json:"required,omitempty"`
 }
 
+const codexkitPromptCount = 4
+
 // New creates an MCP server backed by the given registry.
 func New(registry *codexkit.Registry, info ServerInfo) *Server {
 	return &Server{
@@ -428,6 +430,28 @@ func (s *Server) promptCatalog() []MCPPromptInfo {
 				{Name: "repo", Description: "Optional repo name to target.", Required: false},
 			},
 		},
+		{
+			Name:        "codexkit-baseline-runbook",
+			Description: "Run a dry-run-first baseline validation and remediation pass.",
+			Arguments: []MCPPromptArgInfo{
+				{Name: "repo", Description: "Optional repo path or name to target.", Required: false},
+			},
+		},
+		{
+			Name:        "codexkit-config-runbook",
+			Description: "Generate or refresh Codex, Claude, and Gemini MCP config from repo-local sources.",
+			Arguments: []MCPPromptArgInfo{
+				{Name: "repo", Description: "Optional repo path or name to target.", Required: false},
+				{Name: "workspace", Description: "Optional workspace root for global MCP overlay work.", Required: false},
+			},
+		},
+		{
+			Name:        "codexkit-recovery-runbook",
+			Description: "Recover an interrupted codexkit maintenance pass from git and dry-run evidence.",
+			Arguments: []MCPPromptArgInfo{
+				{Name: "repo", Description: "Optional repo path or name to target.", Required: false},
+			},
+		},
 	}
 }
 
@@ -454,8 +478,72 @@ func (s *Server) promptPayload(name string, arguments map[string]any) (map[strin
 				},
 			},
 		}, nil
+	case "codexkit-baseline-runbook":
+		target := promptStringArg(arguments, "repo", "the target repo")
+		return promptText(
+			"Baseline validation runbook.",
+			fmt.Sprintf(`Run a dry-run-first codexkit baseline validation pass for %s.
+
+1. Inspect local risk first: git branch --show-current; git --no-pager status --short --branch.
+2. Run baseline evidence: GOWORK=off go run ./cmd/codexkit baseline check %s --json.
+3. If baseline reports skill or MCP drift, inspect before applying: GOWORK=off go run ./cmd/codexkit skills diff %s; GOWORK=off go run ./cmd/codexkit mcp diff %s.
+4. Apply only the smallest generator-backed repair, then rerun the same baseline command and summarize remaining findings with remediation commands.`,
+				target, target, target, target,
+			),
+		), nil
+	case "codexkit-config-runbook":
+		target := promptStringArg(arguments, "repo", "the target repo")
+		workspace := promptStringArg(arguments, "workspace", "the workspace root")
+		return promptText(
+			"Config generation runbook.",
+			fmt.Sprintf(`Refresh codexkit-managed provider config for %s.
+
+1. Start with read-only previews: GOWORK=off go run ./cmd/codexkit mcp diff %s; GOWORK=off go run ./cmd/codexkit provider diff %s.
+2. For workspace overlays, preview first: GOWORK=off go run ./cmd/codexkit workspace global-mcp-sync %s --dry-run --json.
+3. Apply only when the preview matches the intended repo-local sources: GOWORK=off go run ./cmd/codexkit mcp sync %s, then the matching provider or workspace sync.
+4. Verify with mcp check, provider check, and baseline check; report any unmanaged blocks or skipped provider entries separately.`,
+				target, target, target, workspace, target,
+			),
+		), nil
+	case "codexkit-recovery-runbook":
+		target := promptStringArg(arguments, "repo", "the target repo")
+		return promptText(
+			"Recovery runbook.",
+			fmt.Sprintf(`Recover an interrupted codexkit maintenance pass for %s without overwriting local work.
+
+1. Capture current state: git branch --show-current; git --no-pager status --short --branch; git log --oneline -5.
+2. Fetch origin, compare HEAD, upstream, and origin/main, then choose a fresh feature branch from the safest clean base.
+3. Rebuild evidence with dry-run commands before editing: baseline check, skills diff, mcp diff, and provider diff for the target repo.
+4. Continue with one small durable repair, stage only intentional files, run focused Go tests, and leave push or merge state explicit.`,
+				target,
+			),
+		), nil
 	default:
 		return nil, fmt.Errorf("unknown prompt: %s", name)
+	}
+}
+
+func promptStringArg(arguments map[string]any, name, fallback string) string {
+	if raw, ok := arguments[name].(string); ok {
+		if trimmed := strings.TrimSpace(raw); trimmed != "" {
+			return trimmed
+		}
+	}
+	return fallback
+}
+
+func promptText(description, text string) map[string]any {
+	return map[string]any{
+		"description": description,
+		"messages": []map[string]any{
+			{
+				"role": "user",
+				"content": map[string]any{
+					"type": "text",
+					"text": text,
+				},
+			},
+		},
 	}
 }
 
