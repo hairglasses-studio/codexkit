@@ -8,8 +8,7 @@ permissions:
 
 jobs:
   go-bench:
-    runs-on:
-      group: Internal-Arch
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6

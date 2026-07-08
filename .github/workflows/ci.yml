@@ -1,7 +1,5 @@
 name: Go CI
 
-# Public fork PRs are not run on self-hosted runners. Push and manual dispatch
-# provide hosted evidence for portfolio-facing changes.
 on:
   push:
     branches:
@@ -18,8 +16,7 @@ concurrency:
 jobs:
   test:
     name: Go test
-    runs-on:
-      group: Internal-Arch
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6

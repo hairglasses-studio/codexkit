@@ -1,7 +1,5 @@
 name: Codex Baseline Guard
 
-# Public fork PRs are not run on self-hosted runners. Push and manual dispatch
-# keep the public baseline evidence current.
 on:
   push:
     branches:
@@ -18,8 +16,7 @@ concurrency:
 jobs:
   baseline:
     name: Baseline check
-    runs-on:
-      group: Internal-Arch
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
