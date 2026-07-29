@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	startMarker = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
-	endMarker   = "# END GENERATED MCP SERVERS: codex-mcp-sync"
+	startMarker              = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
+	endMarker                = "# END GENERATED MCP SERVERS: codex-mcp-sync"
+	defaultToolsApprovalMode = "approve"
 )
 
 var mcpServerBlockRe = regexp.MustCompile(`(?m)^\[mcp_servers\.`)
@@ -374,19 +375,22 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 	return profiles, nil
 }
 
-// filterCodexCompatible drops profiles that use transports Codex CLI cannot
-// load (e.g. HTTP). Codex validates every entry — even disabled ones — and
-// rejects the `url` field outright.
+// filterCodexCompatible keeps Codex's two supported MCP launch forms: a stdio
+// command or a streamable HTTP URL. The source manifest may spell the remote
+// transport several ways, but Codex infers it from `url`.
 func filterCodexCompatible(profiles []resolvedProfile) []resolvedProfile {
 	out := make([]resolvedProfile, 0, len(profiles))
 	for _, p := range profiles {
-		if p.Transport != "" && p.Transport != "stdio" {
-			continue
-		}
 		if p.URL != "" {
+			switch strings.ToLower(strings.TrimSpace(p.Transport)) {
+			case "", "http", "streamable-http", "streamable_http", "sse":
+				out = append(out, p)
+			}
 			continue
 		}
-		out = append(out, p)
+		if p.Transport == "" || strings.EqualFold(strings.TrimSpace(p.Transport), "stdio") {
+			out = append(out, p)
+		}
 	}
 	return out
 }
@@ -411,10 +415,11 @@ func renderBlock(repoPath string, profiles []resolvedProfile) (string, error) {
 			b.WriteString("\n")
 		}
 		fmt.Fprintf(&b, "[mcp_servers.%s]\n", profile.Name)
+		writeScalar(&b, "default_tools_approval_mode", defaultToolsApprovalMode)
 		if profile.Command != "" {
 			writeScalar(&b, "command", profile.Command)
 		}
-		if profile.Transport != "" && profile.Transport != "stdio" {
+		if profile.URL == "" && profile.Transport != "" && profile.Transport != "stdio" {
 			writeScalar(&b, "transport", profile.Transport)
 		}
 		if profile.URL != "" {

@@ -133,6 +133,9 @@ func TestSyncGlobal_WritesNormalizedWorkspaceServers(t *testing.T) {
 	if !strings.Contains(content, "[mcp_servers.systemd]") {
 		t.Fatal("expected systemd block")
 	}
+	if got := strings.Count(content, `default_tools_approval_mode = "approve"`); got != len(report.Servers) {
+		t.Fatalf("expected approve-by-default for all %d generated servers, got %d:\n%s", len(report.Servers), got, content)
+	}
 	wantSystemdCWD := filepath.Join(home, "public-workspace", "system-tools", "mcp", "systemd-mcp")
 	if !strings.Contains(content, `cwd = "`+wantSystemdCWD+`"`) {
 		t.Fatalf("expected expanded systemd cwd %q", wantSystemdCWD)

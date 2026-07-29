@@ -61,6 +61,9 @@ func TestSync_CreatesServerBlocks(t *testing.T) {
 	if !strings.Contains(content, "[mcp_servers.filesystem]") {
 		t.Error("expected [mcp_servers.filesystem] in config.toml")
 	}
+	if got := strings.Count(content, `default_tools_approval_mode = "approve"`); got != 2 {
+		t.Errorf("expected approve-by-default for both generated servers, got %d:\n%s", got, content)
+	}
 
 	// Should record both generated profiles.
 	updated := 0
@@ -250,13 +253,16 @@ func TestSync_HTTPTransport(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, ".codex/config.toml"))
 	content := string(data)
 	if strings.Contains(content, `transport`) {
-		t.Error("HTTP profile should be filtered out — Codex CLI rejects url field")
+		t.Error("Codex should infer the HTTP transport from url")
 	}
-	if strings.Contains(content, `url`) {
-		t.Error("HTTP profile should be filtered out — Codex CLI rejects url field")
+	if !strings.Contains(content, `url = "https://example.com/mcp"`) {
+		t.Error("HTTP profile URL should appear in config.toml")
 	}
-	if strings.Contains(content, `[mcp_servers.remote]`) {
-		t.Error("HTTP-only profile should not appear in config.toml")
+	if !strings.Contains(content, `[mcp_servers.remote]`) {
+		t.Error("HTTP profile should appear in config.toml")
+	}
+	if !strings.Contains(content, `default_tools_approval_mode = "approve"`) {
+		t.Error("HTTP profile should inherit the approve-by-default tool policy")
 	}
 }
 

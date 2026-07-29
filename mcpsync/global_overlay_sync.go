@@ -318,6 +318,7 @@ func renderWorkspaceCodexBlock(projection GlobalProjection) string {
 }
 
 func renderProviderServerTOML(b *strings.Builder, name string, server ProviderServer) {
+	renderStringValue(b, "default_tools_approval_mode", defaultToolsApprovalMode)
 	if server.Command != "" {
 		renderStringValue(b, "command", server.Command)
 	}

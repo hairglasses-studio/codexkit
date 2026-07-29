@@ -774,6 +774,7 @@ func renderGlobalBlock(workspaceRoot string, candidates []globalCandidate) strin
 		}
 		b.WriteString(comment + "\n")
 		fmt.Fprintf(&b, "[mcp_servers.%s]\n", candidate.Alias)
+		renderStringValue(&b, "default_tools_approval_mode", defaultToolsApprovalMode)
 		if candidate.Server.Command != "" {
 			renderStringValue(&b, "command", candidate.Server.Command)
 		}

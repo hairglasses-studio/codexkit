@@ -158,6 +158,9 @@ func TestSyncGlobalProviderOverlaysWritesProviderTargets(t *testing.T) {
 	if !strings.Contains(codexContent, "enabled_tools = [") || !strings.Contains(codexContent, `"app_click"`) {
 		t.Fatalf("codex overlay missing enabled tools:\n%s", codexContent)
 	}
+	if !strings.Contains(codexContent, `default_tools_approval_mode = "approve"`) {
+		t.Fatalf("codex overlay missing approve-by-default MCP policy:\n%s", codexContent)
+	}
 
 	claudeData, err := os.ReadFile(claudePath)
 	if err != nil {
