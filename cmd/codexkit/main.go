@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
@@ -188,10 +189,19 @@ func runBaseline(args []string) {
 	}
 
 	allPassed := true
-	var reports []baselineguard.Report
-	for _, repoPath := range paths {
-		report := baselineguard.Check(repoPath)
-		reports = append(reports, report)
+	reports := make([]baselineguard.Report, len(paths))
+	var wg sync.WaitGroup
+	for i, p := range paths {
+		wg.Add(1)
+		go func(idx int, repoPath string) {
+			defer wg.Done()
+			reports[idx] = baselineguard.Check(repoPath)
+		}(i, p)
+	}
+	wg.Wait()
+
+	for i, repoPath := range paths {
+		report := reports[i]
 		repoName := filepath.Base(repoPath)
 
 		if jsonOut {

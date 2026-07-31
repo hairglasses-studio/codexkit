@@ -537,6 +537,7 @@ func syncContent(report *SyncReport, mode syncMode, srcPath, dstPath, rendered, 
 		return
 	}
 
+
 	action := "update"
 	if errorsIsNotExist(err) {
 		action = "create"
@@ -554,6 +555,9 @@ func syncContent(report *SyncReport, mode syncMode, srcPath, dstPath, rendered, 
 	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
 		report.Errors = append(report.Errors, fmt.Sprintf("mkdir %s: %v", filepath.Dir(dstPath), err))
 		return
+	}
+	if fi, err := os.Lstat(dstPath); err == nil && (fi.Mode()&os.ModeSymlink != 0 || fi.IsDir()) {
+		_ = os.RemoveAll(dstPath)
 	}
 	if err := os.WriteFile(dstPath, []byte(rendered), 0o644); err != nil {
 		report.Errors = append(report.Errors, fmt.Sprintf("write %s: %v", dstPath, err))
