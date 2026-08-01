@@ -537,7 +537,6 @@ func syncContent(report *SyncReport, mode syncMode, srcPath, dstPath, rendered, 
 		return
 	}
 
-
 	action := "update"
 	if errorsIsNotExist(err) {
 		action = "create"

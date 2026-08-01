@@ -60,7 +60,7 @@ var PortableFrontmatterKeys = codexkit.SkillSourceFrontmatterKeys
 
 var (
 	canonicalAgentsRe = regexp.MustCompile(`(?m)^> Canonical instructions: AGENTS\.md`)
-	canonicalClaudeRe = regexp.MustCompile(`This repo uses \[AGENTS\.md\]\(AGENTS\.md\) as the canonical instruction file`)
+	canonicalClaudeRe = regexp.MustCompile(`This repo(sitory)? uses (\*\*)?\[AGENTS\.md\]\(AGENTS\.md\)(\*\*)? as (the|its) canonical instruction file`)
 	canonicalCopilot  = "AGENTS.md"
 	profileRe         = regexp.MustCompile(`(?m)^\[profiles\.(\w+)\]`)
 	dashInFilename    = regexp.MustCompile(`-`)
