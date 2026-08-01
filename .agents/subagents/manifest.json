@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-07-31T19:01:00Z",
+  "subagents": [
+    {
+      "name": "studio_surface_auditor",
+      "description": "Audits all Go codebases, MCP server implementations, tool declarations, handlers, and struct schemas across hairglasses-studio.",
+      "enable_mcp_tools": true,
+      "enable_subagent_tools": false,
+      "enable_write_tools": true
+    },
+    {
+      "name": "launcher_bash_auditor",
+      "description": "Audits all Bash scripts, dotfiles launchers (hg-codex-launch, hg-claude-launch, hg-gemini-launch), CLI wrappers, and path bindings across hairglasses-studio.",
+      "enable_mcp_tools": true,
+      "enable_subagent_tools": false,
+      "enable_write_tools": true
+    },
+    {
+      "name": "skills_agent_auditor",
+      "description": "Audits all agent/subagent skills under .agents/skills, instruction files (AGENTS.md, CLAUDE.md, GEMINI.md), and agent prompts across hairglasses-studio.",
+      "enable_mcp_tools": true,
+      "enable_subagent_tools": false,
+      "enable_write_tools": true
+    },
+    {
+      "name": "llm_provider_parity_auditor",
+      "description": "Audits LLM provider configurations, MCP registrations, runtime environment flags, and model pins across Claude Code, Codex CLI, and AGY.",
+      "enable_mcp_tools": true,
+      "enable_subagent_tools": false,
+      "enable_write_tools": true
+    },
+    {
+      "name": "unification_architect",
+      "description": "Plans, executes, and verifies workspace-wide surface unification across hairglasses-studio to reduce complexity and measure progress.",
+      "enable_mcp_tools": true,
+      "enable_subagent_tools": true,
+      "enable_write_tools": true
+    }
+  ]
+}
