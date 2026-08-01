@@ -76,5 +76,8 @@ fi
 
 (
   cd "$CODEXKIT_ROOT"
-  GOWORK=off go run ./cmd/codexkit skills "$MODE" "$REPO_PATH"
+  # An untracked or cache-created vendor/ directory must not silently switch
+  # this workspace helper into vendor mode. CodexKit does not track vendored
+  # dependencies, so resolve its declared module graph explicitly.
+  GOWORK=off go run -mod=mod ./cmd/codexkit skills "$MODE" "$REPO_PATH"
 )
