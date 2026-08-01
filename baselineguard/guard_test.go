@@ -15,10 +15,9 @@ func setupCompliantRepo(t *testing.T) string {
 
 	writeFile(t, dir, "AGENTS.md", "# Test\n\n> Canonical instructions: AGENTS.md\n")
 	writeFile(t, dir, "CLAUDE.md", "# Test\n\nThis repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file.\n")
-	writeFile(t, dir, "GEMINI.md", "# Test\n\nThis repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file.\n")
 	writeFile(t, dir, ".claude/settings.json", "{}\n")
-	writeFile(t, dir, ".gemini/settings.json", "{\n  \"context\": {\n    \"fileName\": [\"AGENTS.md\", \"GEMINI.md\"]\n  }\n}\n")
-	writeFile(t, dir, ".github/copilot-instructions.md", "See AGENTS.md in the repository root.\n")
+	writeFile(t, dir, ".agents/hooks.json", "{}\n")
+	writeFile(t, dir, ".agents/agents/reviewer/agent.md", "---\nname: reviewer\ndescription: Review changes.\n---\n")
 	writeFile(t, dir, ".codex/config.toml", `
 approval_policy = "on-request"
 `)
@@ -207,19 +206,35 @@ env_key_instructions = "source "$HOME/bad" && broken"
 	}
 }
 
-func TestCheck_MissingGeminiContextBridge(t *testing.T) {
+func TestCheck_InvalidAGYHooks(t *testing.T) {
 	dir := setupCompliantRepo(t)
-	writeFile(t, dir, ".gemini/settings.json", "{}\n")
+	writeFile(t, dir, ".agents/hooks.json", "{broken\n")
 
 	report := Check(dir)
 	found := false
 	for _, f := range report.Findings {
-		if f.Check == "gemini_context_bridge" && !f.Passed {
+		if f.Check == "agy_hooks_json" && !f.Passed {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected gemini_context_bridge failure when AGENTS.md is not in context.fileName")
+		t.Error("expected agy_hooks_json failure for malformed native AGY hooks")
+	}
+}
+
+func TestCheck_RejectsFlatAGYAgentFiles(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, ".agents/agents/flat.md", "# not native AGY layout\n")
+
+	report := Check(dir)
+	found := false
+	for _, f := range report.Findings {
+		if f.Check == "agy_agent_layout" && !f.Passed {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected agy_agent_layout failure for flat .agents/agents file")
 	}
 }
 
@@ -263,9 +278,6 @@ func TestCheck_IgnoresExampleOnlyMCPServers(t *testing.T) {
 
 	report := Check(dir)
 	for _, f := range report.Findings {
-		if f.Check == "gemini_mcp_bridge" && !f.Passed {
-			t.Fatalf("did not expect gemini_mcp_bridge failure for example-only MCP config: %s", f.Message)
-		}
 		if f.Check == "mcp_portability" && !f.Passed {
 			t.Fatalf("did not expect mcp_portability failure for example-only MCP config: %s", f.Message)
 		}

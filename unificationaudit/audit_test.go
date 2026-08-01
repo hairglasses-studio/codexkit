@@ -107,7 +107,7 @@ echo hook >> .state/hooks.log
 	if markdown := report.Markdown(); !strings.Contains(markdown, "Baseline Remediation Queue") || !strings.Contains(markdown, "`app`") || !strings.Contains(markdown, "baseline check") {
 		t.Fatalf("markdown missing baseline remediation queue:\n%s", markdown)
 	}
-	if markdown := report.Markdown(); !strings.Contains(markdown, "Remediation") || !strings.Contains(markdown, "restore canonical provider instruction files") {
+	if markdown := report.Markdown(); !strings.Contains(markdown, "Remediation") || !strings.Contains(markdown, "restore canonical instruction files") {
 		t.Fatalf("markdown missing baseline remediation hints:\n%s", markdown)
 	}
 }

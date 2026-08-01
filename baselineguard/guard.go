@@ -48,10 +48,7 @@ type Report struct {
 var RequiredFiles = []string{
 	"AGENTS.md",
 	"CLAUDE.md",
-	"GEMINI.md",
 	".claude/settings.json",
-	".gemini/settings.json",
-	".github/copilot-instructions.md",
 	".codex/config.toml",
 }
 
@@ -61,10 +58,8 @@ var PortableFrontmatterKeys = codexkit.SkillSourceFrontmatterKeys
 var (
 	canonicalAgentsRe = regexp.MustCompile(`(?m)^> Canonical instructions: AGENTS\.md`)
 	canonicalClaudeRe = regexp.MustCompile(`This repo(sitory)? uses (\*\*)?\[AGENTS\.md\]\(AGENTS\.md\)(\*\*)? as (the|its) canonical instruction file`)
-	canonicalCopilot  = "AGENTS.md"
 	profileRe         = regexp.MustCompile(`(?m)^\[profiles\.(\w+)\]`)
 	dashInFilename    = regexp.MustCompile(`-`)
-	kebabNameRe       = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 )
 
 // Check runs all baseline-guard validations on the given repo path.
@@ -74,6 +69,7 @@ func Check(repoPath string) Report {
 	report.addRequiredFiles(repoPath)
 	report.addCanonicalPatterns(repoPath)
 	report.addProviderSettings(repoPath)
+	report.addAGYAgentLayout(repoPath)
 	report.addProfiles(repoPath)
 	report.addAgentNaming(repoPath)
 	report.addSkillSurface(repoPath)
@@ -177,16 +173,20 @@ func remediationForCheck(repoPath, check string) []Remediation {
 			Message: "regenerate MCP config",
 			Command: command("mcp", "sync", repoPath),
 		}}
-	case "claude_settings_json", "gemini_settings_json", "gemini_context_bridge", "gemini_mcp_bridge":
-		return []Remediation{{
-			Kind:    "generator",
-			Message: "refresh provider settings",
-			Command: command("provider", "sync", repoPath),
-		}}
-	case "required_file", "canonical_agents", "canonical_claude", "canonical_gemini", "canonical_copilot":
+	case "claude_settings_json", "agy_hooks_json":
 		return []Remediation{{
 			Kind:    "edit",
-			Message: "restore canonical provider instruction files: AGENTS.md, CLAUDE.md, GEMINI.md, .github/copilot-instructions.md",
+			Message: "repair the provider-native JSON configuration",
+		}}
+	case "required_file", "canonical_agents", "canonical_claude":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "restore canonical instruction files: AGENTS.md and CLAUDE.md",
+		}}
+	case "agy_agent_layout":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "move AGY agents to .agents/agents/<name>/agent.md",
 		}}
 	case "codex_config_toml", "project_local_profiles":
 		return []Remediation{{
@@ -258,23 +258,6 @@ func (r *Report) addCanonicalPatterns(repoPath string) {
 		}
 	}
 
-	// GEMINI.md: must reference AGENTS.md
-	if data, err := os.ReadFile(filepath.Join(repoPath, "GEMINI.md")); err == nil {
-		if canonicalClaudeRe.Match(data) {
-			r.add("canonical_gemini", true, "")
-		} else {
-			r.add("canonical_gemini", false, "GEMINI.md missing canonical AGENTS.md reference")
-		}
-	}
-
-	// copilot-instructions.md: must mention AGENTS.md
-	if data, err := os.ReadFile(filepath.Join(repoPath, ".github/copilot-instructions.md")); err == nil {
-		if strings.Contains(string(data), canonicalCopilot) {
-			r.add("canonical_copilot", true, "")
-		} else {
-			r.add("canonical_copilot", false, "copilot-instructions.md missing AGENTS.md reference")
-		}
-	}
 }
 
 func (r *Report) addProviderSettings(repoPath string) {
@@ -287,72 +270,34 @@ func (r *Report) addProviderSettings(repoPath string) {
 		}
 	}
 
-	if data, err := os.ReadFile(filepath.Join(repoPath, ".gemini/settings.json")); err == nil {
+	if data, err := os.ReadFile(filepath.Join(repoPath, ".agents/hooks.json")); err == nil {
 		var parsed map[string]any
 		if err := json.Unmarshal(data, &parsed); err != nil {
-			r.add("gemini_settings_json", false, ".gemini/settings.json must be valid JSON")
-			return
-		}
-		r.add("gemini_settings_json", true, "")
-
-		context, _ := parsed["context"].(map[string]any)
-		fileNames, _ := context["fileName"].([]any)
-		hasAgents := false
-		for _, entry := range fileNames {
-			if name, ok := entry.(string); ok && name == "AGENTS.md" {
-				hasAgents = true
-				break
-			}
-		}
-		if hasAgents {
-			r.add("gemini_context_bridge", true, "")
+			r.add("agy_hooks_json", false, ".agents/hooks.json must be valid JSON")
 		} else {
-			r.add("gemini_context_bridge", false, ".gemini/settings.json missing AGENTS.md context bridge")
-		}
-
-		if activeServers, ok := activeMCPServers(repoPath); ok && len(activeServers) > 0 {
-			mcpServers, _ := parsed["mcpServers"].(map[string]any)
-			if len(mcpServers) == 0 {
-				r.add("gemini_mcp_bridge", false, ".gemini/settings.json missing mcpServers bridge")
-			} else {
-				kebabOK := true
-				for name := range mcpServers {
-					if !kebabNameRe.MatchString(name) {
-						kebabOK = false
-						break
-					}
-				}
-				if kebabOK {
-					r.add("gemini_mcp_bridge", true, "")
-				} else {
-					r.add("gemini_mcp_bridge", false, ".gemini/settings.json mcpServers keys must use kebab-case")
-				}
-			}
+			r.add("agy_hooks_json", true, "")
 		}
 	}
 }
 
-func activeMCPServers(repoPath string) (map[string]json.RawMessage, bool) {
-	data, err := os.ReadFile(filepath.Join(repoPath, ".mcp.json"))
+func (r *Report) addAGYAgentLayout(repoPath string) {
+	agentsDir := filepath.Join(repoPath, ".agents", "agents")
+	entries, err := os.ReadDir(agentsDir)
 	if err != nil {
-		return nil, false
+		return
 	}
-
-	var rootMCP struct {
-		MCPServers map[string]json.RawMessage `json:"mcpServers"`
-	}
-	if err := json.Unmarshal(data, &rootMCP); err != nil {
-		return nil, false
-	}
-
-	active := make(map[string]json.RawMessage)
-	for name, payload := range rootMCP.MCPServers {
-		if strings.HasPrefix(name, "_") {
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			r.add("agy_agent_layout", false, fmt.Sprintf("%s must be a directory containing agent.md", entry.Name()))
 			continue
 		}
-		active[name] = payload
+		agentPath := filepath.Join(agentsDir, entry.Name(), "agent.md")
+		if info, statErr := os.Stat(agentPath); statErr != nil || info.IsDir() {
+			r.add("agy_agent_layout", false, fmt.Sprintf("missing: .agents/agents/%s/agent.md", entry.Name()))
+			continue
+		}
+		r.add("agy_agent_layout", true, entry.Name())
 	}
-	return active, true
 }
 
 func (r *Report) addProfiles(repoPath string) {

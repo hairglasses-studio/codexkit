@@ -23,6 +23,7 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 | Package | Purpose |
 |---------|---------|
 | `baselineguard` | Validate Codex repo baseline (canonical patterns, project config, skills, agents, protocol compliance) |
+| `configindex` | Redacted inventory and policy checks for Claude, Codex, AGY, dotfiles, and provider homes |
 | `skillsync` | Sync `.agents/skills/` → `.claude/skills/` + `plugins/` mirrors |
 | `mcpsync` | Sync `.mcp.json` → `.codex/config.toml` MCP server blocks |
 | `mcpserver` | MCP server — aggregates all ToolModules, deferred tool loading |
@@ -35,11 +36,11 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 
 | Check | Description |
 |-------|-------------|
-| `required_file` | Required files exist (AGENTS.md, CLAUDE.md, GEMINI.md, copilot-instructions.md, config.toml) |
+| `required_file` | Required files exist (AGENTS.md, CLAUDE.md, Claude settings, Codex config) |
 | `canonical_agents` | AGENTS.md has canonical marker |
 | `canonical_claude` | CLAUDE.md references AGENTS.md |
-| `canonical_gemini` | GEMINI.md references AGENTS.md |
-| `canonical_copilot` | copilot-instructions.md mentions AGENTS.md |
+| `agy_hooks_json` | Native `.agents/hooks.json` parses when present |
+| `agy_agent_layout` | Native AGY agents use `.agents/agents/<name>/agent.md` |
 | `project_local_profiles` | Repo-local `.codex/config.toml` does not define unsupported `[profiles.*]` tables |
 | `agent_naming` | Agent filenames use underscore_case |
 | `skill_surface` | surface.yaml is valid |
@@ -69,6 +70,8 @@ The MCP server (`cmd/codexkit-mcp`) exposes these tools:
 | `repo_readiness_score` | reporeadiness | Score autonomous mutation readiness lanes for workspace repos |
 | `perf_audit` | perfaudit | Scan the workspace for Codex performance bottlenecks |
 | `perf_report` | perfaudit | Render the Codex performance audit as Markdown |
+| `workspace_config_index` | configindex | Build a redacted provider/dotfiles/home configuration catalog |
+| `workspace_config_check` | configindex | Enforce strict Claude/Codex/AGY ownership and operator-selected autonomy defaults |
 
 ## Protocol Support
 

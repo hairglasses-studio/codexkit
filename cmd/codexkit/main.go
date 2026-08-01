@@ -11,6 +11,7 @@ import (
 
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
+	"github.com/hairglasses-studio/codexkit/configindex"
 	"github.com/hairglasses-studio/codexkit/fleetaudit"
 	"github.com/hairglasses-studio/codexkit/llmreduction"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
@@ -30,6 +31,7 @@ func init() {
 	registry = codexkit.NewRegistry()
 	for _, m := range []codexkit.ToolModule{
 		baselineguard.Module(),
+		configindex.Module(),
 		skillsync.Module(),
 		mcpsync.Module(),
 		fleetaudit.Module(),
@@ -102,9 +104,9 @@ Commands:
   mcp diff <repo>               Show what MCP sync would change
   mcp check <repo>              Fail when the generated MCP block drifts
   mcp list <repo>               List MCP servers from .mcp.json
-  provider check <repo>         Verify Claude/Gemini provider settings parity
-  provider diff <repo>          Show provider settings drift without writing
-  provider sync <repo>          Apply provider settings parity
+  provider check <repo>         Verify legacy provider settings during migration
+  provider diff <repo>          Show legacy provider settings drift without writing
+  provider sync <repo>          Apply legacy provider settings parity during migration
   fleet audit [scan_path]       Run full audit on all repos
   fleet report [scan_path]      Summary report of fleet health
   workspace check [root]        Validate workspace/manifest.json and go.work
@@ -132,6 +134,10 @@ Commands:
                                 Build a workspace index of hooks, provider agents, plugin manifests, nested MCP files, and related agent primitives
   workspace primitive-index-check [root] [--json] [--json-path <path>] [--markdown-path <path>] [--skip-artifacts]
                                 Fail when generated workspace agent primitive artifacts drift
+  workspace config-index [root] [--json] [--json-out <path>] [--markdown-out <path>] [--user-home <path>] [--root-home <path>] [--runtime-stats]
+                                Inventory and classify repo, dotfiles, Claude, Codex, AGY, user-home, and root-home configuration
+  workspace config-index-check [root] [--json] [--user-home <path>] [--root-home <path>] [--runtime-stats]
+                                Enforce strict Claude/Codex/AGY ownership and least-privilege configuration policy
   workspace refresh-parity      Refresh docs parity outputs through codexkit-owned parity tooling
 	  perf audit [root] [--json] [--all-scopes]
 	                                Scan the workspace for Codex performance bottlenecks
@@ -272,8 +278,9 @@ func baselineFailureHints(repoPath string, failures []baselineguard.Finding) []s
 
 	add([]string{"skill_sync"}, fmt.Sprintf("regenerate skill mirrors: %s skills sync %s --quiet-warnings", commandPrefix, shellQuote(repoPath)))
 	add([]string{"mcp_sync"}, fmt.Sprintf("regenerate MCP config: %s mcp sync %s", commandPrefix, shellQuote(repoPath)))
-	add([]string{"required_file", "canonical_agents", "canonical_claude", "canonical_gemini", "canonical_copilot"}, "restore canonical provider instruction files: AGENTS.md, CLAUDE.md, GEMINI.md, .github/copilot-instructions.md")
-	add([]string{"claude_settings_json", "gemini_settings_json", "gemini_context_bridge", "gemini_mcp_bridge"}, fmt.Sprintf("refresh provider settings: %s provider sync %s", commandPrefix, shellQuote(repoPath)))
+	add([]string{"required_file", "canonical_agents", "canonical_claude"}, "restore canonical instruction files: AGENTS.md and CLAUDE.md")
+	add([]string{"claude_settings_json", "agy_hooks_json"}, "repair the provider-native JSON configuration")
+	add([]string{"agy_agent_layout"}, "move AGY agents to .agents/agents/<name>/agent.md")
 	add([]string{"codex_config_toml", "project_local_profiles"}, "edit .codex/config.toml; keep repo-local configs parseable and remove unsupported [profiles.*] tables")
 	add([]string{"agent_naming"}, "rename .codex/agents/*.toml files to underscore_case")
 	add([]string{"skill_surface", "skill_file", "skill_portability"}, "fix the canonical .agents/skills surface before regenerating provider mirrors")
@@ -1082,6 +1089,20 @@ func runWorkspace(args []string) {
 		if !passed {
 			os.Exit(1)
 		}
+	case "config-index":
+		if err := runWorkspaceConfigIndex(args[1:]); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	case "config-index-check":
+		passed, err := runWorkspaceConfigIndexCheck(args[1:])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		if !passed {
+			os.Exit(1)
+		}
 	case "refresh-parity":
 		if err := runWorkspaceRefresh(args[1:]); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -1859,6 +1880,129 @@ func runWorkspaceSurfaceIndexCheck(args []string) (bool, error) {
 			findingStatus = "FAIL"
 		}
 		fmt.Printf("  %-16s %-20s %s\n", findingStatus, finding.Check, finding.Message)
+	}
+	return report.Passed, nil
+}
+
+type configIndexCLIOptions struct {
+	root         string
+	jsonOut      bool
+	jsonPath     string
+	markdownPath string
+	profiles     []configindex.Profile
+	runtimeStats bool
+}
+
+func parseConfigIndexCLIOptions(args []string, allowArtifacts bool) (configIndexCLIOptions, error) {
+	opts := configIndexCLIOptions{root: workspace.DefaultRoot()}
+	rootSet := false
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "--json":
+			opts.jsonOut = true
+		case "--json-out":
+			if !allowArtifacts {
+				return opts, fmt.Errorf("--json-out is not valid for config-index-check")
+			}
+			i++
+			if i >= len(args) {
+				return opts, fmt.Errorf("--json-out requires a path")
+			}
+			opts.jsonPath = args[i]
+		case "--markdown-out":
+			if !allowArtifacts {
+				return opts, fmt.Errorf("--markdown-out is not valid for config-index-check")
+			}
+			i++
+			if i >= len(args) {
+				return opts, fmt.Errorf("--markdown-out requires a path")
+			}
+			opts.markdownPath = args[i]
+		case "--user-home":
+			i++
+			if i >= len(args) {
+				return opts, fmt.Errorf("--user-home requires a path")
+			}
+			opts.profiles = append(opts.profiles, configindex.Profile{Name: "user", Home: args[i]})
+		case "--root-home":
+			i++
+			if i >= len(args) {
+				return opts, fmt.Errorf("--root-home requires a path")
+			}
+			opts.profiles = append(opts.profiles, configindex.Profile{Name: "root", Home: args[i]})
+		case "--runtime-stats":
+			opts.runtimeStats = true
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return opts, fmt.Errorf("unknown flag: %s", arg)
+			}
+			if rootSet {
+				return opts, fmt.Errorf("unexpected extra argument: %s", arg)
+			}
+			opts.root = arg
+			rootSet = true
+		}
+	}
+	return opts, nil
+}
+
+func runWorkspaceConfigIndex(args []string) error {
+	opts, err := parseConfigIndexCLIOptions(args, true)
+	if err != nil {
+		return err
+	}
+	index, err := configindex.Build(configindex.Options{
+		WorkspaceRoot: opts.root, Profiles: opts.profiles, IncludeRuntimeStats: opts.runtimeStats,
+	})
+	if err != nil {
+		return err
+	}
+	if err := configindex.Write(index, opts.jsonPath, opts.markdownPath); err != nil {
+		return err
+	}
+	if opts.jsonOut {
+		printJSON(index)
+		return nil
+	}
+	if opts.jsonPath != "" || opts.markdownPath != "" {
+		fmt.Printf("configuration index: %d physical files, %d canonical logical sources, %d runtime buckets, %d duplicate groups\n",
+			index.Summary.PhysicalFiles, index.Summary.LogicalSources, index.Summary.RuntimeBuckets, index.Summary.DuplicateGroups)
+		return nil
+	}
+	fmt.Print(configindex.RenderMarkdown(index))
+	return nil
+}
+
+func runWorkspaceConfigIndexCheck(args []string) (bool, error) {
+	opts, err := parseConfigIndexCLIOptions(args, false)
+	if err != nil {
+		return false, err
+	}
+	report, err := configindex.Check(configindex.Options{
+		WorkspaceRoot: opts.root, Profiles: opts.profiles, IncludeRuntimeStats: opts.runtimeStats,
+	})
+	if err != nil {
+		return false, err
+	}
+	if opts.jsonOut {
+		printJSON(report)
+		return report.Passed, nil
+	}
+	status := "PASS"
+	if !report.Passed {
+		status = "FAIL"
+	}
+	fmt.Printf("configuration index check: %s (%d findings)\n", status, len(report.Findings))
+	for _, finding := range report.Findings {
+		findingStatus := "PASS"
+		if !finding.Passed {
+			findingStatus = "FAIL"
+		}
+		fmt.Printf("  %-5s %-24s %s\n", findingStatus, finding.Check, finding.Message)
+		if finding.Path != "" {
+			fmt.Printf("        %s\n", finding.Path)
+		}
 	}
 	return report.Passed, nil
 }

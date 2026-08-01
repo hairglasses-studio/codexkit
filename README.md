@@ -33,6 +33,7 @@ private workspace checkout.
 - **MCP sync** — translates `.mcp.json` server entries to `.codex/config.toml` blocks
 - **Source contract check** — validates workspace manifest, skill mirrors, MCP generated blocks, runtime inventory artifacts, and global MCP projections behind one command
 - **Surface index** — maps baseline repos to canonical skills, MCP sources, generated mirrors, runtime projection, and consolidation decisions
+- **Configuration index** — classifies repo, dotfiles, Claude, Codex, AGY, user-home, root-home, secret, and runtime state without emitting secret values
 - **Global MCP projection** — generates Codex, Claude, and Gemini workspace-global MCP provider overlays from repo-local policies
 - **Fleet audit** — runs baseline + skill + MCP checks across all repos in a workspace
 - **Performance audit** — scans for Codex performance bottlenecks and regression budgets
@@ -117,6 +118,14 @@ codexkit workspace primitive-index /path/to/workspace \
   --json-out /path/to/artifacts/workspace-agent-primitives-2026-05-10.json \
   --markdown-out /path/to/artifacts/workspace-agent-primitives-2026-05-10.md
 codexkit workspace primitive-index-check /path/to/workspace
+
+# Inventory and check the strict Claude/Codex/AGY configuration plane
+codexkit workspace config-index /path/to/workspace \
+  --user-home /home/hg --root-home /root \
+  --json-out /path/to/artifacts/provider-config-index.json \
+  --markdown-out /path/to/artifacts/provider-config-index.md
+codexkit workspace config-index-check /path/to/workspace \
+  --user-home /home/hg --root-home /root
 ```
 
 ### Workspace Source Contract
@@ -134,6 +143,8 @@ Use `--json-out <path>` to write the stable JSON source-contract artifact, and `
 Codex workspace-global overlays are intentionally opt-in: repo profiles must set `global_codex: true` or come from workspace-root foundational servers before they are written to user-scope Codex config. Claude and Gemini continue to project review/research profiles by default, so a zero Codex entry count can be a valid policy state when repo-local `.codex/config.toml` files are the Codex source of truth.
 
 `codexkit workspace primitive-index` generates `workspace-agent-primitives-*.json` and `.md`. It records Claude hooks/settings, local overlays, provider agents, output styles, plugin manifests, nested MCP files, and instruction files that are outside the narrower skill/MCP source contract. Canonical and generated hook wiring failures fail `primitive-index-check`; local overlays remain audit-visible warnings.
+
+`codexkit workspace config-index` inventories tracked and untracked provider configuration, canonical dotfiles, provider homes, and redacted runtime buckets. It never hashes secret/authentication files or copies values into output. `config-index-check` rejects unowned active configuration, Gemini/Copilot projections in the strict three-provider fleet, restricted global defaults that drift from the operator's autonomy policy, and unscoped provider-home deletion.
 
 ### MCP Server
 
@@ -171,12 +182,15 @@ Codex workspace-global overlays are intentionally opt-in: repo profiles must set
 | `workspace_source_contract_check` | Validate workspace source contracts behind one read-only report |
 | `workspace_surface_index` | Build a baseline repo index of agent surfaces and runtime projections |
 | `workspace_primitive_index` | Build a workspace index of hooks, provider agents, plugin manifests, nested MCP files, and related agent primitives |
+| `workspace_config_index` | Build a redacted provider configuration and dotfiles inventory |
+| `workspace_config_check` | Check strict-provider ownership and autonomy-default policy |
 
 ## Architecture
 
 ```
 codexkit/
 ├── baselineguard/   # 14-check repo validation engine
+├── configindex/     # Redacted repo/dotfiles/provider-home configuration inventory
 ├── skillsync/       # Skill surface mirror management
 ├── mcpsync/         # MCP-to-Codex config translation
 ├── sourcecontract/  # Workspace-wide source-contract orchestration

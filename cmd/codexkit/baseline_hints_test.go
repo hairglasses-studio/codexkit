@@ -53,7 +53,7 @@ func TestBaselineFailureHintsIncludesRepoScopedCommands(t *testing.T) {
 			Message: "missing canonical marker",
 			Remediation: []baselineguard.Remediation{{
 				Kind:    "edit",
-				Message: "restore canonical provider instruction files: AGENTS.md, CLAUDE.md, GEMINI.md",
+				Message: "restore canonical instruction files: AGENTS.md and CLAUDE.md",
 			}},
 		},
 		{
@@ -71,7 +71,7 @@ func TestBaselineFailureHintsIncludesRepoScopedCommands(t *testing.T) {
 		"baseline check '/tmp/hairglasses-studio/dotfiles'",
 		"skills sync /tmp/hairglasses-studio/dotfiles --quiet-warnings",
 		"mcp sync /tmp/hairglasses-studio/dotfiles",
-		"AGENTS.md, CLAUDE.md, GEMINI.md",
+		"AGENTS.md and CLAUDE.md",
 		"remove unsupported [profiles.*] tables",
 	} {
 		if !strings.Contains(got, want) {

@@ -14,7 +14,6 @@ func TestBaselineCheckJSONIsMachineReadable(t *testing.T) {
 	mkdirAll(t, filepath.Join(dir, ".git"))
 	writeText(t, filepath.Join(dir, "AGENTS.md"), "# Demo\n")
 	writeText(t, filepath.Join(dir, "CLAUDE.md"), "# Demo\n")
-	writeText(t, filepath.Join(dir, "GEMINI.md"), "# Demo\n")
 
 	cmd := exec.Command("go", "run", ".", "baseline", "check", dir, "--json")
 	cmd.Env = append(os.Environ(), "GOWORK=off")
