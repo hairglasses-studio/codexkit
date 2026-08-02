@@ -100,6 +100,7 @@ func Check(repoPath string) Report {
 	report.addA2AAwareness(repoPath)
 	report.addSkillPortability(repoPath)
 	report.addModelPinFreshness(repoPath)
+	report.addMCPSpecTarget(repoPath)
 
 	report.addRemediations(repoPath)
 	report.Total = len(report.Findings)
@@ -260,6 +261,11 @@ func remediationForCheck(repoPath, check string) []Remediation {
 		return []Remediation{{
 			Kind:    "edit",
 			Message: "migrate the pinned model id to its replacement before the deprecation/retirement date",
+		}}
+	case "mcp_spec_target":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "update .well-known/mcp.json protocolVersion to the fleet target/current MCP spec version",
 		}}
 	default:
 		return nil
@@ -859,6 +865,62 @@ func (r *Report) addModelPinVerdict(m modelLifecycleEntry, file string, today ti
 		}
 	}
 	r.add("model_pin_freshness", true, fmt.Sprintf("deprecated model pin %s — plan migration to %s", m.ID, m.Replacement))
+}
+
+// mcpSpecTargetRegistry is the workspace-level MCP protocol version target
+// registry (outside the repo, at <workspace root>/workspace/mcp-spec-target.json).
+type mcpSpecTargetRegistry struct {
+	Version        int    `json:"version"`
+	Current        string `json:"current"`
+	FleetTarget    string `json:"fleet_target"`
+	CompatDeadline string `json:"compat_deadline"`
+}
+
+// addMCPSpecTarget flags a repo's declared MCP protocolVersion
+// (.well-known/mcp.json) against the fleet-wide spec target registry.
+// Presence of .well-known/mcp.json is owned by the mcp_discovery check;
+// this check only runs when the file exists and has a protocolVersion.
+// Version strings are YYYY-MM-DD, so lexicographic string comparison is a
+// valid date comparison.
+func (r *Report) addMCPSpecTarget(repoPath string) {
+	wellKnown := filepath.Join(repoPath, ".well-known", "mcp.json")
+	data, err := os.ReadFile(wellKnown)
+	if err != nil {
+		return
+	}
+	var doc struct {
+		ProtocolVersion string `json:"protocolVersion"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil || doc.ProtocolVersion == "" {
+		return
+	}
+
+	registryPath := filepath.Join(filepath.Dir(filepath.Clean(repoPath)), "workspace", "mcp-spec-target.json")
+	regData, err := os.ReadFile(registryPath)
+	if err != nil {
+		return
+	}
+	var reg mcpSpecTargetRegistry
+	if err := json.Unmarshal(regData, &reg); err != nil {
+		return
+	}
+	if reg.FleetTarget == "" || reg.Current == "" {
+		return
+	}
+
+	v := doc.ProtocolVersion
+	switch {
+	case v < reg.FleetTarget:
+		r.add("mcp_spec_target", false, fmt.Sprintf("spec %s below fleet target %s", v, reg.FleetTarget))
+	case v < reg.Current:
+		if reg.CompatDeadline != "" && nowFunc().Format("2006-01-02") > reg.CompatDeadline {
+			r.add("mcp_spec_target", false, fmt.Sprintf("spec %s behind current %s; compat deadline %s passed", v, reg.Current, reg.CompatDeadline))
+		} else {
+			r.add("mcp_spec_target", true, fmt.Sprintf("spec %s behind current %s; compat window until %s", v, reg.Current, reg.CompatDeadline))
+		}
+	default:
+		r.add("mcp_spec_target", true, fmt.Sprintf("spec %s matches current %s", v, reg.Current))
+	}
 }
 
 // --- ToolModule implementation ---

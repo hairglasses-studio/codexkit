@@ -746,3 +746,93 @@ func TestModelPinFreshness_OverlapGuardDoesNotDoubleReport(t *testing.T) {
 		t.Errorf("message = %q, want %q (gpt-5.4 must not have matched)", findings[0].Message, want)
 	}
 }
+
+// --- mcp_spec_target ---
+
+func setupSpecTargetRepo(t *testing.T, protocolVersion, registryJSON string) string {
+	t.Helper()
+	root := t.TempDir()
+	repoDir := filepath.Join(root, "repo")
+	if err := os.MkdirAll(repoDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if protocolVersion != "" {
+		writeFile(t, repoDir, filepath.Join(".well-known", "mcp.json"), `{"protocolVersion": "`+protocolVersion+`"}`)
+	}
+	if registryJSON != "" {
+		writeFile(t, root, filepath.Join("workspace", "mcp-spec-target.json"), registryJSON)
+	}
+	return repoDir
+}
+
+const testSpecRegistry = `{"version":1,"current":"2026-07-28","fleet_target":"2025-11-25","compat_deadline":"2027-07-28"}`
+
+func TestMCPSpecTarget_OlderThanFleetTargetFails(t *testing.T) {
+	withNow(t, "2026-08-01")
+	dir := setupSpecTargetRepo(t, "2024-11-05", testSpecRegistry)
+
+	report := Check(dir)
+	findings := findingsFor(report, "mcp_spec_target")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 mcp_spec_target finding, got %d: %#v", len(findings), findings)
+	}
+	if findings[0].Passed {
+		t.Fatalf("expected FAIL for spec older than fleet target, got PASS: %s", findings[0].Message)
+	}
+}
+
+func TestMCPSpecTarget_EqualsFleetTargetPassesWithNote(t *testing.T) {
+	withNow(t, "2026-08-01")
+	dir := setupSpecTargetRepo(t, "2025-11-25", testSpecRegistry)
+
+	report := Check(dir)
+	findings := findingsFor(report, "mcp_spec_target")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 mcp_spec_target finding, got %d: %#v", len(findings), findings)
+	}
+	if !findings[0].Passed {
+		t.Fatalf("expected PASS-with-note at fleet target, got FAIL: %s", findings[0].Message)
+	}
+	want := "spec 2025-11-25 behind current 2026-07-28; compat window until 2027-07-28"
+	if findings[0].Message != want {
+		t.Errorf("message = %q, want %q", findings[0].Message, want)
+	}
+}
+
+func TestMCPSpecTarget_EqualsCurrentCleanPass(t *testing.T) {
+	withNow(t, "2026-08-01")
+	dir := setupSpecTargetRepo(t, "2026-07-28", testSpecRegistry)
+
+	report := Check(dir)
+	findings := findingsFor(report, "mcp_spec_target")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 mcp_spec_target finding, got %d: %#v", len(findings), findings)
+	}
+	if !findings[0].Passed {
+		t.Fatalf("expected clean PASS at current spec, got FAIL: %s", findings[0].Message)
+	}
+}
+
+func TestMCPSpecTarget_AbsentFileSkips(t *testing.T) {
+	dir := setupSpecTargetRepo(t, "", testSpecRegistry)
+
+	report := Check(dir)
+	findings := findingsFor(report, "mcp_spec_target")
+	if len(findings) != 0 {
+		t.Fatalf("expected no mcp_spec_target findings when .well-known/mcp.json is absent, got %#v", findings)
+	}
+}
+
+func TestMCPSpecTarget_PastDeadlineFails(t *testing.T) {
+	withNow(t, "2027-08-01") // past compat_deadline 2027-07-28
+	dir := setupSpecTargetRepo(t, "2025-11-25", testSpecRegistry)
+
+	report := Check(dir)
+	findings := findingsFor(report, "mcp_spec_target")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 mcp_spec_target finding, got %d: %#v", len(findings), findings)
+	}
+	if findings[0].Passed {
+		t.Fatalf("expected FAIL once compat deadline has passed, got PASS: %s", findings[0].Message)
+	}
+}
