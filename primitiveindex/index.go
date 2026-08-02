@@ -23,6 +23,12 @@ const IndexKind = "workspace agent primitive index"
 type Options struct {
 	WorkspaceRoot string
 	GeneratedAt   string
+	// OverlayPath, when set, points at a workspace.Overlay file applied to
+	// the manifest before repo metadata (scope, baseline_target) is looked
+	// up. The primitive scan itself always walks WorkspaceRoot in one pass,
+	// so an overlay does not relocate which files are scanned for a repo —
+	// only the manifest-derived metadata attached to its primitives.
+	OverlayPath string
 }
 
 // CheckOptions controls primitive-index artifact validation.
@@ -31,6 +37,7 @@ type CheckOptions struct {
 	JSONPath      string
 	MarkdownPath  string
 	SkipArtifacts bool
+	OverlayPath   string
 }
 
 // Index captures all discovered agent primitives.
@@ -112,7 +119,7 @@ func Build(opts Options) (Index, error) {
 		generatedAt = time.Now().UTC().Format(time.RFC3339)
 	}
 
-	manifest, err := workspace.LoadManifest(root)
+	manifest, err := workspace.LoadManifestWithOverlay(root, opts.OverlayPath)
 	if err != nil {
 		return Index{}, err
 	}
@@ -187,7 +194,7 @@ func Check(opts CheckOptions) (CheckReport, error) {
 		}
 	}
 
-	index, err := Build(Options{WorkspaceRoot: root, GeneratedAt: generatedAt})
+	index, err := Build(Options{WorkspaceRoot: root, GeneratedAt: generatedAt, OverlayPath: opts.OverlayPath})
 	if err != nil {
 		return CheckReport{}, err
 	}

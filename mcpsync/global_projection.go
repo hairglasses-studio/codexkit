@@ -333,7 +333,7 @@ func buildProviderProjections(root string, manifest workspace.Manifest) ([]Provi
 		}
 	}
 	for _, repo := range manifest.Filter(workspace.Filter{BaselineOnly: true}) {
-		repoPath := filepath.Join(root, repo.Name)
+		repoPath := workspace.RepoPath(root, repo)
 		if _, err := os.Stat(repoPath); err != nil {
 			continue
 		}

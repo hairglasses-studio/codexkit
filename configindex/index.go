@@ -167,7 +167,7 @@ func Build(opts Options) (Index, error) {
 	seenPaths := make(map[string]struct{})
 	for _, repo := range manifest.Repos {
 		manifested[repo.Name] = struct{}{}
-		repoRoot := filepath.Join(root, repo.Name)
+		repoRoot := workspace.RepoPath(root, repo)
 		exists := isGitRepo(repoRoot)
 		index.Repos = append(index.Repos, Repo{
 			Name: repo.Name, Path: repoRoot, Lifecycle: repo.Lifecycle,

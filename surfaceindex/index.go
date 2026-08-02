@@ -240,7 +240,7 @@ func Build(opts Options) (Index, error) {
 	}
 
 	for _, repo := range manifest.Filter(workspace.Filter{BaselineOnly: true}) {
-		repoPath := filepath.Join(root, repo.Name)
+		repoPath := workspace.RepoPath(root, repo)
 		entry := RepoEntry{
 			Name:           repo.Name,
 			Path:           relPath(root, repoPath),

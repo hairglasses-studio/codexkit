@@ -15,6 +15,26 @@ type Repo struct {
 	BaselineTarget bool   `json:"baseline_target"`
 	GoWorkMember   bool   `json:"go_work_member"`
 	Lifecycle      string `json:"lifecycle"`
+	// Path overrides the checkout location derived from the workspace root.
+	// Absolute paths are used as-is; relative paths are resolved against the
+	// workspace root. Empty means the default root/<name> location. Set via
+	// an --overlay file (see LoadOverlay/ApplyOverlay) for managed-worktree
+	// or relocated-checkout scenarios; not part of the checked-in manifest.
+	Path string `json:"path,omitempty"`
+}
+
+// RepoPath resolves the on-disk checkout location for repo, honoring an
+// overlay-provided Path override when set. This is the single source of
+// truth for repo-path derivation; every workspace-manifest-driven check
+// should call this instead of filepath.Join(root, repo.Name) directly.
+func RepoPath(root string, repo Repo) string {
+	if repo.Path == "" {
+		return filepath.Join(root, repo.Name)
+	}
+	if filepath.IsAbs(repo.Path) {
+		return filepath.Clean(repo.Path)
+	}
+	return filepath.Join(root, repo.Path)
 }
 
 // Manifest is the canonical machine-readable workspace inventory.

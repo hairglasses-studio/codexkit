@@ -96,15 +96,23 @@ func Check(repoPath string) Report {
 // participate in fleet baseline checks. Compatibility/reference repos remain
 // visible to workspace checks, but they should not fail the active baseline.
 func DiscoverWorkspaceTargets(scanPath string) ([]string, error) {
+	return DiscoverWorkspaceTargetsWithOverlay(scanPath, "")
+}
+
+// DiscoverWorkspaceTargetsWithOverlay is DiscoverWorkspaceTargets with an
+// optional --overlay file applied to the manifest before repo paths are
+// derived, so a relocated checkout (e.g. a managed worktree) is what gets
+// baseline-checked instead of the default root/<name> location.
+func DiscoverWorkspaceTargetsWithOverlay(scanPath, overlayPath string) ([]string, error) {
 	scanPath = filepath.Clean(scanPath)
-	manifest, err := workspace.LoadManifest(scanPath)
+	manifest, err := workspace.LoadManifestWithOverlay(scanPath, overlayPath)
 	if err == nil {
 		paths := make([]string, 0, len(manifest.Repos))
 		for _, repo := range manifest.Repos {
 			if !repo.BaselineTarget && !strings.HasPrefix(repo.Scope, "active_") {
 				continue
 			}
-			repoPath := filepath.Join(scanPath, repo.Name)
+			repoPath := workspace.RepoPath(scanPath, repo)
 			if isGitRepoPath(repoPath) {
 				paths = append(paths, repoPath)
 			}

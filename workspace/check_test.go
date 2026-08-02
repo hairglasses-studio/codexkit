@@ -29,6 +29,41 @@ func TestCheck_FailsWhenRequiredRepoDirectoryMissing(t *testing.T) {
 	}
 }
 
+func TestCheck_OverlayRelocatesRepoPathUsedForFindings(t *testing.T) {
+	root := t.TempDir()
+	// The default location exists but is not a go module — if the overlay
+	// were ignored, go_module would fail here.
+	if err := os.MkdirAll(filepath.Join(root, "active-repo"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// The overlay-relocated checkout is a real go module elsewhere on disk.
+	relocated := t.TempDir()
+	if err := os.WriteFile(filepath.Join(relocated, "go.mod"), []byte("module active-repo\n\ngo 1.26.1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	manifest := Manifest{
+		Version: 1,
+		Repos: []Repo{
+			{
+				Name:         "active-repo",
+				Scope:        "active_first_party",
+				GoWorkMember: true,
+				Path:         relocated,
+			},
+		},
+	}
+	if err := os.WriteFile(filepath.Join(root, "go.work"), []byte("go 1.26.1\nuse ./active-repo\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report := Check(root, manifest)
+	if !hasFinding(report.Findings, "go_module", "active-repo", true, "") {
+		t.Fatalf("expected go_module to pass using the overlay-relocated path; findings: %#v", report.Findings)
+	}
+}
+
 func TestCheck_AllowsMissingArchivedCompatibilityClone(t *testing.T) {
 	root := t.TempDir()
 	docsRoot := filepath.Join(root, "docs-source")

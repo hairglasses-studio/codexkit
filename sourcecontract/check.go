@@ -20,6 +20,9 @@ type CheckOptions struct {
 	ToolsOnly            bool
 	SkipRuntimeInventory bool
 	SkillValidatorMode   skillsync.ValidatorMode
+	// OverlayPath, when set, points at a workspace.Overlay file applied to
+	// the manifest before repo paths are derived (see workspace.RepoPath).
+	OverlayPath string
 }
 
 // OptionsSummary records the source-contract scope used to build a report.
@@ -75,7 +78,7 @@ func Check(root string, opts CheckOptions) (Report, error) {
 	}
 	root = filepath.Clean(root)
 
-	manifest, err := workspace.LoadManifest(root)
+	manifest, err := workspace.LoadManifestWithOverlay(root, opts.OverlayPath)
 	if err != nil {
 		return Report{Root: root}, err
 	}
@@ -92,7 +95,7 @@ func Check(root string, opts CheckOptions) (Report, error) {
 	}
 
 	for _, repo := range manifest.Filter(workspace.Filter{BaselineOnly: true}) {
-		repoPath := filepath.Join(root, repo.Name)
+		repoPath := workspace.RepoPath(root, repo)
 		if _, err := os.Stat(repoPath); err != nil {
 			continue
 		}

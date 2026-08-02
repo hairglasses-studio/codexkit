@@ -174,7 +174,7 @@ func Score(root string, opts Options) (Report, error) {
 }
 
 func scoreRepo(root string, repo workspace.Repo, fleetMode string) RepoScore {
-	repoPath := filepath.Join(root, repo.Name)
+	repoPath := workspace.RepoPath(root, repo)
 	score := RepoScore{
 		RepoName:       repo.Name,
 		RepoPath:       repoPath,

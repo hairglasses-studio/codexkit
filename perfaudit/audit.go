@@ -170,7 +170,7 @@ func Audit(root string, opts Options) Report {
 	report.Summary.Scope = selectedScopeLabel(opts)
 	report.Repos = make([]RepoReport, 0, len(repos))
 	for _, repo := range repos {
-		repoPath := filepath.Join(root, repo.Name)
+		repoPath := workspace.RepoPath(root, repo)
 		if _, err := os.Stat(repoPath); err != nil {
 			continue
 		}

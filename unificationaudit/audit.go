@@ -314,7 +314,7 @@ func selectRepos(root string, opts Options) ([]repoInput, []string, error) {
 			if !opts.AllScopes && repo.Scope != "active_operator" && repo.Scope != "active_first_party" {
 				continue
 			}
-			repoPath := filepath.Join(root, repo.Name)
+			repoPath := workspace.RepoPath(root, repo)
 			if info, err := os.Stat(repoPath); err != nil || !info.IsDir() {
 				continue
 			}

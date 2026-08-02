@@ -95,7 +95,8 @@ func printUsage() {
 	fmt.Println(`codexkit — Codex fleet management toolkit
 
 Commands:
-  baseline check <repo|--all>   Run baseline-guard validation
+  baseline check <repo|--all> [--overlay <file>]
+                                Run baseline-guard validation
   skills sync <repo>            Sync skills to .claude/skills/ and plugins/
   skills diff <repo>            Show what skill sync would change
   skills check <repo>           Fail when managed skill mirrors drift
@@ -109,7 +110,8 @@ Commands:
   provider sync <repo>          Apply legacy provider settings parity during migration
   fleet audit [scan_path]       Run full audit on all repos
   fleet report [scan_path]      Summary report of fleet health
-  workspace check [root]        Validate workspace/manifest.json and go.work
+  workspace check [root] [--overlay <file>]
+                                Validate workspace/manifest.json and go.work
   workspace generate-manifest [root] [--write|--json]
                                 Generate workspace/manifest.json from live repos and docs metadata
   workspace runtime-inventory [root] [--json] [--json-out <path>] [--markdown-out <path>] [--policy <path>]
@@ -124,7 +126,7 @@ Commands:
                                  Sync workspace-global Claude, Codex, and Gemini MCP overlays
   workspace diff-preview --left <path> --right <path> --rel <path> --kind <kind> [--lines <n>]
                                  Render one JSON diff-preview record matching the dotfiles manual projection contract
-  workspace source-contract-check [root] [--json] [--json-out <path>] [--json-path <path>] [--skills-only|--tools-only] [--skip-runtime-inventory] [--skill-validator auto|host|pinned|off]
+  workspace source-contract-check [root] [--json] [--json-out <path>] [--json-path <path>] [--skills-only|--tools-only] [--skip-runtime-inventory] [--skill-validator auto|host|pinned|off] [--overlay <file>]
                                  Fail when repo-controlled workspace, skill, MCP, runtime inventory, or global MCP projection sources drift
   workspace surface-index [root] [--json] [--json-out <path>] [--markdown-out <path>] [--skill-validator auto|host|pinned|off]
                                 Build a baseline repo agent surface index
@@ -132,7 +134,7 @@ Commands:
                                 Fail when generated repo surface index artifacts drift
   workspace primitive-index [root] [--json] [--json-out <path>] [--markdown-out <path>]
                                 Build a workspace index of hooks, provider agents, plugin manifests, nested MCP files, and related agent primitives
-  workspace primitive-index-check [root] [--json] [--json-path <path>] [--markdown-path <path>] [--skip-artifacts]
+  workspace primitive-index-check [root] [--json] [--json-path <path>] [--markdown-path <path>] [--skip-artifacts] [--overlay <file>]
                                 Fail when generated workspace agent primitive artifacts drift
   workspace config-index [root] [--json] [--json-out <path>] [--markdown-out <path>] [--user-home <path>] [--root-home <path>] [--runtime-stats]
                                 Inventory and classify repo, dotfiles, Claude, Codex, AGY, user-home, and root-home configuration
@@ -169,9 +171,35 @@ func hasFlag(args []string, flag string) bool {
 	return false
 }
 
+// takeFlagValue extracts a "--flag value" pair from args, returning the value,
+// the remaining args with that pair removed, and whether the flag was present
+// at all. err is set when the flag appears without a following value.
+func takeFlagValue(args []string, flag string) (value string, rest []string, present bool, err error) {
+	rest = make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if args[i] == flag {
+			present = true
+			if i+1 >= len(args) {
+				return "", nil, true, fmt.Errorf("%s requires a value", flag)
+			}
+			value = args[i+1]
+			i++
+			continue
+		}
+		rest = append(rest, args[i])
+	}
+	return value, rest, present, nil
+}
+
 func runBaseline(args []string) {
 	if len(args) == 0 || args[0] != "check" {
 		fmt.Fprintln(os.Stderr, "usage: codexkit baseline check <repo_path|--all>")
+		os.Exit(1)
+	}
+
+	overlayPath, args, _, err := takeFlagValue(args, "--overlay")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
@@ -181,7 +209,7 @@ func runBaseline(args []string) {
 	if len(args) > 1 && args[1] == "--all" {
 		home, _ := os.UserHomeDir()
 		studioDir := filepath.Join(home, "hairglasses-studio")
-		discovered, err := baselineguard.DiscoverWorkspaceTargets(studioDir)
+		discovered, err := baselineguard.DiscoverWorkspaceTargetsWithOverlay(studioDir, overlayPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error discovering baseline targets in %s: %v\n", studioDir, err)
 			os.Exit(1)
@@ -190,7 +218,7 @@ func runBaseline(args []string) {
 	} else if len(args) > 1 && args[1] != "--json" {
 		paths = append(paths, args[1])
 	} else {
-		fmt.Fprintln(os.Stderr, "usage: codexkit baseline check <repo_path|--all>")
+		fmt.Fprintln(os.Stderr, "usage: codexkit baseline check <repo_path|--all> [--overlay <file>]")
 		os.Exit(1)
 	}
 
@@ -940,16 +968,21 @@ func runWorkspace(args []string) {
 
 	switch args[0] {
 	case "check":
-		jsonOut := hasFlag(args, "--json")
+		overlayPath, rest, _, err := takeFlagValue(args[1:], "--overlay")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		jsonOut := hasFlag(rest, "--json")
 		root := workspace.DefaultRoot()
-		for _, arg := range args[1:] {
+		for _, arg := range rest {
 			if arg != "--json" {
 				root = arg
 				break
 			}
 		}
 
-		manifest, err := workspace.LoadManifest(root)
+		manifest, err := workspace.LoadManifestWithOverlay(root, overlayPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
@@ -1585,6 +1618,12 @@ func runWorkspaceSourceContractCheck(args []string) (bool, error) {
 			opts.ToolsOnly = true
 		case arg == "--skip-runtime-inventory":
 			opts.SkipRuntimeInventory = true
+		case arg == "--overlay":
+			i++
+			if i >= len(args) {
+				return false, fmt.Errorf("--overlay requires a path")
+			}
+			opts.OverlayPath = args[i]
 		case arg == "--skill-validator":
 			i++
 			if i >= len(args) {
@@ -2071,6 +2110,7 @@ func runWorkspacePrimitiveIndexCheck(args []string) (bool, error) {
 	jsonPath := ""
 	markdownPath := ""
 	skipArtifacts := false
+	overlayPath := ""
 	rootSet := false
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -2091,6 +2131,12 @@ func runWorkspacePrimitiveIndexCheck(args []string) (bool, error) {
 			markdownPath = args[i]
 		case arg == "--skip-artifacts":
 			skipArtifacts = true
+		case arg == "--overlay":
+			i++
+			if i >= len(args) {
+				return false, fmt.Errorf("--overlay requires a path")
+			}
+			overlayPath = args[i]
 		default:
 			if strings.HasPrefix(arg, "-") {
 				return false, fmt.Errorf("unknown flag: %s", arg)
@@ -2108,6 +2154,7 @@ func runWorkspacePrimitiveIndexCheck(args []string) (bool, error) {
 		JSONPath:      jsonPath,
 		MarkdownPath:  markdownPath,
 		SkipArtifacts: skipArtifacts,
+		OverlayPath:   overlayPath,
 	})
 	if err != nil {
 		return false, err

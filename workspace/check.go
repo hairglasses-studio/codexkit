@@ -47,7 +47,7 @@ func Check(root string, manifest Manifest) Report {
 			continue
 		}
 		manifestRepos[repo.Name] = repo
-		repoPath := filepath.Join(root, repo.Name)
+		repoPath := RepoPath(root, repo)
 		if _, err := os.Stat(repoPath); err != nil {
 			if repoDirectoryRequired(repo, matrixStatus.decisions[repo.Name]) {
 				report.add("repo_directory", repo.Name, false, "missing directory")
