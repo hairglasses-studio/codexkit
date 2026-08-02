@@ -165,6 +165,11 @@ func TestCheckAllowsHistoricalMentionsButRejectsActiveLegacyProjection(t *testin
 	write(t, root, "workspace/manifest.json", `{"version":1,"repos":[{"name":"app","scope":"active_product","lifecycle":"active","baseline_target":true}]}`)
 	runGit(t, filepath.Join(root, "app"), "init", "--quiet")
 	write(t, root, "app/docs/migrations/copilot-retirement.md", "Copilot and Gemini CLI were retired.\n")
+	write(t, root, "app/whiteclaw/GEMINI.md", "historical source archive instructions\n")
+	write(t, root, "app/whiteclaw/.github/agents/source.agent.md", "historical source archive agent\n")
+	write(t, root, "app/.gemini/settings.json", `{"context":{"fileName":["AGENTS.md"]}}`)
+	write(t, root, "app/.gemini/hooks.json", `{"hooks":{}}`)
+	write(t, root, "app/.gemini/rules/clients.md", "AGY runtime rule\n")
 	runGit(t, filepath.Join(root, "app"), "add", ".")
 
 	report, err := Check(Options{WorkspaceRoot: root, GeneratedAt: "2026-08-01T00:00:00Z"})
@@ -202,6 +207,7 @@ func TestCheckCollapsesDifferentLegacySurfacesByRepository(t *testing.T) {
 	runGit(t, filepath.Join(root, "app"), "init", "--quiet")
 	write(t, root, "app/GEMINI.md", "legacy instructions\n")
 	write(t, root, "app/.gemini/commands/legacy.toml", "description = \"legacy\"\n")
+	write(t, root, "app/.gemini/skills/legacy/SKILL.md", "legacy\n")
 	write(t, root, "app/.github/skills/legacy/SKILL.md", "legacy\n")
 	runGit(t, filepath.Join(root, "app"), "add", ".")
 

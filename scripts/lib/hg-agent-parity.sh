@@ -264,18 +264,6 @@ hg_parity_repo_has_ralph() {
   [[ -f "$repo_path/.ralphrc" || -d "$repo_path/.ralph" ]]
 }
 
-hg_parity_gemini_extension_name() {
-  local repo_name="$1"
-  printf '%s-workspace\n' "$(hg_parity_kebab_case_server_name "$repo_name")"
-}
-
-hg_parity_gemini_extension_relpath() {
-  local repo_name="$1"
-  local ext_name
-  ext_name="$(hg_parity_gemini_extension_name "$repo_name")"
-  printf '.gemini/extensions/%s/gemini-extension.json\n' "$ext_name"
-}
-
 hg_parity_gemini_owner_path() {
   local repo_path="$1"
   printf '%s\n' "$repo_path/.gemini/.hg-gemini-settings-sync.json"
@@ -448,12 +436,6 @@ hg_parity_unsupported_source_hook_rule_count() {
   ' "$settings_path"
 }
 
-hg_parity_repo_requires_gemini_extension() {
-  local repo_path="$1"
-  local repo_name="$2"
-  [[ "$(hg_parity_repo_objective_bool "$repo_name" "gemini_extension_scaffold" "false")" == "true" ]]
-}
-
 hg_parity_render_claude_settings() {
   local repo_path="$1"
   local current_json generated_mcp has_mcp_file
@@ -552,27 +534,6 @@ hg_parity_render_gemini_settings() {
         else
           del(.hooks)
         end
-    '
-}
-
-hg_parity_render_gemini_extension() {
-  local repo_path="$1"
-  local repo_name="$2"
-  if ! hg_parity_repo_requires_gemini_extension "$repo_path" "$repo_name"; then
-    printf '{}\n'
-    return 0
-  fi
-
-  local ext_name
-  ext_name="$(hg_parity_gemini_extension_name "$repo_name")"
-
-  jq -S -n \
-    --arg name "$ext_name" '
-      {
-        name: $name,
-        version: "1.0.0",
-        contextFileName: "GEMINI.md"
-      }
     '
 }
 

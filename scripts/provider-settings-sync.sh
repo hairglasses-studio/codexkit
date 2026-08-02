@@ -271,18 +271,22 @@ sync_provider_settings() {
       ;;
   esac
 
-  if hg_parity_repo_requires_gemini_extension "$REPO_PATH" "$REPO_NAME"; then
-    local extension_rel extension_expected
-    extension_rel="$(hg_parity_gemini_extension_relpath "$REPO_NAME")"
-    extension_expected="$(hg_parity_render_gemini_extension "$REPO_PATH" "$REPO_NAME")"
-    if [[ "$MODE" == "check" ]]; then
-      check_required_extension "$extension_rel" "$extension_expected"
-    else
-      write_text_file "$extension_rel" "$extension_expected" "gemini-extension"
-    fi
-  else
-    report_current "gemini-extension (not managed)"
-  fi
+  local retired_rel retired_path
+  for retired_rel in ".gemini/config.yaml" ".gemini/commands" ".gemini/skills" ".gemini/extensions"; do
+    retired_path="$REPO_PATH/$retired_rel"
+    [[ -e "$retired_path" ]] || continue
+    case "$MODE" in
+      write)
+        rm -rf -- "$retired_path"
+        printf "%s%-20s %s (retired)%s\n" "$HG_GREEN" "$REPO_NAME" "$retired_rel" "$HG_RESET"
+        UPDATED=$((UPDATED + 1))
+        ;;
+      dry-run|check)
+        hg_warn "$REPO_NAME: retired provider surface still exists: $retired_rel"
+        mark_failure
+        ;;
+    esac
+  done
 }
 
 sync_provider_settings

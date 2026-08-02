@@ -104,7 +104,7 @@ build_repo_rg_args() {
 inventory_csv=""
 inventory_json_rows=""
 json_separator=""
-inventory_md=$'| Repo | `claude mcp` | `.claude/settings.json` refs | `claude_desktop_config.json` | `AGENTS.md` | `AGENTS.override.md` | `CLAUDE.md` | `GEMINI.md` | `copilot-instructions.md` | `.codex/config.toml` | project-local profiles | `.agents/skills/surface.yaml` | canonical `.agents/skills/*` | generated `.claude/skills/*` | generated plugin skills | `skills` | `roadmap` | `.ralph` | `.mcp.json` | repo MCP servers | MCP discovery contract | MCP resources | MCP prompts | MCP server health | full MCP contract | MCP policy files | generated MCP configs | unmanaged MCP blocks | example-only `.mcp.json` | Codex MCP servers | curated Codex MCP servers | raw Codex MCP servers | legacy pre-`gpt-5.5` GPT | `.mcp.json` without policy | `.mcp.json` without curated Codex | `.codex/agents/*.toml` | `.codex-plugin` | Codex workflows | `codex_hooks = true` | root `.claude/settings.json` | root `.gemini/settings.json` | legacy `.gemini/config.yaml` | generated `.gemini/settings.json` | Gemini MCP servers | Gemini translated hooks | Claude-only hook gaps | Gemini extensions | provider MCP bridge | provider hook bridge | provider drift | provider runtime drift |\n|------|--------------:|-----------------------------:|-----------------------------:|-----------:|--------------------:|-----------:|-----------:|--------------------------:|---------------------:|--------------:|-------------------------------:|----------------------------:|----------------------------:|------------------------:|-----------:|-----------------:|-----------------------:|----------------:|--------------:|--------------------:|--------------------:|-----------------:|----------------------:|---------------------:|----------------------:|------------------:|--------------------------:|---------------------:|------------------------:|--------------------------:|-------------------------------:|-------------------------:|----------------:|----------------:|----------------------:|------------------------------:|------------------------------:|-------------------------------:|---------------------------------:|-------------------:|------------------------:|----------------------:|------------------:|--------------------:|---------------------:|----------------------:|-----------------------:|--------------------:|-------------------------:|\n'
+inventory_md=$'| Repo | `claude mcp` | `.claude/settings.json` refs | `claude_desktop_config.json` | `AGENTS.md` | `AGENTS.override.md` | `CLAUDE.md` | `GEMINI.md` | `copilot-instructions.md` | `.codex/config.toml` | project-local profiles | `.agents/skills/surface.yaml` | canonical `.agents/skills/*` | generated `.claude/skills/*` | generated plugin skills | `skills` | `roadmap` | `.ralph` | `.mcp.json` | repo MCP servers | MCP discovery contract | MCP resources | MCP prompts | MCP server health | full MCP contract | MCP policy files | generated MCP configs | unmanaged MCP blocks | example-only `.mcp.json` | Codex MCP servers | curated Codex MCP servers | raw Codex MCP servers | legacy pre-`gpt-5.5` GPT | `.mcp.json` without policy | `.mcp.json` without curated Codex | `.codex/agents/*.toml` | `.codex-plugin` | Codex workflows | `codex_hooks = true` | root `.claude/settings.json` | root `.gemini/settings.json` | legacy `.gemini/config.yaml` | generated `.gemini/settings.json` | Gemini MCP servers | Gemini translated hooks | Claude-only hook gaps | retired Gemini extensions | provider MCP bridge | provider hook bridge | provider drift | provider runtime drift |\n|------|--------------:|-----------------------------:|-----------------------------:|-----------:|--------------------:|-----------:|-----------:|--------------------------:|---------------------:|--------------:|-------------------------------:|----------------------------:|----------------------------:|------------------------:|-----------:|-----------------:|-----------------------:|----------------:|--------------:|--------------------:|--------------------:|-----------------:|----------------------:|---------------------:|----------------------:|------------------:|--------------------------:|---------------------:|------------------------:|--------------------------:|-------------------------------:|-------------------------:|----------------:|----------------:|----------------------:|------------------------------:|------------------------------:|-------------------------------:|---------------------------------:|-------------------:|------------------------:|----------------------:|------------------:|--------------------:|---------------------:|----------------------:|-----------------------:|--------------------:|-------------------------:|\n'
 
 count_matches() {
   local repo="$1"
@@ -630,8 +630,8 @@ total_gemini_translated_hook_rules=0
 total_claude_only_hook_gaps=0
 total_missing_codex=0
 total_missing_plugins=0
-total_missing_copilot=0
-total_missing_gemini=0
+total_retired_copilot_present=0
+total_retired_gemini_present=0
 total_missing_skill_surfaces=0
 total_with_project_local_profiles=0
 total_with_codex_agents=0
@@ -678,8 +678,8 @@ total_active_operator_repos=0
 total_active_first_party_repos=0
 total_excluded_repos=0
 total_active_missing_agents=0
-total_active_missing_gemini=0
-total_active_missing_copilot=0
+total_active_retired_gemini_present=0
+total_active_retired_copilot_present=0
 total_active_missing_codex=0
 total_active_missing_root_claude_settings=0
 total_active_missing_root_gemini_settings=0
@@ -838,8 +838,8 @@ for repo in "${repos[@]}"; do
   [[ "$root_gemini_settings" -eq 0 ]] && total_missing_root_gemini_settings=$((total_missing_root_gemini_settings + 1))
   [[ "$codex_config" -eq 0 ]] && total_missing_codex=$((total_missing_codex + 1))
   [[ "$codex_plugin" -eq 0 ]] && total_missing_plugins=$((total_missing_plugins + 1))
-  [[ "$copilot_instructions" -eq 0 ]] && total_missing_copilot=$((total_missing_copilot + 1))
-  [[ "$gemini_md" -eq 0 ]] && total_missing_gemini=$((total_missing_gemini + 1))
+  [[ "$copilot_instructions" -gt 0 ]] && total_retired_copilot_present=$((total_retired_copilot_present + 1))
+  [[ "$gemini_md" -gt 0 ]] && total_retired_gemini_present=$((total_retired_gemini_present + 1))
   [[ "$skill_surface_manifest" -eq 0 ]] && total_missing_skill_surfaces=$((total_missing_skill_surfaces + 1))
   [[ "$codex_project_local_profiles" -gt 0 ]] && total_with_project_local_profiles=$((total_with_project_local_profiles + 1))
   [[ "$canonical_skills" -gt 0 ]] && total_with_canonical_skills=$((total_with_canonical_skills + 1))
@@ -915,8 +915,8 @@ for repo in "${repos[@]}"; do
     [[ "$agents_md" -eq 0 ]] && total_active_missing_agents=$((total_active_missing_agents + 1))
     [[ "$root_claude_settings" -eq 0 ]] && total_active_missing_root_claude_settings=$((total_active_missing_root_claude_settings + 1))
     [[ "$root_gemini_settings" -eq 0 ]] && total_active_missing_root_gemini_settings=$((total_active_missing_root_gemini_settings + 1))
-    [[ "$gemini_md" -eq 0 ]] && total_active_missing_gemini=$((total_active_missing_gemini + 1))
-    [[ "$copilot_instructions" -eq 0 ]] && total_active_missing_copilot=$((total_active_missing_copilot + 1))
+    [[ "$gemini_md" -gt 0 ]] && total_active_retired_gemini_present=$((total_active_retired_gemini_present + 1))
+    [[ "$copilot_instructions" -gt 0 ]] && total_active_retired_copilot_present=$((total_active_retired_copilot_present + 1))
     [[ "$codex_config" -eq 0 ]] && total_active_missing_codex=$((total_active_missing_codex + 1))
     [[ "$codex_project_local_profiles" -gt 0 ]] && total_active_with_project_local_profiles=$((total_active_with_project_local_profiles + 1))
     [[ "$expected_codex_agents" -eq 1 && "$codex_agents" -eq 0 ]] && total_active_missing_codex_agents=$((total_active_missing_codex_agents + 1))
@@ -1055,8 +1055,8 @@ generated .gemini/settings.json files: $total_generated_gemini_settings
 Gemini MCP server entries: $total_gemini_mcp_servers
 Gemini translated hook rules: $total_gemini_translated_hook_rules
 Claude-only hook gaps: $total_claude_only_hook_gaps
-repos missing GEMINI.md: $total_missing_gemini
-repos missing .github/copilot-instructions.md: $total_missing_copilot
+repos with retired GEMINI.md: $total_retired_gemini_present
+repos with retired .github/copilot-instructions.md: $total_retired_copilot_present
 repos missing .codex/config.toml: $total_missing_codex
 repos missing .codex-plugin/plugin.json: $total_missing_plugins
 repos missing .agents/skills/surface.yaml: $total_missing_skill_surfaces
@@ -1091,7 +1091,7 @@ repos with .codex/agents/*.toml: $total_with_codex_agents
 repos with Codex workflows: $total_with_codex_workflows
 repos with AGENTS.override.md: $total_with_agents_override
 repos with codex_hooks enabled: $total_with_codex_hooks
-repos with Gemini extension scaffolds: $total_repos_with_gemini_extensions
+repos with retired Gemini extension scaffolds: $total_repos_with_gemini_extensions
 repos with provider MCP bridge: $total_repos_with_provider_mcp_bridge
 repos with provider hook bridge: $total_repos_with_provider_hook_bridge
 repos with provider drift: $total_repos_with_provider_drift
@@ -1102,8 +1102,8 @@ excluded repos: $total_excluded_repos
 active repos missing AGENTS.md: $total_active_missing_agents
 active repos missing root .claude/settings.json: $total_active_missing_root_claude_settings
 active repos missing root .gemini/settings.json: $total_active_missing_root_gemini_settings
-active repos missing GEMINI.md: $total_active_missing_gemini
-active repos missing .github/copilot-instructions.md: $total_active_missing_copilot
+active repos with retired GEMINI.md: $total_active_retired_gemini_present
+active repos with retired .github/copilot-instructions.md: $total_active_retired_copilot_present
 active repos missing .codex/config.toml: $total_active_missing_codex
 active repos with unsupported project-local Codex profile configs: $total_active_with_project_local_profiles
 active operator repos missing .codex/agents/*.toml: $total_active_missing_codex_agents
@@ -1148,8 +1148,8 @@ inventory_json="{
     \"gemini_mcp_server_entries\": ${total_gemini_mcp_servers},
     \"gemini_translated_hook_rules\": ${total_gemini_translated_hook_rules},
     \"claude_only_hook_gaps\": ${total_claude_only_hook_gaps},
-    \"repos_missing_gemini_md\": ${total_missing_gemini},
-    \"repos_missing_copilot_instructions\": ${total_missing_copilot},
+    \"repos_with_retired_gemini_md\": ${total_retired_gemini_present},
+    \"repos_with_retired_copilot_instructions\": ${total_retired_copilot_present},
     \"repos_missing_codex_config\": ${total_missing_codex},
     \"repos_missing_codex_plugin\": ${total_missing_plugins},
     \"repos_missing_skill_surface_manifest\": ${total_missing_skill_surfaces},
@@ -1197,8 +1197,8 @@ inventory_json="{
     \"active_repos_missing_agents_md\": ${total_active_missing_agents},
     \"active_repos_missing_root_claude_settings\": ${total_active_missing_root_claude_settings},
     \"active_repos_missing_root_gemini_settings\": ${total_active_missing_root_gemini_settings},
-    \"active_repos_missing_gemini_md\": ${total_active_missing_gemini},
-    \"active_repos_missing_copilot_instructions\": ${total_active_missing_copilot},
+    \"active_repos_with_retired_gemini_md\": ${total_active_retired_gemini_present},
+    \"active_repos_with_retired_copilot_instructions\": ${total_active_retired_copilot_present},
     \"active_repos_missing_codex_config\": ${total_active_missing_codex},
     \"active_repos_with_project_local_profile_configs\": ${total_active_with_project_local_profiles},
     \"active_operator_repos_missing_codex_agents\": ${total_active_missing_codex_agents},
@@ -1262,8 +1262,8 @@ Summary from the latest audit:
 - Gemini MCP server entries: ${total_gemini_mcp_servers}
 - Gemini translated hook rules: ${total_gemini_translated_hook_rules}
 - Claude-only hook gaps: ${total_claude_only_hook_gaps}
-- Repos missing \`GEMINI.md\`: ${total_missing_gemini}
-- Repos missing \`.github/copilot-instructions.md\`: ${total_missing_copilot}
+- Repos with retired \`GEMINI.md\`: ${total_retired_gemini_present}
+- Repos with retired \`.github/copilot-instructions.md\`: ${total_retired_copilot_present}
 - Repos missing \`.codex/config.toml\`: ${total_missing_codex}
 - Repos missing \`.codex-plugin/plugin.json\`: ${total_missing_plugins}
 - Repos missing \`.agents/skills/surface.yaml\`: ${total_missing_skill_surfaces}
@@ -1298,7 +1298,7 @@ Summary from the latest audit:
 - Repos with hosted Codex workflows (legacy): ${total_with_codex_workflows}
 - Repos with \`AGENTS.override.md\`: ${total_with_agents_override}
 - Repos with \`codex_hooks = true\`: ${total_with_codex_hooks}
-- Repos with Gemini extension scaffolds: ${total_repos_with_gemini_extensions}
+- Repos with retired Gemini extension scaffolds: ${total_repos_with_gemini_extensions}
 - Repos with provider MCP bridge: ${total_repos_with_provider_mcp_bridge}
 - Repos with provider hook bridge: ${total_repos_with_provider_hook_bridge}
 - Repos with provider drift: ${total_repos_with_provider_drift}
@@ -1310,8 +1310,8 @@ Summary from the latest audit:
 - Active repos missing \`AGENTS.md\`: ${total_active_missing_agents}
 - Active repos missing root \`.claude/settings.json\`: ${total_active_missing_root_claude_settings}
 - Active repos missing root \`.gemini/settings.json\`: ${total_active_missing_root_gemini_settings}
-- Active repos missing \`GEMINI.md\`: ${total_active_missing_gemini}
-- Active repos missing \`.github/copilot-instructions.md\`: ${total_active_missing_copilot}
+- Active repos with retired \`GEMINI.md\`: ${total_active_retired_gemini_present}
+- Active repos with retired \`.github/copilot-instructions.md\`: ${total_active_retired_copilot_present}
 - Active repos missing \`.codex/config.toml\`: ${total_active_missing_codex}
 - Active repos with unsupported project-local Codex profile configs: ${total_active_with_project_local_profiles}
 - Active operator repos missing \`.codex/agents/*.toml\`: ${total_active_missing_codex_agents}
@@ -1370,8 +1370,8 @@ Summary from the latest audit:
 - Gemini MCP server entries: ${total_gemini_mcp_servers}
 - Gemini translated hook rules: ${total_gemini_translated_hook_rules}
 - Claude-only hook gaps: ${total_claude_only_hook_gaps}
-- Repos missing \`GEMINI.md\`: ${total_missing_gemini}
-- Repos missing \`.github/copilot-instructions.md\`: ${total_missing_copilot}
+- Repos with retired \`GEMINI.md\`: ${total_retired_gemini_present}
+- Repos with retired \`.github/copilot-instructions.md\`: ${total_retired_copilot_present}
 - Repos missing \`.codex/config.toml\`: ${total_missing_codex}
 - Repos missing \`.codex-plugin/plugin.json\`: ${total_missing_plugins}
 - Repos with unsupported project-local Codex profile configs: ${total_with_project_local_profiles}
@@ -1402,7 +1402,7 @@ Summary from the latest audit:
 - Repos with hosted Codex workflows (legacy): ${total_with_codex_workflows}
 - Repos with \`AGENTS.override.md\`: ${total_with_agents_override}
 - Repos with \`codex_hooks = true\`: ${total_with_codex_hooks}
-- Repos with Gemini extension scaffolds: ${total_repos_with_gemini_extensions}
+- Repos with retired Gemini extension scaffolds: ${total_repos_with_gemini_extensions}
 - Repos with provider MCP bridge: ${total_repos_with_provider_mcp_bridge}
 - Repos with provider hook bridge: ${total_repos_with_provider_hook_bridge}
 - Repos with provider drift: ${total_repos_with_provider_drift}
@@ -1414,8 +1414,8 @@ Summary from the latest audit:
 - Active repos missing \`AGENTS.md\`: ${total_active_missing_agents}
 - Active repos missing root \`.claude/settings.json\`: ${total_active_missing_root_claude_settings}
 - Active repos missing root \`.gemini/settings.json\`: ${total_active_missing_root_gemini_settings}
-- Active repos missing \`GEMINI.md\`: ${total_active_missing_gemini}
-- Active repos missing \`.github/copilot-instructions.md\`: ${total_active_missing_copilot}
+- Active repos with retired \`GEMINI.md\`: ${total_active_retired_gemini_present}
+- Active repos with retired \`.github/copilot-instructions.md\`: ${total_active_retired_copilot_present}
 - Active repos missing \`.codex/config.toml\`: ${total_active_missing_codex}
 - Active repos with unsupported project-local Codex profile configs: ${total_active_with_project_local_profiles}
 - Active operator repos missing \`.codex/agents/*.toml\`: ${total_active_missing_codex_agents}

@@ -526,7 +526,7 @@ func providerForPath(path string) string {
 		return "cline"
 	}
 	if strings.Contains(lower, "/.gemini/") || strings.Contains(lower, "antigravity") || strings.Contains(base, "agy") || base == "gemini.md" {
-		if strings.Contains(lower, "/antigravity-cli/") || strings.Contains(lower, "/.gemini/config/") || strings.Contains(lower, "antigravity") || strings.Contains(base, "agy") {
+		if strings.Contains(lower, "/antigravity-cli/") || strings.Contains(lower, "/.gemini/config/") || strings.Contains(lower, "antigravity") || strings.Contains(base, "agy") || isActiveAGYRepoPath(lower) {
 			return "agy"
 		}
 		return "gemini"
@@ -572,7 +572,7 @@ func kindForPath(path string) string {
 func classificationForPath(path, scope string, tracked bool, lifecycle string) string {
 	lower := strings.ToLower(filepath.ToSlash(path))
 	base := strings.ToLower(filepath.Base(lower))
-	if strings.Contains(lower, "/imported/") || strings.Contains(lower, "/archives/") || strings.Contains(lower, "/vault/") || strings.Contains(lower, "/third_party/") || strings.Contains(lower, "/vendor/") || lifecycle == "archived" {
+	if strings.Contains(lower, "/imported/") || strings.Contains(lower, "/archives/") || strings.Contains(lower, "/whiteclaw/") || strings.Contains(lower, "/vault/") || strings.Contains(lower, "/third_party/") || strings.Contains(lower, "/vendor/") || lifecycle == "archived" {
 		return "archived_provenance"
 	}
 	if isSecretPath(lower) {
@@ -891,6 +891,7 @@ func isActiveObsoleteProjection(path string) bool {
 		"/.gemini/agents/",
 		"/.gemini/commands/",
 		"/.gemini/extensions/",
+		"/.gemini/skills/",
 	} {
 		if strings.Contains(lower, segment) {
 			return true
@@ -928,6 +929,7 @@ func obsoleteProjectionRoot(file File, repoRoots map[string]string) string {
 		"/.gemini/agents/",
 		"/.gemini/commands/",
 		"/.gemini/extensions/",
+		"/.gemini/skills/",
 	} {
 		if idx := strings.Index(lower, marker); idx >= 0 {
 			return filepath.Clean(clean[:idx+len(marker)-1])
@@ -943,10 +945,22 @@ func isLegacyGeminiPath(lower string) bool {
 		return false
 	}
 	rel := lower[idx+len(marker):]
-	if strings.HasPrefix(rel, "antigravity-cli/") || strings.HasPrefix(rel, "antigravity/") || strings.HasPrefix(rel, "config/") {
+	if strings.HasPrefix(rel, "antigravity-cli/") || strings.HasPrefix(rel, "antigravity/") || strings.HasPrefix(rel, "config/") || isActiveAGYRepoPath(lower) {
 		return false
 	}
 	return true
+}
+
+func isActiveAGYRepoPath(lower string) bool {
+	marker := "/.gemini/"
+	idx := strings.Index(lower, marker)
+	if idx < 0 {
+		return false
+	}
+	rel := lower[idx+len(marker):]
+	return rel == "settings.json" || rel == "hooks.json" ||
+		strings.HasPrefix(rel, "rules/") ||
+		rel == ".hg-gemini-settings-sync.json"
 }
 
 func isAGYHomePath(lower string) bool {
