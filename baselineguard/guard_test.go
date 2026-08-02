@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 )
@@ -578,5 +579,170 @@ approval_policy = "on-request"
 		if f.Check == "mcp_sync" && !f.Passed {
 			t.Fatalf("expected policy-derived MCP server to pass, got: %s", f.Message)
 		}
+	}
+}
+
+// --- model_pin_freshness ---
+
+// withNow overrides the package clock for the duration of a test.
+func withNow(t *testing.T, ts string) {
+	t.Helper()
+	parsed, err := time.Parse("2006-01-02", ts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orig := nowFunc
+	nowFunc = func() time.Time { return parsed }
+	t.Cleanup(func() { nowFunc = orig })
+}
+
+// setupLifecycleRepo returns a repo dir whose parent contains a
+// workspace/model-lifecycle.json registry with the given raw JSON body.
+func setupLifecycleRepo(t *testing.T, registryJSON string) string {
+	t.Helper()
+	root := t.TempDir()
+	repoDir := filepath.Join(root, "repo")
+	if err := os.MkdirAll(repoDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if registryJSON != "" {
+		writeFile(t, root, filepath.Join("workspace", "model-lifecycle.json"), registryJSON)
+	}
+	return repoDir
+}
+
+func findingsFor(report Report, check string) []Finding {
+	var out []Finding
+	for _, f := range report.Findings {
+		if f.Check == check {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func TestModelPinFreshness_RetiredPinFails(t *testing.T) {
+	withNow(t, "2026-08-01")
+	dir := setupLifecycleRepo(t, `{
+  "version": 1,
+  "models": [
+    {"id": "foo-model", "aliases": [], "provider": "test", "status": "deprecated", "retires": "2026-07-15", "replacement": "foo-replacement"}
+  ]
+}`)
+	writeFile(t, dir, ".codex/config.toml", `model = "foo-model"`)
+
+	report := Check(dir)
+	findings := findingsFor(report, "model_pin_freshness")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 model_pin_freshness finding, got %d: %#v", len(findings), findings)
+	}
+	f := findings[0]
+	if f.Passed {
+		t.Fatalf("expected FAIL for retired pin, got PASS: %s", f.Message)
+	}
+	want := "retired model pin foo-model in .codex/config.toml — migrate to foo-replacement"
+	if f.Message != want {
+		t.Errorf("message = %q, want %q", f.Message, want)
+	}
+}
+
+func TestModelPinFreshness_TenDaysOutFails(t *testing.T) {
+	withNow(t, "2026-08-01")
+	dir := setupLifecycleRepo(t, `{
+  "version": 1,
+  "models": [
+    {"id": "foo-model", "aliases": [], "provider": "test", "status": "deprecated", "retires": "2026-08-11", "replacement": "foo-replacement"}
+  ]
+}`)
+	writeFile(t, dir, ".codex/config.toml", `model = "foo-model"`)
+
+	report := Check(dir)
+	findings := findingsFor(report, "model_pin_freshness")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 model_pin_freshness finding, got %d: %#v", len(findings), findings)
+	}
+	if findings[0].Passed {
+		t.Fatalf("expected FAIL for pin retiring in 10 days, got PASS: %s", findings[0].Message)
+	}
+}
+
+func TestModelPinFreshness_TwentyDaysOutPassesWithNote(t *testing.T) {
+	withNow(t, "2026-08-01")
+	dir := setupLifecycleRepo(t, `{
+  "version": 1,
+  "models": [
+    {"id": "foo-model", "aliases": [], "provider": "test", "status": "deprecated", "retires": "2026-08-21", "replacement": "foo-replacement"}
+  ]
+}`)
+	writeFile(t, dir, ".codex/config.toml", `model = "foo-model"`)
+
+	report := Check(dir)
+	findings := findingsFor(report, "model_pin_freshness")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 model_pin_freshness finding, got %d: %#v", len(findings), findings)
+	}
+	if !findings[0].Passed {
+		t.Fatalf("expected PASS-with-note for pin retiring in 20 days, got FAIL: %s", findings[0].Message)
+	}
+	want := "deprecated model pin foo-model — plan migration to foo-replacement"
+	if findings[0].Message != want {
+		t.Errorf("message = %q, want %q", findings[0].Message, want)
+	}
+}
+
+func TestModelPinFreshness_NoDateDeprecatedPassesWithNote(t *testing.T) {
+	withNow(t, "2026-08-01")
+	dir := setupLifecycleRepo(t, `{
+  "version": 1,
+  "models": [
+    {"id": "foo-model", "aliases": [], "provider": "test", "status": "deprecated", "retires": null, "replacement": "foo-replacement"}
+  ]
+}`)
+	writeFile(t, dir, ".codex/config.toml", `model = "foo-model"`)
+
+	report := Check(dir)
+	findings := findingsFor(report, "model_pin_freshness")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 model_pin_freshness finding, got %d: %#v", len(findings), findings)
+	}
+	if !findings[0].Passed {
+		t.Fatalf("expected PASS-with-note for undated deprecated pin, got FAIL: %s", findings[0].Message)
+	}
+}
+
+func TestModelPinFreshness_AbsentRegistrySkips(t *testing.T) {
+	dir := setupLifecycleRepo(t, "")
+	writeFile(t, dir, ".codex/config.toml", `model = "foo-model"`)
+
+	report := Check(dir)
+	findings := findingsFor(report, "model_pin_freshness")
+	if len(findings) != 1 || !findings[0].Passed {
+		t.Fatalf("expected single informational pass finding for absent registry, got %#v", findings)
+	}
+	want := "model lifecycle registry absent — skipping"
+	if findings[0].Message != want {
+		t.Errorf("message = %q, want %q", findings[0].Message, want)
+	}
+}
+
+func TestModelPinFreshness_OverlapGuardDoesNotDoubleReport(t *testing.T) {
+	withNow(t, "2026-08-01")
+	dir := setupLifecycleRepo(t, `{
+  "version": 1,
+  "models": [
+    {"id": "gpt-5.4", "aliases": [], "provider": "openai", "status": "deprecated", "retires": null, "replacement": "gpt-5.6-terra"},
+    {"id": "gpt-5.4-mini", "aliases": [], "provider": "openai", "status": "deprecated", "retires": null, "replacement": "gpt-5.6-luna"}
+  ]
+}`)
+	writeFile(t, dir, ".codex/config.toml", `model = "gpt-5.4-mini"`)
+
+	report := Check(dir)
+	findings := findingsFor(report, "model_pin_freshness")
+	if len(findings) != 1 {
+		t.Fatalf("expected exactly 1 model_pin_freshness finding (no double report), got %d: %#v", len(findings), findings)
+	}
+	want := "deprecated model pin gpt-5.4-mini — plan migration to gpt-5.6-luna"
+	if findings[0].Message != want {
+		t.Errorf("message = %q, want %q (gpt-5.4 must not have matched)", findings[0].Message, want)
 	}
 }

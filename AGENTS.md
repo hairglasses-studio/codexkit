@@ -51,6 +51,7 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 | `mcp_discovery` | HTTP MCP servers have .well-known/mcp.json |
 | `a2a_awareness` | .well-known/agent.json is valid if present |
 | `skill_portability` | SKILL.md frontmatter uses only portable keys per Agent Skills standard |
+| `model_pin_freshness` | Model ids/aliases pinned in repo config are not deprecated/retired soon, per `workspace/model-lifecycle.json` |
 
 ## MCP Tools
 

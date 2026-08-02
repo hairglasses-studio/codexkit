@@ -11,7 +11,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
@@ -19,6 +21,10 @@ import (
 	"github.com/hairglasses-studio/codexkit/workspace"
 	toml "github.com/pelletier/go-toml/v2"
 )
+
+// nowFunc is the injectable clock used by lifecycle/deprecation checks.
+// Tests override it to simulate specific dates without touching the system clock.
+var nowFunc = time.Now
 
 // Finding represents a single validation result.
 type Finding struct {
@@ -93,6 +99,7 @@ func Check(repoPath string) Report {
 	report.addMCPDiscovery(repoPath)
 	report.addA2AAwareness(repoPath)
 	report.addSkillPortability(repoPath)
+	report.addModelPinFreshness(repoPath)
 
 	report.addRemediations(repoPath)
 	report.Total = len(report.Findings)
@@ -248,6 +255,11 @@ func remediationForCheck(repoPath, check string) []Remediation {
 		return []Remediation{{
 			Kind:    "edit",
 			Message: "fix .well-known/agent.json so the Agent2Agent metadata is valid",
+		}}
+	case "model_pin_freshness":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "migrate the pinned model id to its replacement before the deprecation/retirement date",
 		}}
 	default:
 		return nil
@@ -701,6 +713,152 @@ func (r *Report) addSkillSurface(repoPath string) {
 			r.add("skill_file", true, skill.Name)
 		}
 	}
+}
+
+// modelLifecycleEntry is one tracked model pin in the workspace-level
+// model-lifecycle registry.
+type modelLifecycleEntry struct {
+	ID          string   `json:"id"`
+	Aliases     []string `json:"aliases"`
+	Provider    string   `json:"provider"`
+	Status      string   `json:"status"`
+	Retires     string   `json:"retires"`
+	Replacement string   `json:"replacement"`
+}
+
+type modelLifecycleRegistry struct {
+	Version int                   `json:"version"`
+	Models  []modelLifecycleEntry `json:"models"`
+}
+
+// modelPinScanFiles lists the repo-relative files scanned for pinned model
+// ids/aliases. .agents/roles/*.json is globbed separately since it is a
+// directory of files rather than a single fixed path.
+var modelPinScanFiles = []string{
+	".codex/config.toml",
+	".claude/settings.json",
+	".mcp.json",
+	".ralphrc",
+}
+
+// addModelPinFreshness flags model ids/aliases pinned in repo config that are
+// deprecated or retiring soon, per the workspace-level model-lifecycle
+// registry (outside the repo, at <workspace root>/workspace/model-lifecycle.json).
+// A missing or unparseable registry is not a failure — it just means the
+// fleet-wide deprecation clock data isn't available yet.
+func (r *Report) addModelPinFreshness(repoPath string) {
+	registryPath := filepath.Join(filepath.Dir(filepath.Clean(repoPath)), "workspace", "model-lifecycle.json")
+	data, err := os.ReadFile(registryPath)
+	if err != nil {
+		r.add("model_pin_freshness", true, "model lifecycle registry absent — skipping")
+		return
+	}
+	var registry modelLifecycleRegistry
+	if err := json.Unmarshal(data, &registry); err != nil {
+		r.add("model_pin_freshness", true, "model lifecycle registry absent — skipping")
+		return
+	}
+
+	type candidate struct {
+		text  string
+		model modelLifecycleEntry
+	}
+	var candidates []candidate
+	for _, m := range registry.Models {
+		if m.ID != "" {
+			candidates = append(candidates, candidate{text: m.ID, model: m})
+		}
+		for _, alias := range m.Aliases {
+			if alias != "" {
+				candidates = append(candidates, candidate{text: alias, model: m})
+			}
+		}
+	}
+	// Scan longer ids/aliases first so e.g. "gpt-5.4-mini" is matched before
+	// the shorter "gpt-5.4" id that it contains.
+	sort.Slice(candidates, func(i, j int) bool { return len(candidates[i].text) > len(candidates[j].text) })
+
+	var files []string
+	for _, rel := range modelPinScanFiles {
+		if _, err := os.Stat(filepath.Join(repoPath, rel)); err == nil {
+			files = append(files, rel)
+		}
+	}
+	if roleFiles, err := filepath.Glob(filepath.Join(repoPath, ".agents", "roles", "*.json")); err == nil {
+		for _, p := range roleFiles {
+			if rel, err := filepath.Rel(repoPath, p); err == nil {
+				files = append(files, rel)
+			}
+		}
+	}
+
+	now := nowFunc()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+	for _, rel := range files {
+		data, err := os.ReadFile(filepath.Join(repoPath, rel))
+		if err != nil {
+			continue
+		}
+		content := string(data)
+		matched := map[string]bool{}
+		for _, c := range candidates {
+			if matched[c.model.ID] {
+				continue // this model already reported for this file
+			}
+			if pos := findWithBoundary(content, c.text); pos >= 0 {
+				matched[c.model.ID] = true
+				r.addModelPinVerdict(c.model, rel, today)
+			}
+		}
+	}
+}
+
+// findWithBoundary returns the byte offset of the first occurrence of needle
+// in content where neither the preceding nor following character is part of
+// a longer model-id-like token ([0-9A-Za-z.-]), or -1 if there is none.
+func findWithBoundary(content, needle string) int {
+	if needle == "" {
+		return -1
+	}
+	searchFrom := 0
+	for {
+		idx := strings.Index(content[searchFrom:], needle)
+		if idx < 0 {
+			return -1
+		}
+		start := searchFrom + idx
+		end := start + len(needle)
+		searchFrom = end
+		if start > 0 && isModelIDChar(content[start-1]) {
+			continue
+		}
+		if end < len(content) && isModelIDChar(content[end]) {
+			continue
+		}
+		return start
+	}
+}
+
+func isModelIDChar(b byte) bool {
+	return (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '.' || b == '-'
+}
+
+func (r *Report) addModelPinVerdict(m modelLifecycleEntry, file string, today time.Time) {
+	if m.Retires != "" {
+		if retiresDate, err := time.Parse("2006-01-02", m.Retires); err == nil {
+			days := int(retiresDate.Sub(today).Hours() / 24)
+			switch {
+			case days < 0:
+				r.add("model_pin_freshness", false, fmt.Sprintf("retired model pin %s in %s — migrate to %s", m.ID, file, m.Replacement))
+				return
+			case days <= 14:
+				r.add("model_pin_freshness", false, fmt.Sprintf("model pin %s retires %s — migrate to %s", m.ID, m.Retires, m.Replacement))
+				return
+			}
+		}
+	}
+	r.add("model_pin_freshness", true, fmt.Sprintf("deprecated model pin %s — plan migration to %s", m.ID, m.Replacement))
 }
 
 // --- ToolModule implementation ---
