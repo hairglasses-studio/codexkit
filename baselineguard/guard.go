@@ -52,6 +52,18 @@ var RequiredFiles = []string{
 	".codex/config.toml",
 }
 
+// RetiredProviderMirrors lists provider projection files retired fleet-wide by
+// the 2026-08-01 provider-retirement wave. AGENTS.md plus a thin CLAUDE.md
+// mirror is the current contract; AGY and Codex read AGENTS.md directly. These
+// paths must be ABSENT for baseline compliance — presence means a stale mirror
+// was never cleaned up.
+var RetiredProviderMirrors = []string{
+	"GEMINI.md",
+	".gemini/settings.json",
+	".github/copilot-instructions.md",
+	".clinerules",
+}
+
 // PortableFrontmatterKeys re-exports the canonical source-key set from the top-level package.
 var PortableFrontmatterKeys = codexkit.SkillSourceFrontmatterKeys
 
@@ -67,6 +79,7 @@ func Check(repoPath string) Report {
 	report := Report{RepoPath: repoPath}
 
 	report.addRequiredFiles(repoPath)
+	report.addRetiredProviderMirrors(repoPath)
 	report.addCanonicalPatterns(repoPath)
 	report.addProviderSettings(repoPath)
 	report.addAGYAgentLayout(repoPath)
@@ -191,6 +204,11 @@ func remediationForCheck(repoPath, check string) []Remediation {
 			Kind:    "edit",
 			Message: "restore canonical instruction files: AGENTS.md and CLAUDE.md",
 		}}
+	case "retired_provider_mirror":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "remove retired provider mirror files (GEMINI.md, .gemini/settings.json, .github/copilot-instructions.md, .clinerules)",
+		}}
 	case "agy_agent_layout":
 		return []Remediation{{
 			Kind:    "edit",
@@ -243,6 +261,17 @@ func (r *Report) addRequiredFiles(repoPath string) {
 			r.add("required_file", false, fmt.Sprintf("missing: %s", name))
 		} else {
 			r.add("required_file", true, name)
+		}
+	}
+}
+
+func (r *Report) addRetiredProviderMirrors(repoPath string) {
+	for _, name := range RetiredProviderMirrors {
+		path := filepath.Join(repoPath, name)
+		if _, err := os.Lstat(path); err == nil {
+			r.add("retired_provider_mirror", false, fmt.Sprintf("retired provider mirror present — remove it: %s", name))
+		} else {
+			r.add("retired_provider_mirror", true, fmt.Sprintf("absent: %s", name))
 		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hairglasses-studio/codexkit/mcpsync"
@@ -112,6 +113,64 @@ func TestCheck_MissingAgentsMd(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected finding for missing AGENTS.md")
+	}
+}
+
+func TestCheck_RetiredProviderMirrorsAbsentPasses(t *testing.T) {
+	dir := setupCompliantRepo(t)
+
+	report := Check(dir)
+	found := 0
+	for _, f := range report.Findings {
+		if f.Check == "retired_provider_mirror" {
+			found++
+			if !f.Passed {
+				t.Errorf("expected retired_provider_mirror to pass when absent, got failure: %s", f.Message)
+			}
+		}
+	}
+	if found != len(RetiredProviderMirrors) {
+		t.Fatalf("expected %d retired_provider_mirror findings, got %d", len(RetiredProviderMirrors), found)
+	}
+}
+
+func TestCheck_RetiredProviderMirrorPresentFails(t *testing.T) {
+	dir := setupCompliantRepo(t)
+	writeFile(t, dir, "GEMINI.md", "# retired\n")
+
+	report := Check(dir)
+	if report.Passed {
+		t.Fatal("expected FAIL when a retired provider mirror is present")
+	}
+	found := false
+	for _, f := range report.Findings {
+		if f.Check == "retired_provider_mirror" && !f.Passed && f.Message == "retired provider mirror present — remove it: GEMINI.md" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected finding for present GEMINI.md")
+	}
+}
+
+func TestCheck_RetiredProviderMirrorCoversAllRetiredPaths(t *testing.T) {
+	for _, name := range RetiredProviderMirrors {
+		name := name
+		t.Run(name, func(t *testing.T) {
+			dir := setupCompliantRepo(t)
+			writeFile(t, dir, name, "retired\n")
+
+			report := Check(dir)
+			found := false
+			for _, f := range report.Findings {
+				if f.Check == "retired_provider_mirror" && !f.Passed && strings.Contains(f.Message, name) {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("expected retired_provider_mirror failure for %s", name)
+			}
+		})
 	}
 }
 

@@ -37,6 +37,7 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 | Check | Description |
 |-------|-------------|
 | `required_file` | Required files exist (AGENTS.md, CLAUDE.md, Claude settings, Codex config) |
+| `retired_provider_mirror` | Retired provider mirrors (GEMINI.md, .gemini/settings.json, .github/copilot-instructions.md, .clinerules) are absent |
 | `canonical_agents` | AGENTS.md has canonical marker |
 | `canonical_claude` | CLAUDE.md references AGENTS.md |
 | `agy_hooks_json` | Native `.agents/hooks.json` parses when present |
