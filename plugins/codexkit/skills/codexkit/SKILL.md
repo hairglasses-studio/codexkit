@@ -37,7 +37,10 @@ Use this loop for codebase-wide consolidation, Bash-to-Go/Python migrations, hoo
 5. Pick exactly one slice from the recommendations and move behavior behind an existing canonical command surface before deleting shell.
 6. Run focused repo checks plus:
    `GOWORK=off go run ./cmd/codexkit workspace primitive-index-check /path/to/workspace --skip-artifacts`
-7. Update the cycle note work log and add improvement notes for the next cycle.
+7. For provider/configuration work, inventory and enforce the strict three-provider contract:
+   `GOWORK=off go run ./cmd/codexkit workspace config-index /path/to/workspace --user-home /home/hg --root-home /root --json-out <artifact>.json --markdown-out <artifact>.md`
+   followed by `GOWORK=off go run ./cmd/codexkit workspace config-index-check /path/to/workspace --user-home /home/hg --root-home /root`.
+8. Update the cycle note work log and add improvement notes for the next cycle.
 
 For library/API research inside a cycle, use Context7 first. If it is unavailable, use official primary docs and record the fallback in the cycle note.
 

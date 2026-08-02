@@ -144,7 +144,7 @@ Codex workspace-global overlays are intentionally opt-in: repo profiles must set
 
 `codexkit workspace primitive-index` generates `workspace-agent-primitives-*.json` and `.md`. It records Claude hooks/settings, local overlays, provider agents, output styles, plugin manifests, nested MCP files, and instruction files that are outside the narrower skill/MCP source contract. Canonical and generated hook wiring failures fail `primitive-index-check`; local overlays remain audit-visible warnings.
 
-`codexkit workspace config-index` inventories tracked and untracked provider configuration, canonical dotfiles, provider homes, and redacted runtime buckets. It never hashes secret/authentication files or copies values into output. `config-index-check` rejects unowned active configuration, Gemini/Copilot projections in the strict three-provider fleet, restricted global defaults that drift from the operator's autonomy policy, and unscoped provider-home deletion.
+`codexkit workspace config-index` inventories tracked and untracked provider configuration, canonical dotfiles, provider homes, and redacted runtime buckets. It never hashes secret/authentication files or copies values into output. Provider caches, vendored marketplaces, scratch workers, and archived provenance remain out of the active-policy lane. `config-index-check` rejects unowned active configuration, reports legacy Gemini/Copilot/Cline projections once per repository or provider-home surface, enforces operator-selected autonomy only at the user-global provider homes, and rejects unguarded provider-home deletion.
 
 ### MCP Server
 

@@ -244,14 +244,23 @@ func Check(opts Options) (CheckReport, error) {
 		return CheckReport{}, err
 	}
 	report := CheckReport{Index: index, Passed: true}
+	seenObsolete := map[string]struct{}{}
+	repoRoots := make(map[string]string, len(index.Repos))
+	for _, repo := range index.Repos {
+		repoRoots[repo.Name] = repo.Path
+	}
 	for _, file := range index.Files {
 		if file.Classification == "unknown" {
 			report.add("owned_configuration", false, file.Path, "provider-relevant file has no management owner")
 		}
 		if file.Classification == "obsolete" && isActiveObsoleteProjection(file.Path) && (file.Scope == "workspace" || file.Scope == "repo" || file.Scope == "user" || file.Scope == "root") {
-			report.add("strict_provider_set", false, file.Path, "active Gemini CLI or Copilot projection must be retired or migrated to AGY")
+			root := obsoleteProjectionRoot(file, repoRoots)
+			if _, ok := seenObsolete[root]; !ok {
+				seenObsolete[root] = struct{}{}
+				report.add("strict_provider_set", false, root, "active Gemini CLI, Copilot, or Cline projection must be retired or migrated to AGY")
+			}
 		}
-		if file.Provider == "codex" && filepath.Base(file.Path) == "config.toml" && file.Classification != "secret_authentication" {
+		if file.Scope == "user" && file.Provider == "codex" && filepath.Base(file.Path) == "config.toml" && file.Classification != "secret_authentication" {
 			if !autonomousCodexConfig(file.Path) {
 				report.add("codex_autonomy_default", false, file.Path, "Codex config must default to danger-full-access with approval_policy=never")
 			}
@@ -260,7 +269,7 @@ func Check(opts Options) (CheckReport, error) {
 			report.add("claude_autonomy_default", false, file.Path, "Claude settings must default to bypassPermissions and suppress the dangerous-mode prompt")
 		}
 		if file.Scope == "user" && file.Provider == "agy" && strings.HasSuffix(filepath.ToSlash(file.Path), "/.gemini/antigravity-cli/settings.json") && !autonomousAGYConfig(file.Path) {
-			report.add("agy_autonomy_default", false, file.Path, "AGY settings must default to accept-edits, always-proceed, non-workspace access, and Gemini 3.6 Flash Low")
+			report.add("agy_autonomy_default", false, file.Path, "AGY settings must default to accept-edits, always-proceed, and non-workspace access")
 		}
 		if strings.HasSuffix(filepath.ToSlash(file.Path), "/scripts/hg-agent-home-sync.sh") && hasUnscopedDelete(file.Path) {
 			report.add("safe_home_sync", false, file.Path, "provider-home sync contains unscoped rsync --delete")
@@ -350,6 +359,9 @@ func scanWorkspaceRoot(root string) ([]File, error) {
 				return walkErr
 			}
 			if entry.IsDir() {
+				if entry.Name() == ".git" {
+					return filepath.SkipDir
+				}
 				if path != base && isRuntimeSegment(entry.Name()) {
 					return filepath.SkipDir
 				}
@@ -388,6 +400,9 @@ func scanProfile(profile Profile, includeStats bool) ([]File, []RuntimeBucket, e
 				return walkErr
 			}
 			if entry.IsDir() {
+				if entry.Name() == ".git" {
+					return filepath.SkipDir
+				}
 				if path != base && isProfileRuntimeDir(profile.Home, path) {
 					bucket := RuntimeBucket{Profile: profile.Name, Path: path, Kind: "runtime_history_cache"}
 					if includeStats {
@@ -557,14 +572,26 @@ func kindForPath(path string) string {
 func classificationForPath(path, scope string, tracked bool, lifecycle string) string {
 	lower := strings.ToLower(filepath.ToSlash(path))
 	base := strings.ToLower(filepath.Base(lower))
-	if strings.Contains(lower, "/imported/") || strings.Contains(lower, "/archives/") || lifecycle == "archived" {
+	if strings.Contains(lower, "/imported/") || strings.Contains(lower, "/archives/") || strings.Contains(lower, "/vault/") || strings.Contains(lower, "/third_party/") || strings.Contains(lower, "/vendor/") || lifecycle == "archived" {
 		return "archived_provenance"
-	}
-	if strings.Contains(lower, "copilot") || strings.Contains(lower, "/.cline/") || strings.Contains(lower, "/.github/agents/") || strings.Contains(lower, "/.github/skills/") || base == "gemini.md" || strings.Contains(lower, "/.gemini/settings.json") || strings.Contains(lower, "/.gemini/commands/") || strings.Contains(lower, "/.gemini/extensions/") {
-		return "obsolete"
 	}
 	if isSecretPath(lower) {
 		return "secret_authentication"
+	}
+	if (scope == "user" || scope == "root") && isAGYHomePath(lower) {
+		if strings.HasSuffix(lower, "/.gemini/antigravity-cli/settings.json") || strings.Contains(lower, "/.gemini/config/") {
+			return "managed_overlay"
+		}
+		return "user_owned_mutable"
+	}
+	if strings.Contains(lower, "/examples/") || strings.Contains(lower, "/testdata/") || strings.Contains(lower, "/fixtures/") {
+		return "test_fixture"
+	}
+	if strings.Contains(lower, "copilot") || strings.Contains(lower, "/.cline/") || strings.Contains(lower, "/.github/agents/") || strings.Contains(lower, "/.github/skills/") || base == "gemini.md" || isLegacyGeminiPath(lower) {
+		return "obsolete"
+	}
+	if scope == "workspace" && (base == "agents.md" || base == "claude.md" || base == ".mcp.json") {
+		return "canonical_declarative"
 	}
 	if scope == "repo" || scope == "workspace" {
 		if strings.Contains(lower, "/.claude/skills/") || strings.Contains(lower, "/.claude/agents/") || strings.Contains(lower, "/.codex/agents/") {
@@ -572,6 +599,9 @@ func classificationForPath(path, scope string, tracked bool, lifecycle string) s
 		}
 		if strings.HasSuffix(lower, "/.claude/settings.json") || strings.HasSuffix(lower, "/.codex/config.toml") || strings.HasSuffix(lower, "/.agents/hooks.json") {
 			return "managed_overlay"
+		}
+		if scope == "workspace" && (strings.Contains(lower, "/.agents/") || strings.Contains(lower, "/.claude/") || strings.Contains(lower, "/.codex/")) {
+			return "canonical_declarative"
 		}
 		if tracked {
 			return "canonical_declarative"
@@ -640,9 +670,10 @@ func isProfileRuntimeDir(home, path string) bool {
 	for _, prefix := range []string{
 		".agents/memory", ".agents/sessions", ".agents/worktrees", ".agents/logs", ".agents/cache", ".agents/tmp",
 		".claude/file-history", ".claude/projects", ".claude/sessions", ".claude/shell-snapshots", ".claude/session-env", ".claude/history", ".claude/cache", ".claude/paste-cache", ".claude/plans", ".claude/jobs", ".claude/backups", ".claude/agent-memory", ".claude/debug", ".claude/telemetry", ".claude/todos",
-		".claude/tasks", ".claude/teams", ".claude/plugins/cache",
+		".claude/tasks", ".claude/teams", ".claude/plugins/cache", ".claude/plugins/marketplaces", ".claude/plugins/repos",
 		".codex/sessions", ".codex/archived_sessions", ".codex/logs", ".codex/log", ".codex/attachments", ".codex/shell_snapshots", ".codex/memories", ".codex/worktrees", ".codex/cache", ".codex/tmp", ".codex/.tmp", ".codex/plugins/cache",
-		".gemini/antigravity-cli/brain", ".gemini/antigravity-cli/conversations", ".gemini/antigravity-cli/logs", ".gemini/antigravity-cli/sidecar_data", ".gemini/antigravity/brain", ".gemini/antigravity/implicit", ".gemini/antigravity/sidecar_data", ".gemini/antigravity/skills_library", ".gemini/worktrees", ".gemini/history", ".gemini/tmp",
+		".gemini/antigravity-cli/bin", ".gemini/antigravity-cli/brain", ".gemini/antigravity-cli/builtin", ".gemini/antigravity-cli/cache", ".gemini/antigravity-cli/conversations", ".gemini/antigravity-cli/crashes", ".gemini/antigravity-cli/implicit", ".gemini/antigravity-cli/log", ".gemini/antigravity-cli/logs", ".gemini/antigravity-cli/sidecar_data", ".gemini/antigravity-cli/updater", ".gemini/antigravity/bin", ".gemini/antigravity/brain", ".gemini/antigravity/cache", ".gemini/antigravity/daemon", ".gemini/antigravity/implicit", ".gemini/antigravity/knowledge", ".gemini/antigravity/sidecar_data", ".gemini/antigravity/skills_library", ".gemini/antigravity/tool_cache", ".gemini/antigravity/workflow_library", ".gemini/worktrees", ".gemini/history", ".gemini/tmp",
+		".cline/data", ".cline/cache", ".cline/logs", ".cline/tasks", ".cline/sessions",
 	} {
 		if rel == prefix || strings.HasPrefix(rel, prefix+"/") {
 			return true
@@ -661,6 +692,11 @@ func isProfileRuntimePath(lower string) bool {
 }
 
 func isRuntimeSegment(name string) bool {
+	for _, prefix := range []string{"explorer_", "worker_", "reviewer_", "teamwork_"} {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
 	switch name {
 	case "sessions", "history", "logs", "cache", "tmp", "worktrees", "conversations", "sidecar_data", "file-history", "attachments", "backups", "memory", "brain", "implicit", "tasks", "teams":
 		return true
@@ -814,15 +850,13 @@ func autonomousAGYConfig(path string) bool {
 		AgentMode               string `json:"agentMode"`
 		AllowNonWorkspaceAccess bool   `json:"allowNonWorkspaceAccess"`
 		ArtifactReviewPolicy    string `json:"artifactReviewPolicy"`
-		Model                   string `json:"model"`
 		ToolPermission          string `json:"toolPermission"`
 	}
 	if json.Unmarshal(data, &settings) != nil {
 		return false
 	}
 	return settings.AgentMode == "accept-edits" && settings.AllowNonWorkspaceAccess &&
-		settings.ArtifactReviewPolicy == "always-proceed" && settings.ToolPermission == "always-proceed" &&
-		settings.Model == "Gemini 3.6 Flash (Low)"
+		settings.ArtifactReviewPolicy == "always-proceed" && settings.ToolPermission == "always-proceed"
 }
 
 func hasUnscopedDelete(path string) bool {
@@ -831,7 +865,13 @@ func hasUnscopedDelete(path string) bool {
 		return false
 	}
 	text := string(data)
-	return strings.Contains(text, "rsync") && (strings.Contains(text, "--delete") || strings.Contains(text, "-rlptD --delete"))
+	if !strings.Contains(text, "rsync") || (!strings.Contains(text, "--delete") && !strings.Contains(text, "-rlptD --delete")) {
+		return false
+	}
+	guardedDirectorySync := strings.Contains(text, `local source_dir="$1"`) &&
+		strings.Contains(text, `local target_dir="$2"`) &&
+		strings.Contains(text, `"$source_dir/" "$target_dir/"`)
+	return !guardedDirectorySync
 }
 
 // isActiveObsoleteProjection distinguishes retired provider surfaces from
@@ -869,6 +909,50 @@ func isActiveObsoleteProjection(path string) bool {
 		}
 	}
 	return false
+}
+
+// obsoleteProjectionRoot returns the smallest actionable provider-native root
+// so a generated tree with thousands of files produces one policy finding.
+func obsoleteProjectionRoot(file File, repoRoots map[string]string) string {
+	if file.Scope == "repo" && file.Repo != "" {
+		if root := repoRoots[file.Repo]; root != "" {
+			return filepath.Clean(root)
+		}
+	}
+	clean := filepath.ToSlash(filepath.Clean(file.Path))
+	lower := strings.ToLower(clean)
+	for _, marker := range []string{
+		"/.cline/",
+		"/.github/agents/",
+		"/.github/skills/",
+		"/.gemini/agents/",
+		"/.gemini/commands/",
+		"/.gemini/extensions/",
+	} {
+		if idx := strings.Index(lower, marker); idx >= 0 {
+			return filepath.Clean(clean[:idx+len(marker)-1])
+		}
+	}
+	return filepath.Clean(file.Path)
+}
+
+func isLegacyGeminiPath(lower string) bool {
+	marker := "/.gemini/"
+	idx := strings.Index(lower, marker)
+	if idx < 0 {
+		return false
+	}
+	rel := lower[idx+len(marker):]
+	if strings.HasPrefix(rel, "antigravity-cli/") || strings.HasPrefix(rel, "antigravity/") || strings.HasPrefix(rel, "config/") {
+		return false
+	}
+	return true
+}
+
+func isAGYHomePath(lower string) bool {
+	return strings.Contains(lower, "/.gemini/antigravity-cli/") ||
+		strings.Contains(lower, "/.gemini/antigravity/") ||
+		strings.Contains(lower, "/.gemini/config/")
 }
 
 func looksTextPath(path string) bool {

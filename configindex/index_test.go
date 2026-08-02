@@ -72,16 +72,21 @@ func TestBuildClassifiesRepoDotfilesHomesAndSecrets(t *testing.T) {
 
 func TestCheckProvesRestrictedDefaultsAndUnscopedDeleteFail(t *testing.T) {
 	root := t.TempDir()
+	userHome := filepath.Join(root, "home", "user")
 	write(t, root, "workspace/manifest.json", `{"version":1,"repos":[{"name":"app","scope":"active_product","lifecycle":"active","baseline_target":true},{"name":"ralphglasses","scope":"active_product","lifecycle":"active","baseline_target":true}]}`)
 	for _, repo := range []string{"app", "ralphglasses"} {
 		runGit(t, filepath.Join(root, repo), "init", "--quiet")
 	}
-	write(t, root, "app/.codex/config.toml", "approval_policy = \"on-request\"\nsandbox_mode = \"workspace-write\"\n")
+	writeAbs(t, filepath.Join(userHome, ".codex", "config.toml"), "approval_policy = \"on-request\"\nsandbox_mode = \"workspace-write\"\n")
 	write(t, root, "ralphglasses/dotfiles/scripts/hg-agent-home-sync.sh", "#!/bin/sh\nrsync -a --delete source/ target/\n")
 	for _, repo := range []string{"app", "ralphglasses"} {
 		runGit(t, filepath.Join(root, repo), "add", ".")
 	}
-	report, err := Check(Options{WorkspaceRoot: root, GeneratedAt: "2026-08-01T00:00:00Z"})
+	report, err := Check(Options{
+		WorkspaceRoot: root,
+		GeneratedAt:   "2026-08-01T00:00:00Z",
+		Profiles:      []Profile{{Name: "user", Home: userHome}},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,6 +141,25 @@ func TestCheckEnforcesAutonomyDefaultsInUserProviderHomes(t *testing.T) {
 	}
 }
 
+func TestCheckAllowsAutonomousAGYWithOperatorSelectedModel(t *testing.T) {
+	root := t.TempDir()
+	userHome := filepath.Join(root, "home", "user")
+	write(t, root, "workspace/manifest.json", `{"version":1,"repos":[]}`)
+	writeAbs(t, filepath.Join(userHome, ".gemini", "antigravity-cli", "settings.json"), `{"agentMode":"accept-edits","allowNonWorkspaceAccess":true,"artifactReviewPolicy":"always-proceed","model":"gemini-3.1-pro","toolPermission":"always-proceed"}`)
+
+	report, err := Check(Options{
+		WorkspaceRoot: root,
+		GeneratedAt:   "2026-08-01T00:00:00Z",
+		Profiles:      []Profile{{Name: "user", Home: userHome}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.ContainsFunc(report.Findings, func(f Finding) bool { return f.Check == "agy_autonomy_default" && !f.Passed }) {
+		t.Fatalf("AGY model choice was incorrectly coupled to autonomy: %+v", report.Findings)
+	}
+}
+
 func TestCheckAllowsHistoricalMentionsButRejectsActiveLegacyProjection(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "workspace/manifest.json", `{"version":1,"repos":[{"name":"app","scope":"active_product","lifecycle":"active","baseline_target":true}]}`)
@@ -152,6 +176,7 @@ func TestCheckAllowsHistoricalMentionsButRejectsActiveLegacyProjection(t *testin
 	}
 
 	write(t, root, "app/.github/agents/legacy.md", "generated legacy agent\n")
+	write(t, root, "app/.github/agents/another.md", "another generated legacy agent\n")
 	runGit(t, filepath.Join(root, "app"), "add", ".")
 	report, err = Check(Options{WorkspaceRoot: root, GeneratedAt: "2026-08-01T00:00:00Z"})
 	if err != nil {
@@ -159,6 +184,151 @@ func TestCheckAllowsHistoricalMentionsButRejectsActiveLegacyProjection(t *testin
 	}
 	if report.Passed || !slices.ContainsFunc(report.Findings, func(f Finding) bool { return f.Check == "strict_provider_set" && !f.Passed }) {
 		t.Fatalf("active legacy projection unexpectedly passed: %+v", report.Findings)
+	}
+	strictFindings := 0
+	for _, finding := range report.Findings {
+		if finding.Check == "strict_provider_set" && !finding.Passed {
+			strictFindings++
+		}
+	}
+	if strictFindings != 1 {
+		t.Fatalf("legacy projection findings were not collapsed by surface root: %+v", report.Findings)
+	}
+}
+
+func TestCheckCollapsesDifferentLegacySurfacesByRepository(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "workspace/manifest.json", `{"version":1,"repos":[{"name":"app","scope":"active_product","lifecycle":"active","baseline_target":true}]}`)
+	runGit(t, filepath.Join(root, "app"), "init", "--quiet")
+	write(t, root, "app/GEMINI.md", "legacy instructions\n")
+	write(t, root, "app/.gemini/commands/legacy.toml", "description = \"legacy\"\n")
+	write(t, root, "app/.github/skills/legacy/SKILL.md", "legacy\n")
+	runGit(t, filepath.Join(root, "app"), "add", ".")
+
+	report, err := Check(Options{WorkspaceRoot: root, GeneratedAt: "2026-08-01T00:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	strictFindings := 0
+	for _, finding := range report.Findings {
+		if finding.Check == "strict_provider_set" && !finding.Passed {
+			strictFindings++
+			if finding.Path != filepath.Join(root, "app") {
+				t.Fatalf("legacy repository root = %q, want %q", finding.Path, filepath.Join(root, "app"))
+			}
+		}
+	}
+	if strictFindings != 1 {
+		t.Fatalf("legacy surfaces were not collapsed by repository: %+v", report.Findings)
+	}
+}
+
+func TestBuildTreatsWorkspaceCanonicalAndProviderRuntimeAsManaged(t *testing.T) {
+	root := t.TempDir()
+	userHome := filepath.Join(root, "home", "user")
+	write(t, root, "workspace/manifest.json", `{"version":1,"repos":[]}`)
+	write(t, root, "AGENTS.md", "workspace instructions\n")
+	write(t, root, "CLAUDE.md", "workspace Claude instructions\n")
+	write(t, root, ".mcp.json", "{\"mcpServers\":{}}\n")
+	write(t, root, ".agents/skills/demo/SKILL.md", "---\nname: demo\ndescription: demo\n---\n")
+	write(t, root, ".agents/worker_1/progress.md", "scratch\n")
+	writeAbs(t, filepath.Join(userHome, ".gemini", "antigravity-cli", "builtin", "skills", "vendor", "SKILL.md"), "vendor\n")
+	writeAbs(t, filepath.Join(userHome, ".gemini", "antigravity", "workflow_library", "vendor", ".git", "objects", "aa"), "object\n")
+	writeAbs(t, filepath.Join(userHome, ".cline", "data", "sessions", "one.json"), "{}\n")
+
+	index, err := Build(Options{
+		WorkspaceRoot: root,
+		GeneratedAt:   "2026-08-01T00:00:00Z",
+		Profiles:      []Profile{{Name: "user", Home: userHome}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical := findFile(index.Files, ".agents/skills/demo/SKILL.md")
+	if canonical == nil || canonical.Classification != "canonical_declarative" {
+		t.Fatalf("workspace canonical classification = %+v", canonical)
+	}
+	for _, suffix := range []string{"AGENTS.md", "CLAUDE.md", ".mcp.json"} {
+		file := findFile(index.Files, suffix)
+		if file == nil || file.Classification != "canonical_declarative" {
+			t.Fatalf("workspace root classification for %s = %+v", suffix, file)
+		}
+	}
+	for _, suffix := range []string{".agents/worker_1/progress.md", "builtin/skills/vendor/SKILL.md", ".git/objects/aa", ".cline/data/sessions/one.json"} {
+		if findFile(index.Files, suffix) != nil {
+			t.Fatalf("runtime/vendor path leaked into file inventory: %s", suffix)
+		}
+	}
+}
+
+func TestBuildTreatsActiveAGYHomeStateAsOwned(t *testing.T) {
+	root := t.TempDir()
+	userHome := filepath.Join(root, "home", "user")
+	write(t, root, "workspace/manifest.json", `{"version":1,"repos":[]}`)
+	writeAbs(t, filepath.Join(userHome, ".gemini", "antigravity", "global_workflows", "ship.md"), "workflow\n")
+	writeAbs(t, filepath.Join(userHome, ".gemini", "antigravity-cli", "mcp", "demo", "instructions.md"), "instructions\n")
+	writeAbs(t, filepath.Join(userHome, ".gemini", "antigravity", "tool_cache", "vendor.vsix"), "vendor\n")
+
+	index, err := Build(Options{
+		WorkspaceRoot: root,
+		GeneratedAt:   "2026-08-01T00:00:00Z",
+		Profiles:      []Profile{{Name: "user", Home: userHome}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, suffix := range []string{"global_workflows/ship.md", "mcp/demo/instructions.md"} {
+		file := findFile(index.Files, suffix)
+		if file == nil || file.Classification != "user_owned_mutable" {
+			t.Fatalf("AGY home classification for %s = %+v", suffix, file)
+		}
+	}
+	if findFile(index.Files, "tool_cache/vendor.vsix") != nil {
+		t.Fatal("AGY tool cache leaked into file inventory")
+	}
+}
+
+func TestCheckAcceptsGuardedDirectoryRsyncDelete(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "workspace/manifest.json", `{"version":1,"repos":[{"name":"ralphglasses","scope":"active_product","lifecycle":"active","baseline_target":true}]}`)
+	runGit(t, filepath.Join(root, "ralphglasses"), "init", "--quiet")
+	write(t, root, "ralphglasses/dotfiles/scripts/hg-agent-home-sync.sh", `#!/bin/sh
+sync_directory_tree() {
+  local source_dir="$1"
+  local target_dir="$2"
+  local -a sync_args=(-rlptD --delete)
+  rsync "${sync_args[@]}" "$source_dir/" "$target_dir/"
+}
+`)
+	runGit(t, filepath.Join(root, "ralphglasses"), "add", ".")
+	report, err := Check(Options{WorkspaceRoot: root, GeneratedAt: "2026-08-01T00:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.ContainsFunc(report.Findings, func(f Finding) bool { return f.Check == "safe_home_sync" && !f.Passed }) {
+		t.Fatalf("guarded directory sync was rejected: %+v", report.Findings)
+	}
+}
+
+func TestCheckDoesNotImposeUserAutonomyOnRepoOrRootProfiles(t *testing.T) {
+	root := t.TempDir()
+	rootHome := filepath.Join(root, "home", "root")
+	write(t, root, "workspace/manifest.json", `{"version":1,"repos":[{"name":"app","scope":"active_product","lifecycle":"active","baseline_target":true}]}`)
+	runGit(t, filepath.Join(root, "app"), "init", "--quiet")
+	write(t, root, "app/.codex/config.toml", "approval_policy = \"on-request\"\nsandbox_mode = \"workspace-write\"\n")
+	runGit(t, filepath.Join(root, "app"), "add", ".")
+	writeAbs(t, filepath.Join(rootHome, ".codex", "config.toml"), "approval_policy = \"on-request\"\nsandbox_mode = \"workspace-write\"\n")
+
+	report, err := Check(Options{
+		WorkspaceRoot: root,
+		GeneratedAt:   "2026-08-01T00:00:00Z",
+		Profiles:      []Profile{{Name: "root", Home: rootHome}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.ContainsFunc(report.Findings, func(f Finding) bool { return f.Check == "codex_autonomy_default" && !f.Passed }) {
+		t.Fatalf("user autonomy leaked into repo/root policy: %+v", report.Findings)
 	}
 }
 
