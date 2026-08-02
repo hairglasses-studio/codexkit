@@ -836,3 +836,121 @@ func TestMCPSpecTarget_PastDeadlineFails(t *testing.T) {
 		t.Fatalf("expected FAIL once compat deadline has passed, got PASS: %s", findings[0].Message)
 	}
 }
+
+// --- config_drift ---
+
+func setupConfigExpectationRepo(t *testing.T, registryJSON string) string {
+	t.Helper()
+	root := t.TempDir()
+	repoDir := filepath.Join(root, "repo")
+	if err := os.MkdirAll(repoDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if registryJSON != "" {
+		writeFile(t, root, filepath.Join("workspace", "config-expectations.json"), registryJSON)
+	}
+	return repoDir
+}
+
+const testConfigExpectations = `{
+  "version": 1,
+  "expectations": [
+    {
+      "id": "codex-safe-default",
+      "provider": "codex",
+      "repos": ["repo"],
+      "file": ".codex/config.toml",
+      "format": "toml",
+      "expected": {
+        "approval_policy": "on-request",
+        "sandbox_mode": "workspace-write"
+      },
+      "forbidden": ["profiles"]
+    },
+    {
+      "id": "claude-launch-contract",
+      "provider": "claude",
+      "repos": ["repo"],
+      "file": "scripts/hg-claude-launch.sh",
+      "format": "text",
+      "expected_contains": ["--provider claude"],
+      "forbidden_contains": ["--dangerously-skip-permissions"]
+    }
+  ]
+}`
+
+func TestConfigDrift_RegisteredConfigAndLauncherPass(t *testing.T) {
+	dir := setupConfigExpectationRepo(t, testConfigExpectations)
+	writeFile(t, dir, ".codex/config.toml", "approval_policy = \"on-request\"\nsandbox_mode = \"workspace-write\"\n")
+	writeFile(t, dir, "scripts/hg-claude-launch.sh", "exec runner --provider claude -- \"$@\"\n")
+
+	findings := findingsFor(Check(dir), "config_drift")
+	if len(findings) != 2 {
+		t.Fatalf("expected two config_drift pass findings, got %d: %#v", len(findings), findings)
+	}
+	for _, finding := range findings {
+		if !finding.Passed {
+			t.Fatalf("expected registered config to pass, got: %s", finding.Message)
+		}
+	}
+}
+
+func TestConfigDrift_NegativeControlDetectsMutatedExpectedValue(t *testing.T) {
+	dir := setupConfigExpectationRepo(t, testConfigExpectations)
+	writeFile(t, dir, ".codex/config.toml", "approval_policy = \"never\"\nsandbox_mode = \"workspace-write\"\n")
+	writeFile(t, dir, "scripts/hg-claude-launch.sh", "exec runner --provider claude -- \"$@\"\n")
+
+	findings := findingsFor(Check(dir), "config_drift")
+	failed := 0
+	for _, finding := range findings {
+		if !finding.Passed {
+			failed++
+			if !strings.Contains(finding.Message, "approval_policy") {
+				t.Fatalf("negative control failed for the wrong reason: %s", finding.Message)
+			}
+		}
+	}
+	if failed != 1 {
+		t.Fatalf("expected exactly one negative-control failure, got %d: %#v", failed, findings)
+	}
+}
+
+func TestConfigDrift_ForbiddenStructuredKeyFails(t *testing.T) {
+	dir := setupConfigExpectationRepo(t, testConfigExpectations)
+	writeFile(t, dir, ".codex/config.toml", "approval_policy = \"on-request\"\nsandbox_mode = \"workspace-write\"\n[profiles.review]\nmodel = \"test\"\n")
+	writeFile(t, dir, "scripts/hg-claude-launch.sh", "exec runner --provider claude -- \"$@\"\n")
+
+	findings := findingsFor(Check(dir), "config_drift")
+	if len(findings) < 1 || findings[0].Passed || !strings.Contains(findings[0].Message, "forbidden key profiles") {
+		t.Fatalf("expected forbidden profiles table to fail, got %#v", findings)
+	}
+}
+
+func TestConfigDrift_ForbiddenLauncherFlagFails(t *testing.T) {
+	dir := setupConfigExpectationRepo(t, testConfigExpectations)
+	writeFile(t, dir, ".codex/config.toml", "approval_policy = \"on-request\"\nsandbox_mode = \"workspace-write\"\n")
+	writeFile(t, dir, "scripts/hg-claude-launch.sh", "exec runner --provider claude --dangerously-skip-permissions -- \"$@\"\n")
+
+	findings := findingsFor(Check(dir), "config_drift")
+	if len(findings) != 2 || findings[1].Passed || !strings.Contains(findings[1].Message, "forbidden launcher contract") {
+		t.Fatalf("expected forbidden launcher flag to fail, got %#v", findings)
+	}
+}
+
+func TestConfigDrift_MalformedRegistryFailsClosed(t *testing.T) {
+	dir := setupConfigExpectationRepo(t, `{not-json`)
+
+	findings := findingsFor(Check(dir), "config_drift")
+	if len(findings) != 1 || findings[0].Passed || !strings.Contains(findings[0].Message, "invalid config expectations registry") {
+		t.Fatalf("expected malformed registry to fail closed, got %#v", findings)
+	}
+}
+
+func TestConfigDrift_AbsentRegistrySkips(t *testing.T) {
+	dir := setupConfigExpectationRepo(t, "")
+
+	findings := findingsFor(Check(dir), "config_drift")
+	if len(findings) != 1 || !findings[0].Passed || findings[0].Message != "config expectations registry absent — skipping" {
+		t.Fatalf("expected absent registry to skip, got %#v", findings)
+	}
+}

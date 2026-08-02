@@ -53,6 +53,7 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 | `skill_portability` | SKILL.md frontmatter uses only portable keys per Agent Skills standard |
 | `model_pin_freshness` | Model ids/aliases pinned in repo config are not deprecated/retired soon, per `workspace/model-lifecycle.json` |
 | `mcp_spec_target` | `.well-known/mcp.json` protocolVersion meets the fleet-wide MCP spec target, per `workspace/mcp-spec-target.json` |
+| `config_drift` | Provider config keys and canonical launcher flags match `workspace/config-expectations.json` |
 
 ## MCP Tools
 

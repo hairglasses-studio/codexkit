@@ -101,6 +101,7 @@ func Check(repoPath string) Report {
 	report.addSkillPortability(repoPath)
 	report.addModelPinFreshness(repoPath)
 	report.addMCPSpecTarget(repoPath)
+	report.addConfigDrift(repoPath)
 
 	report.addRemediations(repoPath)
 	report.Total = len(report.Findings)
@@ -266,6 +267,11 @@ func remediationForCheck(repoPath, check string) []Remediation {
 		return []Remediation{{
 			Kind:    "edit",
 			Message: "update .well-known/mcp.json protocolVersion to the fleet target/current MCP spec version",
+		}}
+	case "config_drift":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "restore the provider configuration or launcher contract declared in workspace/config-expectations.json",
 		}}
 	default:
 		return nil
@@ -921,6 +927,188 @@ func (r *Report) addMCPSpecTarget(repoPath string) {
 	default:
 		r.add("mcp_spec_target", true, fmt.Sprintf("spec %s matches current %s", v, reg.Current))
 	}
+}
+
+// configExpectationRegistry is the workspace-level provider configuration
+// policy. It deliberately lives outside individual repositories so a repo
+// cannot weaken the baseline that validates it.
+type configExpectationRegistry struct {
+	Version      int                 `json:"version"`
+	Expectations []configExpectation `json:"expectations"`
+}
+
+// configExpectation describes one provider-owned file contract. Structured
+// JSON/TOML files use dotted key paths in Expected and Forbidden. Text files
+// use the contains lists for launcher flags and other source-level contracts.
+type configExpectation struct {
+	ID                string         `json:"id"`
+	Provider          string         `json:"provider"`
+	Repos             []string       `json:"repos"`
+	File              string         `json:"file"`
+	Format            string         `json:"format"`
+	Expected          map[string]any `json:"expected,omitempty"`
+	Forbidden         []string       `json:"forbidden,omitempty"`
+	ExpectedContains  []string       `json:"expected_contains,omitempty"`
+	ForbiddenContains []string       `json:"forbidden_contains,omitempty"`
+}
+
+// addConfigDrift validates provider config and canonical launcher flags against
+// workspace/config-expectations.json. An absent registry is an informational
+// skip for standalone clones; once present, invalid policy or unreadable target
+// files fail closed.
+func (r *Report) addConfigDrift(repoPath string) {
+	registryPath := filepath.Join(filepath.Dir(filepath.Clean(repoPath)), "workspace", "config-expectations.json")
+	data, err := os.ReadFile(registryPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			r.add("config_drift", true, "config expectations registry absent — skipping")
+			return
+		}
+		r.add("config_drift", false, fmt.Sprintf("read config expectations registry: %v", err))
+		return
+	}
+
+	var registry configExpectationRegistry
+	if err := json.Unmarshal(data, &registry); err != nil {
+		r.add("config_drift", false, fmt.Sprintf("invalid config expectations registry: %v", err))
+		return
+	}
+	if registry.Version != 1 {
+		r.add("config_drift", false, fmt.Sprintf("unsupported config expectations registry version %d", registry.Version))
+		return
+	}
+
+	repoName := filepath.Base(filepath.Clean(repoPath))
+	matched := 0
+	for _, expectation := range registry.Expectations {
+		applies, matchErr := expectationApplies(expectation.Repos, repoName)
+		if matchErr != nil {
+			r.add("config_drift", false, fmt.Sprintf("expectation %q has invalid repo pattern: %v", expectation.ID, matchErr))
+			continue
+		}
+		if !applies {
+			continue
+		}
+		matched++
+		r.checkConfigExpectation(repoPath, expectation)
+	}
+	if matched == 0 {
+		r.add("config_drift", true, fmt.Sprintf("no config expectations target %s", repoName))
+	}
+}
+
+func expectationApplies(patterns []string, repoName string) (bool, error) {
+	if len(patterns) == 0 {
+		patterns = []string{"*"}
+	}
+	for _, pattern := range patterns {
+		matched, err := filepath.Match(pattern, repoName)
+		if err != nil {
+			return false, err
+		}
+		if matched {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *Report) checkConfigExpectation(repoPath string, expectation configExpectation) {
+	label := expectation.ID
+	if label == "" {
+		label = expectation.Provider + ":" + expectation.File
+	}
+	if expectation.ID == "" || expectation.Provider == "" || expectation.File == "" {
+		r.add("config_drift", false, fmt.Sprintf("invalid config expectation %q: id, provider, and file are required", label))
+		return
+	}
+	if filepath.IsAbs(expectation.File) || strings.HasPrefix(filepath.Clean(expectation.File), "..") {
+		r.add("config_drift", false, fmt.Sprintf("invalid config expectation %q: file must stay within the repo", label))
+		return
+	}
+
+	data, err := os.ReadFile(filepath.Join(repoPath, expectation.File))
+	if err != nil {
+		r.add("config_drift", false, fmt.Sprintf("%s: cannot read %s: %v", label, expectation.File, err))
+		return
+	}
+
+	switch expectation.Format {
+	case "json", "toml":
+		var document map[string]any
+		if expectation.Format == "json" {
+			err = json.Unmarshal(data, &document)
+		} else {
+			err = toml.Unmarshal(data, &document)
+		}
+		if err != nil {
+			r.add("config_drift", false, fmt.Sprintf("%s: invalid %s in %s: %v", label, expectation.Format, expectation.File, err))
+			return
+		}
+		failed := false
+		keys := make([]string, 0, len(expectation.Expected))
+		for key := range expectation.Expected {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			actual, ok := lookupDottedKey(document, key)
+			if !ok || !configValuesEqual(actual, expectation.Expected[key]) {
+				r.add("config_drift", false, fmt.Sprintf("%s: %s key %s does not match the registered value", label, expectation.File, key))
+				failed = true
+			}
+		}
+		for _, key := range expectation.Forbidden {
+			if _, ok := lookupDottedKey(document, key); ok {
+				r.add("config_drift", false, fmt.Sprintf("%s: forbidden key %s is present in %s", label, key, expectation.File))
+				failed = true
+			}
+		}
+		if !failed {
+			r.add("config_drift", true, fmt.Sprintf("%s: %s matches registered %s expectations", label, expectation.File, expectation.Provider))
+		}
+	case "text":
+		content := string(data)
+		failed := false
+		for _, needle := range expectation.ExpectedContains {
+			if !strings.Contains(content, needle) {
+				r.add("config_drift", false, fmt.Sprintf("%s: %s is missing a required launcher contract", label, expectation.File))
+				failed = true
+			}
+		}
+		for _, needle := range expectation.ForbiddenContains {
+			if strings.Contains(content, needle) {
+				r.add("config_drift", false, fmt.Sprintf("%s: %s contains a forbidden launcher contract", label, expectation.File))
+				failed = true
+			}
+		}
+		if !failed {
+			r.add("config_drift", true, fmt.Sprintf("%s: %s matches registered %s launcher expectations", label, expectation.File, expectation.Provider))
+		}
+	default:
+		r.add("config_drift", false, fmt.Sprintf("%s: unsupported format %q", label, expectation.Format))
+	}
+}
+
+func lookupDottedKey(document map[string]any, key string) (any, bool) {
+	var current any = document
+	for _, part := range strings.Split(key, ".") {
+		object, ok := current.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		current, ok = object[part]
+		if !ok {
+			return nil, false
+		}
+	}
+	return current, true
+}
+
+func configValuesEqual(actual, expected any) bool {
+	actualJSON, actualErr := json.Marshal(actual)
+	expectedJSON, expectedErr := json.Marshal(expected)
+	return actualErr == nil && expectedErr == nil && string(actualJSON) == string(expectedJSON)
 }
 
 // --- ToolModule implementation ---
