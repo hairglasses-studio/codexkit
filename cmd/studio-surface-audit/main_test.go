@@ -100,6 +100,15 @@ func TestRunWritesReportsAndRejectsUnexpectedArguments(t *testing.T) {
 	if code := run([]string{"extra"}, &stdout, &stderr); code != 2 {
 		t.Fatalf("unexpected-argument exit = %d, want 2", code)
 	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"-workspace", root, "-json", root, "-md", mdPath}, &stdout, &stderr); code != 1 {
+		t.Fatalf("unwritable-report exit = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "error writing JSON report") {
+		t.Fatalf("missing write error: %s", stderr.String())
+	}
 }
 
 func writeFixture(t *testing.T, root, rel, content string) {

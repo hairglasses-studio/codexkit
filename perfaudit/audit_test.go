@@ -137,6 +137,47 @@ func TestAudit_AllScopesIncludesNonActiveReposAndDocsArchivePrompts(t *testing.T
 	}
 }
 
+func TestAudit_SkipsRuntimeArchiveAndDependencyTrees(t *testing.T) {
+	root := t.TempDir()
+	writeWorkspaceManifest(t, root, map[string]any{
+		"version": 1,
+		"repos": []map[string]any{
+			{
+				"name":            "ralphglasses",
+				"category":        "hub",
+				"scope":           "active_operator",
+				"language":        "go",
+				"baseline_target": true,
+				"go_work_member":  true,
+				"lifecycle":       "active",
+			},
+		},
+	})
+
+	repoPath := filepath.Join(root, "ralphglasses")
+	writeFile(t, repoPath, ".agents/skills/live/SKILL.md", "# Live\n")
+	for _, rel := range []string{
+		"vault/.agents/skills/secret/SKILL.md",
+		"imported/legacy/.agents/skills/archive/SKILL.md",
+		"vendor/example/.agents/skills/dependency/SKILL.md",
+		"data/runtime/.agents/skills/generated/SKILL.md",
+		".codex-worktrees/run/.agents/skills/copy/SKILL.md",
+	} {
+		writeFile(t, repoPath, rel, strings.Repeat("X", 17000))
+	}
+
+	report := Audit(root, Options{AllScopes: true})
+	if len(report.Repos) != 1 {
+		t.Fatalf("expected one repo, got %d", len(report.Repos))
+	}
+	if got := report.Repos[0].SkillCount; got != 1 {
+		t.Fatalf("SkillCount = %d, want only the live skill", got)
+	}
+	if got := len(report.Repos[0].OversizedSkills); got != 0 {
+		t.Fatalf("runtime/archive trees leaked into audit: %#v", report.Repos[0].OversizedSkills)
+	}
+}
+
 func TestAudit_SourcegraphRemoteWithoutEnabledToolsIsAllowed(t *testing.T) {
 	root := t.TempDir()
 	writeWorkspaceManifest(t, root, map[string]any{

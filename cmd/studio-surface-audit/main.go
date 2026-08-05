@@ -6,8 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"go/format"
+	"io"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,91 +26,55 @@ type AuditReport struct {
 }
 
 func main() {
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	flagSet := flag.NewFlagSet("studio-surface-audit", flag.ContinueOnError)
+	flagSet.SetOutput(stderr)
+
 	var workspaceRoot string
 	var outputJSON string
 	var outputMD string
 	var checkMode bool
 
-	flag.StringVar(&workspaceRoot, "workspace", "/home/hg/hairglasses-studio", "Workspace root to audit")
-	flag.StringVar(&outputJSON, "json", "surface-audit.json", "JSON output file")
-	flag.StringVar(&outputMD, "md", "surface-audit.md", "Markdown output file")
-	flag.BoolVar(&checkMode, "check", false, "Run continuous unification compliance checks")
-	flag.Parse()
+	flagSet.StringVar(&workspaceRoot, "workspace", "/home/hg/hairglasses-studio", "Workspace root to audit")
+	flagSet.StringVar(&outputJSON, "json", "surface-audit.json", "JSON output file")
+	flagSet.StringVar(&outputMD, "md", "surface-audit.md", "Markdown output file")
+	flagSet.BoolVar(&checkMode, "check", false, "Run continuous unification compliance checks")
+
+	if err := flagSet.Parse(args); err != nil {
+		return 2
+	}
+
+	if flagSet.NArg() > 0 {
+		fmt.Fprintf(stderr, "error: unexpected arguments\n")
+		return 2
+	}
 
 	if checkMode {
 		if !runComplianceChecks(workspaceRoot) {
-			os.Exit(1)
+			return 1
 		}
-		os.Exit(0)
+		return 0
 	}
 
-	report := AuditReport{
-		Timestamp:     time.Now(),
-		WorkspaceRoot: workspaceRoot,
-		LLMSurfaces:   make(map[string][]string),
+	report, err := collectAudit(workspaceRoot)
+	if err != nil {
+		fmt.Fprintf(stderr, "error collecting audit: %v\n", err)
+		return 1
 	}
 
-	// 1. Audit repos (directories in workspace root)
-	entries, err := os.ReadDir(workspaceRoot)
-	if err == nil {
-		for _, e := range entries {
-			if e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
-				// Check if it's a git repo
-				if _, err := os.Stat(filepath.Join(workspaceRoot, e.Name(), ".git")); err == nil {
-					report.Repos = append(report.Repos, e.Name())
-				}
-			}
-		}
-	} else {
-		log.Printf("Warning: failed to read workspace root: %v", err)
-	}
-
-	// 2. Audit skills
-	skillsDir := filepath.Join(workspaceRoot, ".agents", "skills")
-	if skillEntries, err := os.ReadDir(skillsDir); err == nil {
-		for _, e := range skillEntries {
-			if e.IsDir() {
-				report.Skills = append(report.Skills, e.Name())
-			}
-		}
-	}
-
-	// 3. Audit scripts
-	_ = filepath.WalkDir(workspaceRoot, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") && d.Name() != ".agents" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if strings.HasSuffix(d.Name(), ".sh") || strings.HasSuffix(d.Name(), ".py") {
-			rel, _ := filepath.Rel(workspaceRoot, path)
-			report.Scripts = append(report.Scripts, rel)
-		}
-		// 4. Audit LLM surfaces (claude, codex, agy, gemini)
-		nameLower := strings.ToLower(d.Name())
-		if nameLower == "claude.md" || nameLower == ".claude.json" || strings.Contains(path, "/.claude/") {
-			report.LLMSurfaces["claude"] = append(report.LLMSurfaces["claude"], path)
-		} else if nameLower == "codex.md" || nameLower == "agents.md" || nameLower == ".codex.json" || strings.Contains(path, "/.codex/") {
-			report.LLMSurfaces["codex"] = append(report.LLMSurfaces["codex"], path)
-		} else if nameLower == "gemini.md" || nameLower == ".gemini.json" || strings.Contains(path, "/.gemini/") {
-			report.LLMSurfaces["gemini"] = append(report.LLMSurfaces["gemini"], path)
-		} else if nameLower == "agy.md" || nameLower == ".agy.json" || strings.Contains(path, "/.agy/") {
-			report.LLMSurfaces["agy"] = append(report.LLMSurfaces["agy"], path)
-		}
-		return nil
-	})
-
-	// Output JSON
 	jsonBytes, err := json.MarshalIndent(report, "", "  ")
-	if err == nil {
-		_ = os.WriteFile(outputJSON, jsonBytes, 0644)
+	if err != nil {
+		fmt.Fprintf(stderr, "error encoding JSON report: %v\n", err)
+		return 1
+	}
+	if err := writeReportFile(outputJSON, jsonBytes); err != nil {
+		fmt.Fprintf(stderr, "error writing JSON report: %v\n", err)
+		return 1
 	}
 
-	// Output Markdown
 	mdBuilder := strings.Builder{}
 	mdBuilder.WriteString(fmt.Sprintf("# Surface Audit Report\n\nGenerated: %s\nWorkspace: %s\n\n", report.Timestamp.Format(time.RFC3339), report.WorkspaceRoot))
 
@@ -137,16 +101,149 @@ func main() {
 		}
 	}
 
-	_ = os.WriteFile(outputMD, []byte(mdBuilder.String()), 0644)
+	if err := writeReportFile(outputMD, []byte(mdBuilder.String())); err != nil {
+		fmt.Fprintf(stderr, "error writing Markdown report: %v\n", err)
+		return 1
+	}
 
-	fmt.Printf("Audit completed successfully. Wrote to %s and %s\n", outputJSON, outputMD)
+	fmt.Fprintf(stdout, "Audit completed successfully. Wrote to %s and %s\n", outputJSON, outputMD)
+	return 0
+}
+
+func writeReportFile(path string, data []byte) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("output path is required")
+	}
+	if dir := filepath.Dir(path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("create %s: %w", dir, err)
+		}
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	return nil
+}
+
+func collectAudit(workspaceRoot string) (AuditReport, error) {
+	report := AuditReport{
+		Timestamp:     time.Now(),
+		WorkspaceRoot: workspaceRoot,
+		LLMSurfaces:   make(map[string][]string),
+	}
+
+	manifestPath := filepath.Join(workspaceRoot, "workspace", "manifest.json")
+	if data, err := os.ReadFile(manifestPath); err == nil {
+		var m struct {
+			Repos []struct {
+				Name string `json:"name"`
+			} `json:"repos"`
+		}
+		if err := json.Unmarshal(data, &m); err == nil {
+			for _, r := range m.Repos {
+				if r.Name != "" {
+					report.Repos = append(report.Repos, r.Name)
+				}
+			}
+		}
+	}
+
+	if len(report.Repos) == 0 {
+		entries, err := os.ReadDir(workspaceRoot)
+		if err == nil {
+			for _, e := range entries {
+				if e.IsDir() && !strings.HasPrefix(e.Name(), ".") && e.Name() != "vault" && e.Name() != "imported" {
+					if _, err := os.Stat(filepath.Join(workspaceRoot, e.Name(), ".git")); err == nil {
+						report.Repos = append(report.Repos, e.Name())
+					}
+				}
+			}
+		}
+	}
+
+	skillsDir := filepath.Join(workspaceRoot, ".agents", "skills")
+	if skillEntries, err := os.ReadDir(skillsDir); err == nil {
+		for _, e := range skillEntries {
+			if e.IsDir() || e.Type()&os.ModeSymlink != 0 {
+				report.Skills = append(report.Skills, e.Name())
+			}
+		}
+	}
+
+	skipDirs := map[string]bool{
+		"imported":             true,
+		"vault":                true,
+		".codex-worktrees":     true,
+		".graveyard":           true,
+		"node_modules":         true,
+		"vendor":               true,
+		".cache":               true,
+		"git-cleanup-archives": true,
+		"worktrees":            true,
+		".worktrees":           true,
+	}
+
+	_ = filepath.WalkDir(workspaceRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		name := d.Name()
+		if d.IsDir() {
+			if skipDirs[name] {
+				return filepath.SkipDir
+			}
+			if len(report.Repos) > 0 && path != workspaceRoot {
+				rel, _ := filepath.Rel(workspaceRoot, path)
+				parts := strings.Split(filepath.ToSlash(rel), "/")
+				if len(parts) == 1 {
+					topDir := parts[0]
+					if !strings.HasPrefix(topDir, ".") && topDir != "scripts" {
+						isRepo := false
+						for _, r := range report.Repos {
+							if r == topDir {
+								isRepo = true
+								break
+							}
+						}
+						if !isRepo {
+							return filepath.SkipDir
+						}
+					}
+				}
+			}
+			if strings.HasPrefix(name, ".") && name != ".agents" && name != ".claude" && name != ".codex" && name != ".gemini" && name != ".agy" && path != workspaceRoot {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		rel, _ := filepath.Rel(workspaceRoot, path)
+
+		if strings.HasSuffix(name, ".sh") || strings.HasSuffix(name, ".py") {
+			report.Scripts = append(report.Scripts, rel)
+		}
+
+		nameLower := strings.ToLower(name)
+		if nameLower == "claude.md" || nameLower == ".claude.json" || strings.Contains(path, "/.claude/") {
+			report.LLMSurfaces["claude"] = append(report.LLMSurfaces["claude"], rel)
+		} else if nameLower == "codex.md" || nameLower == "agents.md" || nameLower == ".codex.json" || strings.Contains(path, "/.codex/") {
+			report.LLMSurfaces["codex"] = append(report.LLMSurfaces["codex"], rel)
+		} else if nameLower == "gemini.md" || nameLower == ".gemini.json" || strings.Contains(path, "/.gemini/") {
+			report.LLMSurfaces["gemini"] = append(report.LLMSurfaces["gemini"], rel)
+		} else if nameLower == "agy.md" || nameLower == ".agy.json" || strings.Contains(path, "/.agy/") {
+			report.LLMSurfaces["agy"] = append(report.LLMSurfaces["agy"], rel)
+		}
+
+		return nil
+	})
+
+	return report, nil
 }
 
 func runComplianceChecks(workspaceRoot string) bool {
 	fmt.Println("=== Studio Continuous Unification Compliance Checks ===")
 	passed := true
 
-	// 1. Schema drift via codexkit source-contract-check
 	fmt.Println("--> Running Source Contract Check...")
 	report, err := sourcecontract.Check(workspaceRoot, sourcecontract.CheckOptions{})
 	if err != nil {
@@ -206,7 +303,6 @@ func runComplianceChecks(workspaceRoot string) bool {
 		fmt.Println("[PASS] Source contract check passed")
 	}
 
-	// 2. Skill symlinks integrity check
 	fmt.Println("--> Running Skill Symlinks Integrity Check...")
 	if !checkSkillSymlinks(workspaceRoot) {
 		passed = false
@@ -214,7 +310,6 @@ func runComplianceChecks(workspaceRoot string) bool {
 		fmt.Println("[PASS] Skill symlinks integrity check passed")
 	}
 
-	// 3. Gofmt compliance check
 	fmt.Println("--> Running Gofmt Compliance Check...")
 	if !checkGofmtCompliance(workspaceRoot) {
 		passed = false
@@ -235,7 +330,6 @@ func checkSkillSymlinks(workspaceRoot string) bool {
 	passed := true
 	symlinksChecked := 0
 
-	// Find all repo directories + workspaceRoot
 	dirsToScan := []string{workspaceRoot}
 	entries, err := os.ReadDir(workspaceRoot)
 	if err == nil {
@@ -246,7 +340,7 @@ func checkSkillSymlinks(workspaceRoot string) bool {
 		}
 	}
 
-	skillProviderDirs := []string{".claude/skills", ".codex/skills", ".gemini/skills"}
+	skillProviderDirs := []string{".claude/skills", ".codex/skills", ".gemini/skills", ".agents/skills"}
 	for _, baseDir := range dirsToScan {
 		for _, providerDir := range skillProviderDirs {
 			targetDir := filepath.Join(baseDir, providerDir)
@@ -294,7 +388,12 @@ func checkSkillSymlinks(workspaceRoot string) bool {
 	return passed
 }
 
-func checkGofmtCompliance(workspaceRoot string) bool {
+func checkGofmtCompliance(workspaceRoot string, out ...io.Writer) bool {
+	var w io.Writer = os.Stdout
+	if len(out) > 0 && out[0] != nil {
+		w = out[0]
+	}
+
 	excludedDirs := map[string]bool{
 		".git":                 true,
 		"vault":                true,
@@ -307,6 +406,7 @@ func checkGofmtCompliance(workspaceRoot string) bool {
 		"git-cleanup-archives": true,
 		"config":               true,
 		"data":                 true,
+		".data":                true,
 		"docs":                 true,
 		"reports":              true,
 		"deploy":               true,
@@ -341,21 +441,21 @@ func checkGofmtCompliance(workspaceRoot string) bool {
 			filesChecked++
 			content, rerr := os.ReadFile(path)
 			if rerr != nil {
-				fmt.Printf("[FAIL] Could not read Go file %s: %v\n", path, rerr)
+				fmt.Fprintf(w, "[FAIL] Could not read Go file %s: %v\n", path, rerr)
 				passed = false
 				return nil
 			}
 
 			formatted, ferr := format.Source(content)
 			if ferr != nil {
-				fmt.Printf("[FAIL] gofmt error in %s: %v\n", path, ferr)
+				fmt.Fprintf(w, "[FAIL] gofmt error in %s: %v\n", path, ferr)
 				passed = false
 				return nil
 			}
 
 			if !bytes.Equal(content, formatted) {
 				rel, _ := filepath.Rel(workspaceRoot, path)
-				fmt.Printf("[FAIL] Unformatted Go file: %s\n", rel)
+				fmt.Fprintf(w, "[FAIL] Unformatted Go file: %s\n", rel)
 				passed = false
 			}
 		}
@@ -364,12 +464,12 @@ func checkGofmtCompliance(workspaceRoot string) bool {
 	})
 
 	if err != nil {
-		fmt.Printf("[FAIL] Gofmt walk error: %v\n", err)
+		fmt.Fprintf(w, "[FAIL] Gofmt walk error: %v\n", err)
 		return false
 	}
 
 	if filesChecked > 0 {
-		fmt.Printf("    Checked %d Go source files for formatting\n", filesChecked)
+		fmt.Fprintf(w, "    Checked %d Go source files for formatting\n", filesChecked)
 	}
 	return passed
 }
