@@ -32,6 +32,11 @@ func (r Report) Markdown() string {
 		r.Summary.CompatibilityOnlyRepos,
 		r.Summary.MissingDirectories,
 	)
+	if r.Summary.ExcludedCompatibilityOnly > 0 {
+		fmt.Fprintf(&b, "- Excluded from scoring: `%d` compatibility-only repos (pass `all_scopes: true` to include them)\n",
+			r.Summary.ExcludedCompatibilityOnly,
+		)
+	}
 
 	if len(r.Repos) > 0 {
 		fmt.Fprintf(&b, "\n## Repo Scores\n\n")

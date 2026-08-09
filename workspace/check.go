@@ -100,6 +100,10 @@ func Check(root string, manifest Manifest) Report {
 		if _, ok := expectedGoWork[repoName]; ok {
 			continue
 		}
+		if owner, kind := resolveGoWorkOwner(root, repoName, manifestRepos); owner != "" {
+			report.add("go_work_member", repoName, true, fmt.Sprintf("%s of manifest repo %q; not required to be its own go_work_member entry", kind, owner))
+			continue
+		}
 		report.add("go_work_member", repoName, false, "present in go.work but not marked go_work_member in workspace manifest")
 	}
 
@@ -218,6 +222,42 @@ func repoDirectoryRequired(repo Repo, decision ConsolidationDecision) bool {
 	default:
 		return true
 	}
+}
+
+// resolveGoWorkOwner maps a go.work "use" entry that doesn't match a
+// manifest repo name directly to its owning manifest repo, for two cases
+// that are legitimate but aren't 1:1 with a top-level repo name:
+//
+//   - a nested-module path, e.g. "cr8-cli/go" owned by manifest repo
+//     "cr8-cli" (only a subdirectory of that repo is a Go module); and
+//   - a symlinked repo directory, e.g. "docs" -> "ralphglasses/studio-docs",
+//     owned by manifest repo "ralphglasses" via symlink resolution.
+//
+// Returns an empty owner if repoName can't be resolved to a manifest repo.
+func resolveGoWorkOwner(root, repoName string, manifestRepos map[string]Repo) (owner, kind string) {
+	if idx := strings.Index(repoName, "/"); idx > 0 {
+		first := repoName[:idx]
+		if _, ok := manifestRepos[first]; ok {
+			return first, "nested go module"
+		}
+		return "", ""
+	}
+
+	target, err := os.Readlink(filepath.Join(root, repoName))
+	if err != nil {
+		return "", ""
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(root, target)
+	}
+	target = filepath.Clean(target)
+	for name, repo := range manifestRepos {
+		repoPath := filepath.Clean(RepoPath(root, repo))
+		if target == repoPath || strings.HasPrefix(target, repoPath+string(filepath.Separator)) {
+			return name, "symlinked module"
+		}
+	}
+	return "", ""
 }
 
 // ParseGoWorkModules returns relative module paths listed in a go.work use block.

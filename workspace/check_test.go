@@ -114,6 +114,70 @@ func TestCheck_AllowsMissingArchivedCompatibilityClone(t *testing.T) {
 	}
 }
 
+func TestCheck_GoWorkNestedModulePathOwnedByManifestRepo(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "cr8-cli", "go"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go.work"), []byte("go 1.26.1\nuse ./cr8-cli/go\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	manifest := Manifest{
+		Version: 1,
+		Repos: []Repo{
+			{
+				Name:         "cr8-cli",
+				Scope:        "active_first_party",
+				GoWorkMember: false,
+			},
+		},
+	}
+
+	report := Check(root, manifest)
+	if !report.Passed {
+		t.Fatalf("expected workspace check to pass; findings: %+v", report.Findings)
+	}
+	if !hasFinding(report.Findings, "go_work_member", "cr8-cli/go", true, `nested go module of manifest repo "cr8-cli"; not required to be its own go_work_member entry`) {
+		t.Fatalf("expected cr8-cli/go to resolve as a nested module of cr8-cli; findings: %+v", report.Findings)
+	}
+}
+
+func TestCheck_GoWorkSymlinkedRepoOwnedByManifestRepo(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "ralphglasses", "studio-docs"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("ralphglasses", "studio-docs"), filepath.Join(root, "docs")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "ralphglasses", "go.mod"), []byte("module ralphglasses\n\ngo 1.26.1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go.work"), []byte("go 1.26.1\nuse (\n\t./ralphglasses\n\t./docs\n)\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	manifest := Manifest{
+		Version: 1,
+		Repos: []Repo{
+			{
+				Name:         "ralphglasses",
+				Scope:        "active_operator",
+				GoWorkMember: true,
+			},
+		},
+	}
+
+	report := Check(root, manifest)
+	if !report.Passed {
+		t.Fatalf("expected workspace check to pass; findings: %+v", report.Findings)
+	}
+	if !hasFinding(report.Findings, "go_work_member", "docs", true, `symlinked module of manifest repo "ralphglasses"; not required to be its own go_work_member entry`) {
+		t.Fatalf("expected docs symlink to resolve as a module of ralphglasses; findings: %+v", report.Findings)
+	}
+}
+
 func hasFinding(findings []Finding, check, repo string, passed bool, message string) bool {
 	for _, finding := range findings {
 		if finding.Check == check && finding.Repo == repo && finding.Passed == passed && finding.Message == message {

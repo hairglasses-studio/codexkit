@@ -9,12 +9,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 	"github.com/hairglasses-studio/codexkit/skillsync"
 )
+
+// maxFleetReportFailingRepos bounds how many failing repos fleet_report
+// lists by name before collapsing the remainder into a count, keeping the
+// report readable for a large fleet.
+const maxFleetReportFailingRepos = 30
 
 // RepoAudit is the combined audit result for a single repo.
 type RepoAudit struct {
@@ -134,9 +140,50 @@ func (m *module) Tools() []codexkit.ToolDef {
 					scanPath = filepath.Join(home, "hairglasses-studio")
 				}
 				report := Audit(scanPath)
-				return fmt.Sprintf("Fleet: %d repos, %d passed, %d failed",
-					report.TotalRepos, report.Passed, report.Failed), nil
+				return fleetReportSummary(report), nil
 			},
 		},
 	}
+}
+
+// fleetReportSummary renders the fleet_report text: an overall count line
+// plus, when any repos fail, their names and failing-check counts so the
+// caller doesn't have to re-run fleet_audit to see who's broken.
+func fleetReportSummary(report FleetReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Fleet: %d repos, %d passed, %d failed",
+		report.TotalRepos, report.Passed, report.Failed)
+	if report.Failed == 0 {
+		return b.String()
+	}
+	b.WriteString("\n\nFailing repos:\n")
+	shown := 0
+	for _, repo := range report.Repos {
+		if repo.Passed {
+			continue
+		}
+		if shown >= maxFleetReportFailingRepos {
+			break
+		}
+		fmt.Fprintf(&b, "- %s (%d failing check%s)\n",
+			repo.RepoName, failingCheckCount(repo), pluralSuffix(failingCheckCount(repo)))
+		shown++
+	}
+	if remaining := report.Failed - shown; remaining > 0 {
+		fmt.Fprintf(&b, "- ... and %d more\n", remaining)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// failingCheckCount counts the failing baseline checks plus skill-sync and
+// mcp-sync errors for one repo audit.
+func failingCheckCount(repo RepoAudit) int {
+	return repo.Baseline.Failed + len(repo.SkillSync.Errors) + len(repo.MCPSync.Errors)
+}
+
+func pluralSuffix(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }

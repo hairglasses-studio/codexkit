@@ -31,12 +31,24 @@ func (m *module) Tools() []codexkit.ToolDef {
 				"type":        "boolean",
 				"description": "Return Markdown instead of structured JSON.",
 			},
+			"detail": map[string]any{
+				"type":        "boolean",
+				"description": "Return the full per-repo shape (git status, baseline findings, every signal) instead of the compact default (name, score, lane, lifecycle, negative-signal one-liners).",
+			},
+			"limit": map[string]any{
+				"type":        "integer",
+				"description": "Max repos to include in the repos list. 0 or omitted means no limit.",
+			},
+			"offset": map[string]any{
+				"type":        "integer",
+				"description": "Repos to skip before applying limit, for paging through a large fleet.",
+			},
 		},
 	}
 	return []codexkit.ToolDef{
 		{
 			Name:        "repo_readiness_score",
-			Description: "Score workspace repos for autonomous mutation readiness using manifest, fleet, git, and baseline signals.",
+			Description: "Score workspace repos for autonomous mutation readiness using manifest, fleet, git, and baseline signals. Compact by default; pass detail:true for the full per-repo shape.",
 			Annotations: codexkit.ToolAnnotations(true, false, true, false),
 			Schema:      schema,
 			Handler: func(params map[string]any) (any, error) {
@@ -53,8 +65,25 @@ func (m *module) Tools() []codexkit.ToolDef {
 				if markdown {
 					return report.Markdown(), nil
 				}
-				return report, nil
+				limit := intParam(params["limit"])
+				offset := intParam(params["offset"])
+				detail, _ := params["detail"].(bool)
+				if detail {
+					return report.Detail(limit, offset), nil
+				}
+				return report.Compact(limit, offset), nil
 			},
 		},
+	}
+}
+
+func intParam(v any) int {
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	default:
+		return 0
 	}
 }

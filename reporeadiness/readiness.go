@@ -59,6 +59,10 @@ type Summary struct {
 	BaselineFailingRepos   int            `json:"baseline_failing_repos"`
 	NeverPublishRepos      int            `json:"never_publish_repos"`
 	CompatibilityOnlyRepos int            `json:"compatibility_only_repos"`
+	// ExcludedCompatibilityOnly counts compatibility_only manifest repos
+	// that were skipped entirely because AllScopes was false. Without this,
+	// their absence from Repos is silent rather than visible.
+	ExcludedCompatibilityOnly int `json:"excluded_compatibility_only"`
 }
 
 // RepoScore captures one repo's scored readiness lane.
@@ -152,8 +156,12 @@ func Score(root string, opts Options) (Report, error) {
 		},
 	}
 
+	excludedCompatibilityOnly := 0
 	for _, repo := range manifest.Repos {
 		if !opts.AllScopes && repo.Scope != "active_operator" && repo.Scope != "active_first_party" {
+			if repo.Scope == "compatibility_only" {
+				excludedCompatibilityOnly++
+			}
 			continue
 		}
 		score := scoreRepo(root, repo, fleetModes[repo.Name])
@@ -169,6 +177,7 @@ func Score(root string, opts Options) (Report, error) {
 		return laneRank(report.Repos[i].Lane) < laneRank(report.Repos[j].Lane)
 	})
 	report.Summary = summarize(report.Summary.Scope, report.Repos)
+	report.Summary.ExcludedCompatibilityOnly = excludedCompatibilityOnly
 	sort.Strings(report.Warnings)
 	return report, nil
 }
@@ -227,6 +236,10 @@ func scoreRepo(root string, repo workspace.Repo, fleetMode string) RepoScore {
 	case "maintenance-only":
 		add("lifecycle", -12, "maintenance-only lifecycle")
 		block("maintenance-only lifecycle")
+	case "archived":
+		add("lifecycle", -2, "archived lifecycle")
+	case "deprecated":
+		add("lifecycle", -2, "deprecated lifecycle")
 	default:
 		add("lifecycle", -4, "unknown lifecycle")
 	}
@@ -498,6 +511,111 @@ func laneRank(lane string) int {
 	default:
 		return 4
 	}
+}
+
+// CompactRepoScore is the token-bounded per-repo projection used by the
+// default repo_readiness_score response: no git detail, no baseline
+// findings, no full signal list — just enough to triage a lane decision.
+type CompactRepoScore struct {
+	RepoName        string   `json:"repo_name"`
+	Score           int      `json:"score"`
+	Lane            string   `json:"lane"`
+	Lifecycle       string   `json:"lifecycle,omitempty"`
+	NegativeSignals []string `json:"negative_signals,omitempty"`
+}
+
+// CompactReport is the default, token-bounded repo_readiness_score shape.
+// Pass detail:true to the tool for the full Report shape instead.
+type CompactReport struct {
+	GeneratedAt   string              `json:"generated_at"`
+	GeneratedBy   string              `json:"generated_by"`
+	WorkspaceRoot string              `json:"workspace_root"`
+	Summary       Summary             `json:"summary"`
+	Repos         []CompactRepoScore  `json:"repos"`
+	Warnings      []string            `json:"warnings,omitempty"`
+	TotalRepos    int                 `json:"total_repos"`
+	Offset        int                 `json:"offset"`
+	Limit         int                 `json:"limit,omitempty"`
+	Truncated     bool                `json:"truncated,omitempty"`
+}
+
+// DetailReport is the full Report shape plus pagination metadata, for
+// detail:true callers that still want a bounded repos slice.
+type DetailReport struct {
+	Report
+	TotalRepos int  `json:"total_repos"`
+	Offset     int  `json:"offset"`
+	Limit      int  `json:"limit,omitempty"`
+	Truncated  bool `json:"truncated,omitempty"`
+}
+
+// Compact projects the report to its default, token-bounded shape.
+// limit <= 0 means no limit; offset skips already-seen repos.
+func (r Report) Compact(limit, offset int) CompactReport {
+	repos, total, truncated := paginateRepos(r.Repos, limit, offset)
+	compact := make([]CompactRepoScore, 0, len(repos))
+	for _, repo := range repos {
+		compact = append(compact, CompactRepoScore{
+			RepoName:        repo.RepoName,
+			Score:           repo.Score,
+			Lane:            repo.Lane,
+			Lifecycle:       repo.Lifecycle,
+			NegativeSignals: negativeSignalLines(repo.Signals),
+		})
+	}
+	return CompactReport{
+		GeneratedAt:   r.GeneratedAt,
+		GeneratedBy:   r.GeneratedBy,
+		WorkspaceRoot: r.WorkspaceRoot,
+		Summary:       r.Summary,
+		Repos:         compact,
+		Warnings:      r.Warnings,
+		TotalRepos:    total,
+		Offset:        offset,
+		Limit:         limit,
+		Truncated:     truncated,
+	}
+}
+
+// Detail returns the full Report shape with the Repos slice paginated.
+func (r Report) Detail(limit, offset int) DetailReport {
+	repos, total, truncated := paginateRepos(r.Repos, limit, offset)
+	out := r
+	out.Repos = repos
+	return DetailReport{
+		Report:     out,
+		TotalRepos: total,
+		Offset:     offset,
+		Limit:      limit,
+		Truncated:  truncated,
+	}
+}
+
+func paginateRepos(repos []RepoScore, limit, offset int) (sliced []RepoScore, total int, truncated bool) {
+	total = len(repos)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > total {
+		offset = total
+	}
+	sliced = repos[offset:]
+	if limit > 0 && len(sliced) > limit {
+		sliced = sliced[:limit]
+		truncated = true
+	}
+	return sliced, total, truncated
+}
+
+func negativeSignalLines(signals []Signal) []string {
+	var lines []string
+	for _, signal := range signals {
+		if signal.Delta >= 0 {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s: %s (%d)", signal.Name, signal.Reason, signal.Delta))
+	}
+	return lines
 }
 
 func scopeLabel(opts Options) string {

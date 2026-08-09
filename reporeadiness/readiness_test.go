@@ -69,13 +69,19 @@ func initGitRepo(t *testing.T, path string) {
 	runReadinessGit(t, path, "init")
 	runReadinessGit(t, path, "config", "user.email", "test@example.test")
 	runReadinessGit(t, path, "config", "user.name", "Test User")
+	runReadinessGit(t, path, "config", "commit.gpgsign", "false")
 	runReadinessGit(t, path, "add", ".")
 	runReadinessGit(t, path, "commit", "-m", "initial")
 }
 
 func runReadinessGit(t *testing.T, path string, args ...string) {
 	t.Helper()
+	// A local gpgsign=false doesn't reach repos the test creates in
+	// t.TempDir() if the operator's global git config demands signing —
+	// GIT_CONFIG_GLOBAL=/dev/null keeps commit from blocking on a GPG
+	// prompt regardless of the host's global config.
 	cmd := exec.Command("git", append([]string{"-C", path}, args...)...)
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v failed: %v\n%s", args, err, out)
