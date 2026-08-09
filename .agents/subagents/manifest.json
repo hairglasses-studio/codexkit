@@ -4,7 +4,7 @@
   "optimization_policy": {
     "git_mutex_prevention": "workspace_branch_isolation",
     "output_mode": "direct_file_stream",
-    "fast_audit_binary": "/home/hg/.local/bin/studio-surface-audit"
+    "fast_audit_binary": "studio-surface-audit"
   },
   "subagents": [
     {

@@ -1,5 +1,12 @@
 # codexkit
 
+> **Status: frozen public compatibility snapshot.** Active internal development
+> moved to the private `hairglasses-studio/codex-harness-staging` repository,
+> where Codex-specific harness policy and this toolkit now share one authority.
+> This public module path and the `v0.1.0` release remain available for existing
+> consumers, but new fleet-policy development does not land here. See
+> [DEPRECATED.md](DEPRECATED.md) for the compatibility and archive gates.
+
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Public CI](https://github.com/hairglasses-studio/codexkit/actions/workflows/public-ci.yml/badge.svg)](https://github.com/hairglasses-studio/codexkit/actions/workflows/public-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -7,7 +14,10 @@
 
 Fleet management toolkit for AI agent repos — baseline validation, skill surface sync, and MCP profile management.
 
-> **Public portfolio context:** codexkit is the sanitized public slice of a larger private fleet-management workflow. It shows the reusable validation, sync, and projection patterns without publishing private repo inventory, workstation state, credentials, or tenant details.
+> **Public portfolio context:** codexkit is the frozen sanitized public slice of
+> a larger private fleet-management workflow. It shows the reusable validation,
+> sync, and projection patterns without publishing private repo inventory,
+> workstation state, credentials, or tenant details.
 >
 > See [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) for the explicit include/exclude contract.
 
@@ -121,11 +131,11 @@ codexkit workspace primitive-index-check /path/to/workspace
 
 # Inventory and check the strict Claude/Codex/AGY configuration plane
 codexkit workspace config-index /path/to/workspace \
-  --user-home /home/hg --root-home /root \
+  --user-home /path/to/user-home --root-home /path/to/root-home \
   --json-out /path/to/artifacts/provider-config-index.json \
   --markdown-out /path/to/artifacts/provider-config-index.md
 codexkit workspace config-index-check /path/to/workspace \
-  --user-home /home/hg --root-home /root
+  --user-home /path/to/user-home --root-home /path/to/root-home
 ```
 
 ### Workspace Source Contract

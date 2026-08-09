@@ -4,6 +4,11 @@
 provider configuration management. It intentionally demonstrates the generic
 mechanics while excluding private workspace state.
 
+This tree is now a frozen public compatibility snapshot. Active internal
+development lives with the private Codex harness; changes published here must
+remain sanitized, provider-neutral, and suitable for external consumers. See
+`DEPRECATED.md` for the transition contract.
+
 ## Included
 
 - Repo baseline validation for agent instruction files, Codex config, skills,

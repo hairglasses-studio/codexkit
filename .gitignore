@@ -1,5 +1,6 @@
 # Build artifacts
 .codex/bin/
+/codexkit
 
 # Ralph runtime state
 .ralph/handoffs/

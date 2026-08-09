@@ -8,6 +8,11 @@ SemVer cadence.
 
 ## [Unreleased]
 
+### Deprecated
+- Froze this repository as the public compatibility snapshot after importing
+  its full history into the private Codex harness. The public module path and
+  `v0.1.0` release remain available during the compatibility window.
+
 ### Added
 - Performance audit module (`perfaudit`) with supporting script improvements.
 - Projection diff preview helper for global MCP overlay changes.
@@ -36,6 +41,8 @@ SemVer cadence.
   test, lint, or validate this repo.
 
 ### Fixed
+- Removed an accidentally tracked compiled `codexkit` ELF binary and added a
+  root-level ignore rule so local builds cannot reintroduce it.
 - Ignored retired Cline hooks and stale audit state in `unificationaudit`.
 - Honored repo-local source-contract checks; aligned workspace projection
   checks.
