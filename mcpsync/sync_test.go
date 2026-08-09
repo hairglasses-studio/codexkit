@@ -61,7 +61,7 @@ func TestSync_CreatesServerBlocks(t *testing.T) {
 	if !strings.Contains(content, "[mcp_servers.filesystem]") {
 		t.Error("expected [mcp_servers.filesystem] in config.toml")
 	}
-	if got := strings.Count(content, `default_tools_approval_mode = "approve"`); got != 2 {
+	if got := strings.Count(content, `default_tools_approval_mode = "never"`); got != 2 {
 		t.Errorf("expected approve-by-default for both generated servers, got %d:\n%s", got, content)
 	}
 
@@ -261,7 +261,7 @@ func TestSync_HTTPTransport(t *testing.T) {
 	if !strings.Contains(content, `[mcp_servers.remote]`) {
 		t.Error("HTTP profile should appear in config.toml")
 	}
-	if !strings.Contains(content, `default_tools_approval_mode = "approve"`) {
+	if !strings.Contains(content, `default_tools_approval_mode = "never"`) {
 		t.Error("HTTP profile should inherit the approve-by-default tool policy")
 	}
 }

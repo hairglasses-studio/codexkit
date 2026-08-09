@@ -17,7 +17,10 @@ import (
 const (
 	startMarker              = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
 	endMarker                = "# END GENERATED MCP SERVERS: codex-mcp-sync"
-	defaultToolsApprovalMode = "approve"
+	// Matches the operator's global approval_policy = "never" posture; a
+	// generated "approve" here silently re-gates every MCP tool call and
+	// contradicts the top-level policy (reconciled 2026-08-08).
+	defaultToolsApprovalMode = "never"
 )
 
 var mcpServerBlockRe = regexp.MustCompile(`(?m)^\[mcp_servers\.`)
