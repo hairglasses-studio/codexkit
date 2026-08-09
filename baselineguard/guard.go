@@ -131,7 +131,11 @@ func DiscoverWorkspaceTargetsWithOverlay(scanPath, overlayPath string) ([]string
 	if err == nil {
 		paths := make([]string, 0, len(manifest.Repos))
 		for _, repo := range manifest.Repos {
-			if !repo.BaselineTarget && !strings.HasPrefix(repo.Scope, "active_") {
+			// baseline_target:false always excludes a repo, regardless of
+			// scope — a repo scoped active_* (e.g. a compat mirror or
+			// practice repo) is not implicitly swept back in. This mirrors
+			// Manifest.Filter's BaselineOnly gate (workspace/manifest.go).
+			if !repo.BaselineTarget {
 				continue
 			}
 			repoPath := workspace.RepoPath(scanPath, repo)

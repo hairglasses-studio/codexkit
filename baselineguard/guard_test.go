@@ -92,9 +92,44 @@ func TestDiscoverWorkspaceTargetsUsesManifestAndSkipsNonGitRepos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{filepath.Join(root, "active"), filepath.Join(root, "operator")}
+	// "operator" has baseline_target:false despite its active_operator scope,
+	// and "missing" has no on-disk .git — neither should be swept in.
+	want := []string{filepath.Join(root, "active")}
 	if !equalStrings(targets, want) {
 		t.Fatalf("targets = %#v, want %#v", targets, want)
+	}
+}
+
+// TestDiscoverWorkspaceTargetsBaselineTargetFalseExcludesRegardlessOfScope is
+// a regression test for the OR-vs-AND bug where a repo with
+// baseline_target:false was still swept into baseline checks solely because
+// its scope had an "active_" prefix. Modeled on the real fleet manifest
+// entries for open-mcpkit and anthropic-ica-practice, both scoped
+// active_first_party but deliberately marked baseline_target:false.
+func TestDiscoverWorkspaceTargetsBaselineTargetFalseExcludesRegardlessOfScope(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "workspace/manifest.json", `{
+  "version": 2,
+  "repos": [
+    {"name": "open-mcpkit", "category": "application", "scope": "active_first_party", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "canonical"},
+    {"name": "anthropic-ica-practice", "category": "application", "scope": "active_first_party", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "canonical"},
+    {"name": "active", "category": "application", "scope": "active_first_party", "language": "Go", "baseline_target": true, "go_work_member": false, "lifecycle": "canonical"}
+  ]
+}
+`)
+	for _, name := range []string{"open-mcpkit", "anthropic-ica-practice", "active"} {
+		if err := os.MkdirAll(filepath.Join(root, name, ".git"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	targets, err := DiscoverWorkspaceTargets(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{filepath.Join(root, "active")}
+	if !equalStrings(targets, want) {
+		t.Fatalf("targets = %#v, want %#v — baseline_target:false must exclude regardless of active_ scope", targets, want)
 	}
 }
 

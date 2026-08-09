@@ -61,10 +61,18 @@ func Audit(scanPath string) FleetReport {
 			MCPSync:   mcpsync.Diff(repoPath),
 		}
 
+		// mcpsync.Diff reports a "reading .mcp.json" error when the file is
+		// simply absent — a legitimate state, not a repo that has drifted.
+		// baselineguard.addMCPSyncCheck already skips its own mcp_sync
+		// finding in that case; mirror that here so an absent .mcp.json
+		// doesn't fold into a false failure.
+		_, mcpConfigErr := os.Stat(filepath.Join(repoPath, ".mcp.json"))
+		mcpConfigPresent := mcpConfigErr == nil
+
 		// Passed if baseline passes and no sync errors
 		audit.Passed = audit.Baseline.Passed &&
 			len(audit.SkillSync.Errors) == 0 &&
-			len(audit.MCPSync.Errors) == 0
+			(!mcpConfigPresent || len(audit.MCPSync.Errors) == 0)
 
 		report.Repos = append(report.Repos, audit)
 		report.TotalRepos++
