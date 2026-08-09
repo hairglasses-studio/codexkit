@@ -18,5 +18,5 @@ credentials.json
 auth.json
 token.json
 
-# Generated private skill mirrors stay out of the public tree.
-skills/
+# Top-level generated private skill mirrors stay out of the public tree.
+/skills/
