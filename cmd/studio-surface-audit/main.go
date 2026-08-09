@@ -38,7 +38,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	var outputMD string
 	var checkMode bool
 
-	flagSet.StringVar(&workspaceRoot, "workspace", "/home/hg/hairglasses-studio", "Workspace root to audit")
+	flagSet.StringVar(&workspaceRoot, "workspace", ".", "Workspace root to audit")
 	flagSet.StringVar(&outputJSON, "json", "surface-audit.json", "JSON output file")
 	flagSet.StringVar(&outputMD, "md", "surface-audit.md", "Markdown output file")
 	flagSet.BoolVar(&checkMode, "check", false, "Run continuous unification compliance checks")

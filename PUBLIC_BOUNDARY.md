@@ -4,6 +4,12 @@
 provider configuration management. It intentionally demonstrates the generic
 mechanics while excluding private workspace state.
 
+As of the harness consolidation, this standalone repository is a public
+compatibility snapshot. Active private development lives in a centralized
+Codex harness; this repo must not describe private harness internals, private
+repo names beyond already-public compatibility context, workstation paths, or
+operator state.
+
 ## Included
 
 - Repo baseline validation for agent instruction files, Codex config, skills,
@@ -26,6 +32,8 @@ mechanics while excluding private workspace state.
   agent worktrees.
 - Private policy details that only make sense inside a single operator's
   workstation or organization.
+- Private Codex harness implementation details. Keep references generic unless
+  a public compatibility path requires them.
 - Generated private skill mirrors. The public tree keeps only sanitized
   codexkit skill docs under `.agents/`, `.claude/`, and `plugins/`.
 

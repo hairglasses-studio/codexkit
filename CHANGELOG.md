@@ -8,6 +8,12 @@ SemVer cadence.
 
 ## [Unreleased]
 
+### Deprecated
+- The standalone repository is now a public compatibility snapshot. Active
+  private development moved into the centralized Codex harness with this module
+  nested under `codexkit/`; the module path remains
+  `github.com/hairglasses-studio/codexkit` during the compatibility window.
+
 ### Added
 - Performance audit module (`perfaudit`) with supporting script improvements.
 - Projection diff preview helper for global MCP overlay changes.
@@ -17,6 +23,8 @@ SemVer cadence.
 - `scripts/check-public-boundary.sh` public-boundary checker, wired into CI.
 
 ### Changed
+- Removed the tracked built `codexkit` binary from source control; build the CLI
+  from `cmd/codexkit` instead.
 - Retired hosted Claude/Codex workflows in favor of the fleet-local baseline
   guard and public CI paths.
 - Refined unification and performance-reduction heuristics; bounded Gemini

@@ -7,6 +7,13 @@
 
 Fleet management toolkit for AI agent repos — baseline validation, skill surface sync, and MCP profile management.
 
+> **Deprecation notice:** this standalone repository is now a public
+> compatibility snapshot. Active private development moved to the centralized
+> Codex harness repository, where this module is nested under `codexkit/`.
+> The Go module path remains `github.com/hairglasses-studio/codexkit` for the
+> compatibility window, so existing installs and imports can continue to work.
+> See [DEPRECATED.md](DEPRECATED.md).
+>
 > **Public portfolio context:** codexkit is the sanitized public slice of a larger private fleet-management workflow. It shows the reusable validation, sync, and projection patterns without publishing private repo inventory, workstation state, credentials, or tenant details.
 >
 > See [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) for the explicit include/exclude contract.
@@ -15,12 +22,13 @@ Fleet management toolkit for AI agent repos — baseline validation, skill surfa
 
 For a quick review path:
 
-1. Run the self-contained commands in [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md).
-2. Review the data flow in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-3. Use [docs/PORTFOLIO_PROOF.md](docs/PORTFOLIO_PROOF.md) for the architecture
+1. Read [DEPRECATED.md](DEPRECATED.md) for the compatibility-window contract.
+2. Run the self-contained commands in [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md).
+3. Review the data flow in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+4. Use [docs/PORTFOLIO_PROOF.md](docs/PORTFOLIO_PROOF.md) for the architecture
    diagram, walkthrough plan, tradeoffs, and interview prompts.
-4. Check [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) before adding examples or generated artifacts.
-5. Use the workspace commands only against paths you control.
+5. Check [PUBLIC_BOUNDARY.md](PUBLIC_BOUNDARY.md) before adding examples or generated artifacts.
+6. Use the workspace commands only against paths you control.
 
 For dry-run sync demos, use the synthetic fixture in
 [`examples/minimal-agent-repo`](examples/minimal-agent-repo/) instead of a
@@ -121,11 +129,11 @@ codexkit workspace primitive-index-check /path/to/workspace
 
 # Inventory and check the strict Claude/Codex/AGY configuration plane
 codexkit workspace config-index /path/to/workspace \
-  --user-home /home/hg --root-home /root \
+  --user-home /path/to/user-home --root-home /path/to/root-home \
   --json-out /path/to/artifacts/provider-config-index.json \
   --markdown-out /path/to/artifacts/provider-config-index.md
 codexkit workspace config-index-check /path/to/workspace \
-  --user-home /home/hg --root-home /root
+  --user-home /path/to/user-home --root-home /path/to/root-home
 ```
 
 ### Workspace Source Contract
