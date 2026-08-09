@@ -50,3 +50,27 @@ For library/API research inside a cycle, use Context7 first. If it is unavailabl
 2. Report structured results (JSON) for programmatic consumption.
 3. Never modify files outside the target repo unless explicitly requested.
 4. Do not start the next unification migration slice until carry-forward improvement notes have been applied or explicitly marked out of scope.
+
+## Convention ownership gate
+
+Before centralizing a convention, record exactly one ownership class and its
+projection rule:
+
+- `shared-provider-neutral`: stable policy or workflow shared by Claude, Codex,
+  and AGY; keep one canonical source under `.agents/` or the workspace control
+  plane and generate provider adapters.
+- `claude-harness-specific`: depends on Claude settings, hook events, saved-agent
+  schemas, transcripts, or runtime behavior; keep it in the Claude harness.
+- `codex-harness-specific`: depends on Codex config, hooks, subagent TOML, CLI,
+  app, SDK, or sandbox behavior; keep it in the Codex harness.
+- `repo-local-projection`: depends on a repository's architecture, commands,
+  trust boundary, or validation pipeline; keep the source with that repo and
+  register only its projection contract centrally.
+- `external-owner`: already has a canonical owner such as Ralphglasses,
+  dotfiles, or an upstream specification; reference it instead of copying it.
+
+For every centralized row, record the canonical owner, consumers, generated or
+linked destinations, verification command, and deprecation/exception state.
+Schema similarity is not sufficient evidence that two provider surfaces should
+share an implementation; require policy-equivalent behavior and keep native
+adapters when provider semantics differ.
