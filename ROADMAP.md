@@ -18,6 +18,15 @@ Codex fleet management toolkit for baseline validation, skill sync, and MCP prof
 - [x] Pause automatic GitHub Actions triggers while the public org repo is constrained to the private `Internal-Arch` runner path.
 - [ ] Re-enable automatic pull request and push checks after organization Actions billing and runner access are healthy.
 
+## MCP Ecosystem Currency Notes (2026-08-08)
+
+Findings from a best-practices research pass, recorded here rather than acted on directly (cheap/verified items only; the rest needs follow-up work):
+
+- [x] Verified `mcp_spec_target`'s "current"/"fleet_target" values are not hardcoded in `baselineguard` — they are read entirely from the external `workspace/mcp-spec-target.json` registry (deliberately outside any single repo, per `guard.go`'s `mcpSpecTargetRegistry`), and that registry file does not exist yet in this workspace, so the check is currently a fleet-wide no-op. `guard_test.go`'s fixture registry already correctly models `current: 2026-07-28` / `fleet_target: 2025-11-25`, matching the MCP spec's 2026-07-28 final release (stateless protocol, no `initialize` handshake/session id, extensions framework, Roots/Sampling/Logging deprecated) superseding 2025-11-25 — nothing to change in this repo's code or tests for this.
+- [ ] Populate `workspace/mcp-spec-target.json` (owned outside this repo, at the workspace root) with the 2026-07-28 current / 2025-11-25 fleet_target values so the `mcp_spec_target` check actually activates fleet-wide instead of silently skipping every repo.
+- [ ] Claude Code enforces `MAX_MCP_OUTPUT_TOKENS=25,000` per tool call (warns at 10K). `repo_readiness_score`'s single-line JSON output has been observed near ~58KB, which blows this ceiling on every call. Needs a compact/summary response mode plus pagination, the same pattern already used elsewhere in this repo's MCP tools.
+- [ ] Native `ToolSearch`-style retrieval matches on tool NAME + DESCRIPTION only — description quality ("Call this when...") is the practical tuning lever for how discoverable this repo's MCP tools are. Related hazard: dynamic content (counts, timestamps) embedded in a tool description invalidates the whole prompt cache on every call; keep descriptions static and put dynamic state in tool output instead.
+
 ## Unification Loop Improvements
 
 - [x] Add repo-scoped remediation hints to `codexkit baseline check` failure output, including exact `baseline check`, `skills sync`, `mcp sync`, and `provider sync` commands where the failing check maps to a generator.
