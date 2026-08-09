@@ -104,8 +104,15 @@ type rawSkillEntry struct {
 	ClaudeAliases          []json.RawMessage `json:"claude_aliases,omitempty"`
 }
 
+// projectedFrontmatterKeyOrder must stay a superset of the keys actually
+// rendered — renderSkill only emits a key when it is in BOTH this list AND
+// codexkit.PortableFrontmatterKeys (module.go), mirroring the same
+// intersection the canonical ralphglasses skillgen projection uses. Adding a
+// key to PortableFrontmatterKeys without also listing it here silently drops
+// it from generated skill mirrors (see ralphglasses commit 881cf58a9).
 var projectedFrontmatterKeyOrder = []string{
 	"compatibility",
+	"when_to_use",
 	"license",
 	"user-invocable",
 	"argument-hint",
@@ -116,6 +123,8 @@ var projectedFrontmatterKeyOrder = []string{
 	"see_also",
 	"paths",
 	"context",
+	"background",
+	"hooks",
 	"metadata",
 	"agent",
 	"effort",

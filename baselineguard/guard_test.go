@@ -837,6 +837,46 @@ func TestMCPSpecTarget_PastDeadlineFails(t *testing.T) {
 	}
 }
 
+// realRalphglassesWellKnownPath is codexkit's own submodule-relative path to
+// the ralphglasses superproject's .well-known/mcp.json. codexkit is also
+// published standalone (its own mirror repo), where this superproject file
+// does not exist — TestMCPSpecTarget_RalphglassesOwnFileMeetsCurrent skips in
+// that case rather than failing a repo that has no opinion about
+// ralphglasses' spec version.
+const realRalphglassesWellKnownPath = "../../../.well-known/mcp.json"
+
+// TestMCPSpecTarget_RalphglassesOwnFileMeetsCurrent wires the mcp_spec_target
+// check to ralphglasses' own .well-known/mcp.json so a future regression
+// (e.g. someone reverting the protocolVersion bump) is caught by this
+// package's own test suite, not just by fleet-wide baseline_check_all.
+func TestMCPSpecTarget_RalphglassesOwnFileMeetsCurrent(t *testing.T) {
+	data, err := os.ReadFile(realRalphglassesWellKnownPath)
+	if err != nil {
+		t.Skipf("codexkit checked out standalone (no ralphglasses superproject found): %v", err)
+	}
+	var doc struct {
+		ProtocolVersion string `json:"protocolVersion"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("ralphglasses .well-known/mcp.json is not valid JSON: %v", err)
+	}
+
+	withNow(t, "2026-08-08")
+	dir := setupSpecTargetRepo(t, doc.ProtocolVersion, testSpecRegistry)
+
+	report := Check(dir)
+	findings := findingsFor(report, "mcp_spec_target")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 mcp_spec_target finding, got %d: %#v", len(findings), findings)
+	}
+	if !findings[0].Passed {
+		t.Fatalf("ralphglasses' own .well-known/mcp.json (protocolVersion %q) fails the fleet mcp-spec-target check: %s — bump .well-known/mcp.json's protocolVersion", doc.ProtocolVersion, findings[0].Message)
+	}
+	if !strings.Contains(findings[0].Message, "matches current") {
+		t.Errorf("ralphglasses' own .well-known/mcp.json (protocolVersion %q) is behind the fleet-current MCP spec, not just within a compat window: %s", doc.ProtocolVersion, findings[0].Message)
+	}
+}
+
 // --- config_drift ---
 
 func setupConfigExpectationRepo(t *testing.T, registryJSON string) string {

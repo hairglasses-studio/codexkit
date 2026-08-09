@@ -82,12 +82,18 @@ func ToolAnnotations(readOnly, destructive, idempotent, openWorld bool) map[stri
 
 // PortableFrontmatterKeys are the only keys allowed in portable
 // skill frontmatter per the Agent Skills open standard (Dec 2025).
+//
+// This set mirrors the canonical internal/module.go in the ralphglasses
+// superproject exactly — keep the two in sync by hand until a generated
+// projection replaces this copy (see ralphglasses commit 881cf58a9, which
+// added when_to_use/background/hooks to the canonical map and flagged this
+// file as a tracked follow-up).
 var PortableFrontmatterKeys = map[string]bool{
 	"name":                     true,
 	"description":              true,
-	"allowed-tools":            true,
-	"compatibility":            true,
+	"when_to_use":              true, // description-adjacent; Claude Code merges it into the effective description
 	"license":                  true,
+	"allowed-tools":            true,
 	"user-invocable":           true,
 	"argument-hint":            true,
 	"disable-model-invocation": true,
@@ -97,23 +103,31 @@ var PortableFrontmatterKeys = map[string]bool{
 	"see_also":                 true,
 	"paths":                    true,
 	"context":                  true,
-	"metadata":                 true,
-	"agent":                    true,
-	"effort":                   true,
-	"model":                    true,
+	// background and hooks are Claude-only per skillfrontmatterlint's
+	// classification, but so are paths/context/agent/effort/model above —
+	// this map projects Claude-only fields through consistently (inert on
+	// non-Claude providers) rather than singling these two out for stripping.
+	"background": true,
+	"hooks":      true,
+	"metadata":   true,
+	"agent":      true,
+	"effort":     true,
+	"model":      true,
 }
 
 // SkillSourceFrontmatterKeys are allowed in canonical repo-owned skill sources.
 // Provider-specific export paths still filter down to PortableFrontmatterKeys.
+//
+// Mirrors canonical internal/module.go — see the comment on
+// PortableFrontmatterKeys above.
 var SkillSourceFrontmatterKeys = map[string]bool{
 	"name":                     true,
 	"description":              true,
-	"allowed-tools":            true,
-	"compatibility":            true,
 	"license":                  true,
+	"allowed-tools":            true,
+	"tools":                    true, // legacy alias; prefer allowed-tools
 	"user-invocable":           true,
 	"argument-hint":            true,
-	"metadata":                 true,
 	"reload":                   true,
 	"disable-model-invocation": true,
 	"triggers":                 true,
@@ -123,5 +137,9 @@ var SkillSourceFrontmatterKeys = map[string]bool{
 	"context":                  true,
 	"agent":                    true,
 	"effort":                   true,
+	"shell":                    true,
 	"model":                    true,
+	"arguments":                true,
+	"metadata":                 true,
+	"compatibility":            true,
 }
