@@ -444,3 +444,37 @@ func TestSync_RendersToolAllowlistsCompactly(t *testing.T) {
 		t.Fatalf("tool arrays should render on one line\n%s", content)
 	}
 }
+
+func TestSync_PolicyRepoLocalOwnerDefers(t *testing.T) {
+	dir := setupMCPRepo(t)
+	writeFile(t, dir, ".codex/mcp-profile-policy.json", `{
+  "version": 1,
+  "owner": "repo_local",
+  "profiles": [
+    {"name": "github_curated", "from": "github"}
+  ]
+}`)
+	before, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report := Sync(dir, false)
+	if len(report.Errors) != 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	if report.PendingChanges {
+		t.Fatal("repo_local-owned policy must not produce pending changes")
+	}
+	if len(report.Actions) != 1 || !strings.Contains(report.Actions[0].Message, "owner=repo_local") {
+		t.Fatalf("expected single repo_local deferral action, got %+v", report.Actions)
+	}
+
+	after, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("config.toml must be untouched when policy declares repo_local owner")
+	}
+}

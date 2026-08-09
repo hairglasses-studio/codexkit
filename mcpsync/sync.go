@@ -41,7 +41,29 @@ type MCPFile struct {
 
 type policyFile struct {
 	Version  int             `json:"version"`
+	Owner    string          `json:"owner,omitempty"`
 	Profiles []policyProfile `json:"profiles"`
+}
+
+// policyDeclaresRepoLocalOwner reports whether the repo's
+// .codex/mcp-profile-policy.json opts out of codexkit-managed rendering by
+// declaring "owner": "repo_local" (or "repo-local"). Such repos render the
+// generated block with their own policy-aware tool.
+func policyDeclaresRepoLocalOwner(absRepoPath string) (bool, error) {
+	path := filepath.Join(absRepoPath, ".codex", "mcp-profile-policy.json")
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("reading policy file: %w", err)
+	}
+	var policy policyFile
+	if err := json.Unmarshal(data, &policy); err != nil {
+		return false, fmt.Errorf("invalid policy file: %w", err)
+	}
+	owner := strings.ToLower(strings.TrimSpace(policy.Owner))
+	return owner == "repo_local" || owner == "repo-local", nil
 }
 
 type policyProfile struct {
@@ -197,6 +219,25 @@ func buildPlan(repoPath string) (*plan, error) {
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading config.toml: %w", err)
+	}
+	if owned, ownerErr := policyDeclaresRepoLocalOwner(absRepoPath); ownerErr != nil {
+		return nil, ownerErr
+	} else if owned {
+		// The repo's mcp-profile-policy.json declares a repo-local owner:
+		// its own generator (e.g. jobb-sync-surfaces) renders the block
+		// with policy semantics this package does not implement
+		// (primary-collapse, tool-group env projection). Defer instead of
+		// fighting it with a second renderer.
+		return &plan{
+			RepoPath:   repoPath,
+			ConfigPath: configPath,
+			Output:     string(configData),
+			Actions: []SyncAction{{
+				Action:  "unchanged",
+				Server:  "policy",
+				Message: "mcp-profile-policy.json declares owner=repo_local; generated block managed by the repo's own sync tool",
+			}},
+		}, nil
 	}
 	configText := string(configData)
 	if mcpServerBlockRe.MatchString(configText) && !strings.Contains(configText, startMarker) {
