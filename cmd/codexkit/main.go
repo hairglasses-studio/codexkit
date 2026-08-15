@@ -85,6 +85,8 @@ func main() {
 		runAGY(os.Args[2:])
 	case "teamwork":
 		runTeamwork(os.Args[2:])
+	case "fleet-autopilot", "autopilot":
+		runAGYAutopilot(os.Args[2:])
 	case "bridge":
 		runBridge(os.Args[2:])
 	case "tools":
@@ -106,8 +108,11 @@ Commands:
                                 Run autonomous AGY 2.0 / Gemini 3.7 Flash Ralph Wiggum loop
   agy teamwork <repo> [--topology <star|chain|blackboard>] [--workers <n>] [--prompt <prompt>] [--model <model>] [--auto-merge] [--auto-push] [--dry-run] [--json]
                                 Run multi-agent AGY 2.0 / Gemini 3.7 Flash teamwork session
+  agy autopilot [workspace_root] [--concurrency <n>] [--max-iter <n>] [--model <model>] [--auto-commit] [--auto-push] [--dry-run] [--json]
+                                Run fleet autopilot across all ready repositories
   agy status <repo>             Inspect loop progress and HMAC attestation receipts
   teamwork <repo>               Alias for codexkit agy teamwork
+  fleet-autopilot [root]        Alias for codexkit agy autopilot
   baseline check <repo|--all> [--overlay <file>]
                                 Run baseline-guard validation
   skills sync <repo>            Sync skills to .claude/skills/ and plugins/
@@ -2193,7 +2198,7 @@ func runWorkspacePrimitiveIndexCheck(args []string) (bool, error) {
 
 func runAGY(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: codexkit agy <loop|teamwork|status> [repo] [flags]")
+		fmt.Fprintln(os.Stderr, "usage: codexkit agy <loop|teamwork|autopilot|status> [repo] [flags]")
 		os.Exit(1)
 	}
 
@@ -2202,6 +2207,8 @@ func runAGY(args []string) {
 		runAGYLoop(args[1:])
 	case "teamwork":
 		runAGYTeamwork(args[1:])
+	case "autopilot", "fleet":
+		runAGYAutopilot(args[1:])
 	case "status":
 		runAGYStatus(args[1:])
 	default:
@@ -2369,6 +2376,88 @@ func runAGYTeamwork(args []string) {
 			sig = sig[:24] + "..."
 		}
 		fmt.Printf("  master receipt: %s\n", sig)
+	}
+}
+
+func runAGYAutopilot(args []string) {
+	jsonOut := hasFlag(args, "--json")
+	dryRun := hasFlag(args, "--dry-run")
+	autoCommit := hasFlag(args, "--auto-commit")
+	autoPush := hasFlag(args, "--auto-push")
+
+	model, args, _, _ := takeFlagValue(args, "--model")
+	effort, args, _, _ := takeFlagValue(args, "--effort")
+	concurrencyStr, args, _, _ := takeFlagValue(args, "--concurrency")
+	maxIterStr, args, _, _ := takeFlagValue(args, "--max-iter")
+	prompt, args, _, _ := takeFlagValue(args, "--prompt")
+	lanes, args, _, _ := takeFlagValue(args, "--lanes")
+
+	concurrency := 4
+	if concurrencyStr != "" {
+		if val, err := strconv.Atoi(concurrencyStr); err == nil && val > 0 {
+			concurrency = val
+		}
+	}
+
+	maxIter := 3
+	if maxIterStr != "" {
+		if val, err := strconv.Atoi(maxIterStr); err == nil && val > 0 {
+			maxIter = val
+		}
+	}
+
+	root := "."
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		root = args[0]
+	}
+
+	opts := agyloop.FleetAutopilotOptions{
+		WorkspaceRoot:   root,
+		Concurrency:     concurrency,
+		MaxIterations:   maxIter,
+		Model:           model,
+		ReasoningEffort: effort,
+		Prompt:          prompt,
+		AutoCommit:      autoCommit,
+		AutoPush:        autoPush,
+		DryRun:          dryRun,
+		IncludeLanes:    lanes,
+	}
+
+	report, err := agyloop.RunFleetAutopilot(context.Background(), opts)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fleet autopilot error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if jsonOut {
+		printJSON(report)
+		return
+	}
+
+	status := "PASS"
+	if report.CircuitBreakerOpen || report.FailedRepos > 0 {
+		status = "WARN"
+	}
+	fmt.Printf("fleet autopilot: %s (model: %s, scanned: %d, eligible: %d, success: %d, failed: %d, %.1fs)\n",
+		status, report.Model, report.TotalReposScanned, report.EligibleRepos, report.SuccessfulRepos, report.FailedRepos, report.TotalDurationSec)
+	for _, res := range report.Results {
+		repoStatus := "PASS"
+		if !res.Success {
+			repoStatus = "FAIL"
+		}
+		fmt.Printf("  %-20s %-4s (lane: %-20s score: %3d, rounds: %d/%d, %.1fs)\n",
+			res.RepoName, repoStatus, res.ReadinessLane, res.ReadinessScore, res.SuccessfulRounds, res.IterationsRun, res.DurationSeconds)
+		if res.ErrorReason != "" {
+			fmt.Printf("    error: %s\n", res.ErrorReason)
+		}
+	}
+	if report.MasterAttestation != "" {
+		sig := report.MasterAttestation
+		if len(sig) > 24 {
+			sig = sig[:24] + "..."
+		}
+		fmt.Printf("  master hmac: %s\n", sig)
 	}
 }
 

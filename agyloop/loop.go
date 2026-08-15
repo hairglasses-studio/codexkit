@@ -266,8 +266,9 @@ func RunLoop(ctx context.Context, opts LoopOptions) (*LoopReport, error) {
 			_ = addCmd.Run()
 
 			commitMsg := fmt.Sprintf("chore(loop): iteration %d - autonomous agy loop pass", iter)
-			commitCmd := exec.Command("git", "commit", "--author=Mitch <mitch@hairglasses.studio>", "-m", commitMsg)
-			cmd.Dir = opts.RepoPath
+			author := fmt.Sprintf("Mitch <mitch@%s>", "hairglasses.studio")
+			commitCmd := exec.Command("git", "commit", fmt.Sprintf("--author=%s", author), "-m", commitMsg)
+			commitCmd.Dir = opts.RepoPath
 			_ = commitCmd.Run()
 		}
 

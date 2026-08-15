@@ -160,5 +160,54 @@ func (m *ModuleImpl) Tools() []codexkit.ToolDef {
 				return report, nil
 			}),
 		},
+		{
+			Name:        "agy_autopilot",
+			Description: "Run autonomous fleet autopilot across all ready repositories using AGY 2.0 and Gemini 3.7 Flash",
+			Annotations: codexkit.ToolAnnotations(false, false, false, true),
+			Schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"workspace_root": map[string]any{
+						"type":        "string",
+						"description": "Path to workspace root (defaults to current directory)",
+					},
+					"concurrency": map[string]any{
+						"type":        "integer",
+						"description": "Concurrent worker sessions (default: 4, max: 8)",
+					},
+					"max_iterations": map[string]any{
+						"type":        "integer",
+						"description": "Max iterations per repo (default: 3)",
+					},
+					"model": map[string]any{
+						"type":        "string",
+						"description": "Model identifier (default: gemini-3.7-flash-high)",
+					},
+					"reasoning_effort": map[string]any{
+						"type":        "string",
+						"description": "Reasoning effort (high, medium, low)",
+					},
+					"prompt": map[string]any{
+						"type":        "string",
+						"description": "Master unification/modernization task prompt",
+					},
+					"auto_commit": map[string]any{
+						"type":        "boolean",
+						"description": "Auto commit verified rounds",
+					},
+					"auto_push": map[string]any{
+						"type":        "boolean",
+						"description": "Auto push verified commits to origin",
+					},
+					"dry_run": map[string]any{
+						"type":        "boolean",
+						"description": "Dry run preview mode",
+					},
+				},
+			},
+			Handler: codexkit.TypedHandler(func(req FleetAutopilotOptions) (any, error) {
+				return RunFleetAutopilot(context.Background(), req)
+			}),
+		},
 	}
 }

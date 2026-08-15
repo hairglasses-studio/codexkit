@@ -8,7 +8,7 @@ import (
 )
 
 func TestSignAndVerifyReceipt(t *testing.T) {
-	repo := "/home/hg/hairglasses-studio/codexkit"
+	repo := "codexkit"
 	branch := "main"
 	gitSHA := "abcdef1234567890abcdef1234567890abcdef12"
 	prompt := "modernize loop tooling"
@@ -66,7 +66,7 @@ func TestModuleDeclaration(t *testing.T) {
 	if mod.Name() != "agyloop" {
 		t.Errorf("expected module name 'agyloop', got '%s'", mod.Name())
 	}
-	if len(mod.Tools()) != 3 {
-		t.Errorf("expected 3 tools, got %d", len(mod.Tools()))
+	if len(mod.Tools()) != 4 {
+		t.Errorf("expected 4 tools, got %d", len(mod.Tools()))
 	}
 }
