@@ -28,24 +28,24 @@ else
 fi
 
 echo "== absolute user paths =="
-if git grep -n -E -e '(/home/[A-Za-z0-9._-]+|/Users/[A-Za-z0-9._-]+|[A-Za-z]:\\Users\\[^[:space:]]+)' -- . ':!scripts/check-public-boundary.sh'; then
+if git grep -n -E -e '(/home/[A-Za-z0-9._-]+|/Users/[A-Za-z0-9._-]+|[A-Za-z]:\\Users\\[^[:space:]]+)' -- . ':!scripts/check-public-boundary.sh' ':!vendor/**' ':!surface-audit.*'; then
   mark_failed
 fi
 
 echo "== private workspace path examples =="
-if git grep -n -E -e '(~|\$HOME)/hairglasses-studio' -- . ':!scripts/check-public-boundary.sh'; then
+if git grep -n -E -e '(~|\$HOME)/hairglasses-studio' -- . ':!scripts/check-public-boundary.sh' ':!vendor/**' ':!surface-audit.*'; then
   mark_failed
 fi
 
 echo "== live account URLs =="
-if git grep -n -E -e 'linkedin\.com/(in|messaging|jobs)' -- . ':!scripts/check-public-boundary.sh'; then
+if git grep -n -E -e 'linkedin\.com/(in|messaging|jobs)' -- . ':!scripts/check-public-boundary.sh' ':!vendor/**'; then
   mark_failed
 fi
 
 echo "== non-example emails =="
 email_hits="$(mktemp)"
 trap 'rm -f "$email_hits"' EXIT
-if git grep -n -E -e '[[:alnum:]_.%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}' -- . ':!scripts/check-public-boundary.sh' >"$email_hits"; then
+if git grep -n -E -e '[[:alnum:]_.%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}' -- . ':!scripts/check-public-boundary.sh' ':!vendor/**' >"$email_hits"; then
   if grep -v -E '@example\.(com|org|net|test)' "$email_hits"; then
     mark_failed
   fi

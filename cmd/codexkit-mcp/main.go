@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/hairglasses-studio/codexkit"
+	"github.com/hairglasses-studio/codexkit/agyloop"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
 	"github.com/hairglasses-studio/codexkit/fleetaudit"
 	"github.com/hairglasses-studio/codexkit/llmreduction"
@@ -29,6 +30,7 @@ func main() {
 	reg := codexkit.NewRegistry()
 
 	modules := []codexkit.ToolModule{
+		agyloop.Module(),
 		baselineguard.Module(),
 		skillsync.Module(),
 		mcpsync.Module(),

@@ -3,6 +3,7 @@
 /codexkit
 
 # Ralph runtime state
+.ralph/
 .ralph/handoffs/
 
 # Local secrets
