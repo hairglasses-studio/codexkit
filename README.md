@@ -1,7 +1,7 @@
 # codexkit
 
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
-[![Public CI](https://github.com/hairglasses-studio/codexkit/actions/workflows/public-ci.yml/badge.svg)](https://github.com/hairglasses-studio/codexkit/actions/workflows/public-ci.yml)
+[![CI](https://img.shields.io/badge/CI-local%20make%20ci-success)](#local-ci)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25-blue)](https://modelcontextprotocol.io/specification/2025-11-25)
 
@@ -45,7 +45,7 @@ private workspace checkout.
 - **Global MCP projection** — generates Codex, Claude, and Gemini workspace-global MCP provider overlays from repo-local policies
 - **Fleet audit** — runs baseline + skill + MCP checks across all repos in a workspace
 - **Performance audit** — scans for Codex performance bottlenecks and regression budgets
-- **19 MCP tools** — all operations available via MCP server for AI agent consumption
+- **Discovery-first MCP tools** — operations grouped by module with compact catalog search and on-demand schema lookup
 
 ## Install
 
@@ -65,13 +65,8 @@ host-specific runner, or local operator state.
 git clone https://github.com/hairglasses-studio/codexkit.git
 cd codexkit
 
-# Build confidence in the published module surface.
-GOWORK=off go mod download
-GOWORK=off go vet ./...
-GOWORK=off go test ./...
-
-# Run the repo-local baseline checker against this checkout.
-GOWORK=off go run ./cmd/codexkit baseline check .
+# Run the authoritative repository gate.
+make ci
 ```
 
 Expected result:
@@ -167,6 +162,17 @@ Codex workspace-global overlays are intentionally opt-in: repo profiles must set
 }
 ```
 
+Codex and Responses API clients should configure Tool Search and
+`defer_loading` on the client-side tool or MCP server definition. The MCP
+server itself returns complete standard `inputSchema` objects from
+`tools/list`; `tool_catalog`, `tool_search`, and `tool_schema` provide a compact
+namespace-aware discovery path. Profile `enabled_tools` lists are bounded, and
+approval policy remains a client/operator decision rather than an authorization
+claim made by catalog metadata.
+
+See [Codex 0.147.0 compatibility](docs/CODEX_COMPATIBILITY.md) for the current
+model routes, stable feature surface, and MCP protocol status.
+
 ## MCP Tools
 
 | Tool | Description |
@@ -214,12 +220,25 @@ codexkit/
 
 All packages implement the `ToolModule` interface for uniform registration and aggregation.
 
-## Build
+## Local CI
+
+Local CI is authoritative. Tracked GitHub workflows are deprecated,
+manual-only diagnostics and do not validate or mutate pull requests.
+
+```bash
+make ci       # JSON/TOML, workflow policy, format, tidy, vet, build, race tests, public boundary, baseline
+make baseline # repo baseline; permits only the recognized unstaged managed-launcher approval overlay
+make baseline-strict # repo baseline with no local overlay exception
+make test     # race-enabled Go tests only
+```
+
+The equivalent component commands are:
 
 ```bash
 GOWORK=off go build ./...                 # Build all
 GOWORK=off go vet ./...                   # Lint
 GOWORK=off go test -count=1 -race ./...   # Test
+GOWORK=off go run ./cmd/codexkit baseline check .
 ```
 
 ## License

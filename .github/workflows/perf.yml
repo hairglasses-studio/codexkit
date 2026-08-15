@@ -1,4 +1,4 @@
-name: Perf
+name: "Deprecated: Perf"
 
 on:
   workflow_dispatch:
@@ -7,15 +7,8 @@ permissions:
   contents: read
 
 jobs:
-  go-bench:
+  diagnostic:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-      - name: Benchmark Go package path
-        run: |
-          set -euo pipefail
-          go test ./... -run '^$'
-          go test ./... -run '^$' -bench . -benchmem -benchtime=1s
+      - name: Local benchmarks are authoritative
+        run: echo "Deprecated diagnostic only. Run Go benchmarks locally when needed."

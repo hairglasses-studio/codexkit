@@ -1,42 +1,14 @@
-name: Go CI
+name: "Deprecated: Go CI"
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  test:
-    name: Go test
+  diagnostic:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Download modules
-        run: go mod download
-
-      - name: Check go.mod tidy
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod go.sum
-
-      - name: Vet
-        run: GOWORK=off go vet ./...
-
-      - name: Test
-        run: GOWORK=off go test -race ./...
+      - name: Local CI is authoritative
+        run: echo "Deprecated diagnostic only. Run 'make ci' in a local checkout."

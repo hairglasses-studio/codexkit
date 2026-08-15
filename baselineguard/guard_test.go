@@ -681,6 +681,21 @@ func TestModelPinFreshness_RetiredPinFails(t *testing.T) {
 	}
 }
 
+func TestModelPinFreshness_RetiredStatusWithoutDateFails(t *testing.T) {
+	dir := setupLifecycleRepo(t, `{
+  "version": 1,
+  "models": [
+    {"id": "old-model", "aliases": [], "provider": "test", "status": "retired", "retires": null, "replacement": "current-model"}
+  ]
+}`)
+	writeFile(t, dir, ".codex/config.toml", `model = "old-model"`)
+
+	findings := findingsFor(Check(dir), "model_pin_freshness")
+	if len(findings) != 1 || findings[0].Passed {
+		t.Fatalf("retired status must fail even without a retirement date: %#v", findings)
+	}
+}
+
 func TestModelPinFreshness_TenDaysOutFails(t *testing.T) {
 	withNow(t, "2026-08-01")
 	dir := setupLifecycleRepo(t, `{
@@ -745,6 +760,31 @@ func TestModelPinFreshness_NoDateDeprecatedPassesWithNote(t *testing.T) {
 	}
 }
 
+func TestModelPinFreshness_ScansCodexAgentPins(t *testing.T) {
+	// The gpt-5.5 pin is intentionally historical: this verifies that agent
+	// files participate in lifecycle migration checks.
+	withNow(t, "2026-08-01")
+	dir := setupLifecycleRepo(t, `{
+  "version": 1,
+  "models": [
+    {"id": "gpt-5.5", "aliases": [], "provider": "openai", "status": "deprecated", "retires": "2026-07-15", "replacement": "gpt-5.6-sol"},
+    {"id": "gpt-5.6-terra", "aliases": [], "provider": "openai", "status": "active", "retires": null, "replacement": ""}
+  ]
+}`)
+	writeFile(t, dir, ".codex/agents/reviewer.toml", "model = \"gpt-5.5\"\n")
+	writeFile(t, dir, ".codex/agents/repo_explorer.toml", "model = \"gpt-5.6-terra\"\n")
+
+	report := Check(dir)
+	findings := findingsFor(report, "model_pin_freshness")
+	if len(findings) != 1 || findings[0].Passed {
+		t.Fatalf("expected only the retired agent pin to fail, got %#v", findings)
+	}
+	want := "retired model pin gpt-5.5 in .codex/agents/reviewer.toml — migrate to gpt-5.6-sol"
+	if findings[0].Message != want {
+		t.Fatalf("message = %q, want %q", findings[0].Message, want)
+	}
+}
+
 func TestModelPinFreshness_AbsentRegistrySkips(t *testing.T) {
 	dir := setupLifecycleRepo(t, "")
 	writeFile(t, dir, ".codex/config.toml", `model = "foo-model"`)
@@ -761,6 +801,8 @@ func TestModelPinFreshness_AbsentRegistrySkips(t *testing.T) {
 }
 
 func TestModelPinFreshness_OverlapGuardDoesNotDoubleReport(t *testing.T) {
+	// Intentionally historical pins exercise deprecated-id boundary matching;
+	// these are not current model guidance.
 	withNow(t, "2026-08-01")
 	dir := setupLifecycleRepo(t, `{
   "version": 1,

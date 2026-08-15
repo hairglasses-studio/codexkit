@@ -6,9 +6,11 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 
 ## Build & Test
 
-- `go build ./...` — build all binaries
-- `go test -race ./...` — run tests
-- `go vet ./...` — lint
+- `make ci` — authoritative local gate (parsing, workflow policy, format, tidy, vet, build, race tests, public boundary, baseline)
+- `make test` — run race-enabled Go tests
+- `make baseline` — validate this repo, permitting only the exact unstaged managed-launcher approval overlay
+- `make baseline-strict` — validate with no local overlay exception
+- Tracked GitHub workflows are deprecated manual-only diagnostics, not CI gates.
 
 ## Architecture
 
@@ -26,11 +28,11 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 | `configindex` | Redacted inventory and policy checks for Claude, Codex, AGY, dotfiles, and provider homes |
 | `skillsync` | Sync `.agents/skills/` → `.claude/skills/` + `plugins/` mirrors |
 | `mcpsync` | Sync `.mcp.json` → `.codex/config.toml` MCP server blocks |
-| `mcpserver` | MCP server — aggregates all ToolModules, deferred tool loading |
+| `mcpserver` | MCP server — aggregates ToolModules with namespaced discovery, full schemas, and cursor pagination |
 | `fleetaudit` | Fleet-wide audit combining baseline, skill sync, and MCP sync checks |
 | `reporeadiness` | Score repo mutation readiness lanes from manifest, fleet mode, git state, and baseline status |
 | `perfaudit` | Fleet-wide static audit for Codex performance bottlenecks and regression budgets |
-| `internal/toml` | Minimal TOML writer (zero external dependencies) |
+| `internal/toml` | Minimal TOML writer |
 
 ## Baseline Checks
 
@@ -79,7 +81,9 @@ The MCP server (`cmd/codexkit-mcp`) exposes these tools:
 
 ## Protocol Support
 
-- **MCP 2025-11**: stdio transport, deferred tool loading, server discovery via `.well-known/mcp.json`
+- **MCP 2025-11**: stdio transport, complete `tools/list` schemas, cursor pagination, and server discovery via `.well-known/mcp.json`
+- **OpenAI Tool Search**: clients set `defer_loading` on their tool/MCP definition; the server groups compact catalog entries by module and does not invent an MCP deferred-loading capability.
+- **Codex 0.147.0**: stable apps, goals, hooks, multi-agent, plugins, skill search, and tool suggestions; `mcp_2026_07_28` remains under development and disabled.
 - **Agent Skills open standard** (Dec 2025): portable frontmatter validation, hot-reloading (`reload: true`)
 - **Agent2Agent (A2A)**: `.well-known/agent.json` validation
 - **ToolModule interface**: modeled after claudekit's pattern for module aggregation

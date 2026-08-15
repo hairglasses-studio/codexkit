@@ -1,46 +1,14 @@
-name: Public CI
+name: "Deprecated: Public CI"
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  public-go-checks:
-    name: Public Go checks
-    # This job stays limited to public checkout-local checks; the README
-    # quickstart is the outsider-verifiable path.
+  diagnostic:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Download modules
-        run: go mod download
-
-      - name: Vet
-        run: GOWORK=off go vet ./...
-
-      - name: Test
-        run: GOWORK=off go test ./...
-
-      - name: Baseline check
-        run: GOWORK=off go run ./cmd/codexkit baseline check .
-
-      - name: Public boundary check
-        run: bash scripts/check-public-boundary.sh
+      - name: Local CI is authoritative
+        run: echo "Deprecated diagnostic only. Run 'make ci' in a local checkout."

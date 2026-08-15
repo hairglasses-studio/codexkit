@@ -3,9 +3,12 @@
 // JSON-RPC over stdio.
 //
 // It supports the MCP 2025-11 specification including:
-//   - Tool listing with deferred schema loading (85% token reduction)
+//   - Complete tool schemas with cursor-based pagination
 //   - Stdio transport (JSON-RPC 2.0 over stdin/stdout)
 //   - Notifications and error handling
+//
+// OpenAI Tool Search deferral is selected by the client on its Responses API
+// tool or MCP server definition. It is not an MCP tools/list extension.
 package mcpserver
 
 import (
@@ -14,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -63,14 +67,12 @@ type JSONRPCError struct {
 	Message string `json:"message"`
 }
 
-// MCPToolInfo is the lightweight tool description for tools/list.
-// Supports deferred loading: schema is only provided when requested.
+// MCPToolInfo is the standards-compliant tool description for tools/list.
 type MCPToolInfo struct {
-	Name         string         `json:"name"`
-	Description  string         `json:"description"`
-	Annotations  map[string]any `json:"annotations,omitempty"`
-	InputSchema  map[string]any `json:"inputSchema,omitempty"`
-	DeferLoading bool           `json:"defer_loading,omitempty"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Annotations map[string]any `json:"annotations,omitempty"`
+	InputSchema map[string]any `json:"inputSchema"`
 }
 
 type MCPResourceInfo struct {
@@ -93,6 +95,7 @@ type MCPPromptArgInfo struct {
 }
 
 const codexkitPromptCount = 4
+const toolsListPageSize = 50
 
 // New creates an MCP server backed by the given registry.
 func New(registry *codexkit.Registry, info ServerInfo) *Server {
@@ -173,8 +176,7 @@ func (s *Server) handleInitialize(req JSONRPCRequest) JSONRPCResponse {
 			"protocolVersion": "2025-11-25",
 			"capabilities": map[string]any{
 				"tools": map[string]any{
-					"listChanged":     true,
-					"deferredLoading": true,
+					"listChanged": false,
 				},
 				"resources": map[string]any{
 					"listChanged": false,
@@ -197,38 +199,55 @@ func (s *Server) handlePing(req JSONRPCRequest) JSONRPCResponse {
 }
 
 func (s *Server) handleToolsList(req JSONRPCRequest) JSONRPCResponse {
-	// Support deferred loading: check if client wants full schemas
 	var params struct {
-		IncludeSchemas bool `json:"include_schemas"`
+		Cursor string `json:"cursor"`
 	}
-	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+	if len(req.Params) > 0 {
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			return invalidParamsResponse(req.ID)
+		}
 	}
 
 	tools := s.registry.ListTools()
-	infos := make([]MCPToolInfo, len(tools))
-	for i, t := range tools {
-		info := MCPToolInfo{
+	sort.Slice(tools, func(i, j int) bool { return tools[i].Name < tools[j].Name })
+	start := 0
+	if params.Cursor != "" {
+		parsed, err := strconv.Atoi(params.Cursor)
+		if err != nil || parsed < 0 || parsed > len(tools) {
+			return invalidParamsResponse(req.ID)
+		}
+		start = parsed
+	}
+	end := start + toolsListPageSize
+	if end > len(tools) {
+		end = len(tools)
+	}
+	infos := make([]MCPToolInfo, 0, end-start)
+	for _, t := range tools[start:end] {
+		infos = append(infos, MCPToolInfo{
 			Name:        t.Name,
 			Description: t.Description,
 			Annotations: t.Annotations,
-			InputSchema: map[string]any{
-				"type":       "object",
-				"properties": map[string]any{},
-			},
-		}
-		if params.IncludeSchemas {
-			info.InputSchema = t.Schema
-		} else {
-			info.DeferLoading = true
-		}
-		infos[i] = info
+			InputSchema: t.Schema,
+		})
+	}
+	result := map[string]any{"tools": infos}
+	if end < len(tools) {
+		result["nextCursor"] = strconv.Itoa(end)
 	}
 
 	return JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
-		Result:  map[string]any{"tools": infos},
+		Result:  result,
+	}
+}
+
+func invalidParamsResponse(id any) JSONRPCResponse {
+	return JSONRPCResponse{
+		JSONRPC: "2.0",
+		ID:      id,
+		Error:   &JSONRPCError{Code: -32602, Message: "invalid params"},
 	}
 }
 
@@ -380,6 +399,12 @@ func (s *Server) resourceCatalog() []MCPResourceInfo {
 			Description: "Detailed list of registered modules and their tools.",
 			MimeType:    "application/json",
 		},
+		{
+			URI:         "codexkit://catalog/compatibility",
+			Name:        "compatibility",
+			Description: "Codex 0.147.0 models, stable features, and MCP protocol status.",
+			MimeType:    "application/json",
+		},
 	}
 }
 
@@ -393,29 +418,21 @@ func (s *Server) resourcePayload(uri string) (map[string]any, error) {
 			"modules":      s.registry.ListModules(),
 		}, nil
 	case "codexkit://catalog/modules":
-		tools := s.registry.ListTools()
 		moduleNames := s.registry.ListModules()
 		moduleTools := map[string][]string{}
 		for _, name := range moduleNames {
 			moduleTools[name] = []string{}
 		}
-		for _, tool := range tools {
-			parts := tool.Name
-			if idx := len(parts); idx > 0 {
-				// Tool names are already module-prefixed, so expose them directly.
-			}
-			for _, moduleName := range moduleNames {
-				if len(tool.Name) > len(moduleName) && tool.Name[:len(moduleName)] == moduleName {
-					moduleTools[moduleName] = append(moduleTools[moduleName], tool.Name)
-					break
-				}
-			}
+		for _, entry := range s.registry.ListRegisteredTools() {
+			moduleTools[entry.Namespace] = append(moduleTools[entry.Namespace], entry.Tool.Name)
 		}
 		return map[string]any{
 			"server":       s.info,
 			"module_count": len(moduleNames),
 			"modules":      moduleTools,
 		}, nil
+	case "codexkit://catalog/compatibility":
+		return compatibilityPayload(), nil
 	default:
 		return nil, fmt.Errorf("unknown resource: %s", uri)
 	}

@@ -82,7 +82,8 @@ repos.
 - Enforced MCP launcher portability; made MCP launchers repo-local.
 - Organization-wide runner migration and health sync; studio-scale
   optimization sync; published codexkit parity surfaces.
-- Improved Codex startup performance; preferred `gpt-5.4-xhigh`; dropped
+- Improved Codex startup performance; preferred `gpt-5.4-xhigh` (historical
+  release note, not current model guidance); dropped
   Ollama inventory columns from the parity audit; moved the `codexkit-mcp`
   cache to a user-owned `XDG_CACHE_HOME` path.
 

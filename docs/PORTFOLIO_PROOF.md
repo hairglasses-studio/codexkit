@@ -31,10 +31,7 @@ flowchart LR
 ```bash
 git clone https://github.com/hairglasses-studio/codexkit.git
 cd codexkit
-GOWORK=off go mod download
-GOWORK=off go vet ./...
-GOWORK=off go test ./...
-GOWORK=off go run ./cmd/codexkit baseline check .
+make ci
 ```
 
 The review path is intentionally self-contained. Workspace-wide commands require a caller-provided workspace and should not depend on private machine state.
@@ -48,7 +45,7 @@ The review path is intentionally self-contained. Workspace-wide commands require
    `GOWORK=off go run ./cmd/codexkit mcp diff examples/minimal-agent-repo`.
 3. Show how source-contract and index commands produce diffable artifacts.
 4. Show the MCP server exposing the same command families.
-5. Close by pointing to `PUBLIC_BOUNDARY.md` and the CI badge.
+5. Close by pointing to `PUBLIC_BOUNDARY.md` and the authoritative local CI target.
 
 ## Trust Boundary
 

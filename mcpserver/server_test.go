@@ -46,6 +46,14 @@ func (m *testModule) Tools() []codexkit.ToolDef {
 	}
 }
 
+type listTestModule struct {
+	tools []codexkit.ToolDef
+}
+
+func (m *listTestModule) Name() string              { return "list_test" }
+func (m *listTestModule) Init() error               { return nil }
+func (m *listTestModule) Tools() []codexkit.ToolDef { return m.tools }
+
 func sendRequest(t *testing.T, s *Server, method string, id any, params any) JSONRPCResponse {
 	t.Helper()
 
@@ -141,6 +149,10 @@ func TestInitialize(t *testing.T) {
 	if caps["resources"] == nil || caps["prompts"] == nil {
 		t.Fatalf("expected resources and prompts capabilities, got %+v", caps)
 	}
+	tools := caps["tools"].(map[string]any)
+	if _, exists := tools["deferredLoading"]; exists {
+		t.Fatalf("deferredLoading is not an MCP tools capability: %+v", tools)
+	}
 }
 
 func TestInitialize_FramedTransport(t *testing.T) {
@@ -182,23 +194,45 @@ func TestToolsList(t *testing.T) {
 		t.Fatal("expected inputSchema object")
 	}
 	if schema["type"] != "object" {
-		t.Fatalf("expected minimal object schema, got %+v", schema)
+		t.Fatalf("expected object schema, got %+v", schema)
+	}
+	properties := schema["properties"].(map[string]any)
+	if properties["message"] == nil {
+		t.Fatalf("tools/list must return the complete registered schema, got %+v", schema)
+	}
+	if _, exists := tool["defer_loading"]; exists {
+		t.Fatalf("defer_loading is a client definition property, not MCP tool metadata: %+v", tool)
 	}
 }
 
-func TestToolsListWithSchemas(t *testing.T) {
-	s := setupTestServer(t)
-	resp := sendRequest(t, s, "tools/list", 3, map[string]any{"include_schemas": true})
-
-	if resp.Error != nil {
-		t.Fatalf("unexpected error: %v", resp.Error.Message)
+func TestToolsListPaginatesWithCursor(t *testing.T) {
+	reg := codexkit.NewRegistry()
+	module := &listTestModule{}
+	for i := 0; i < toolsListPageSize+1; i++ {
+		module.tools = append(module.tools, codexkit.ToolDef{
+			Name:        fmt.Sprintf("tool_%02d", i),
+			Description: "A paginated test tool.",
+			Schema:      map[string]any{"type": "object", "properties": map[string]any{}},
+			Handler:     func(map[string]any) (any, error) { return nil, nil },
+		})
 	}
-
-	result := resp.Result.(map[string]any)
-	tools := result["tools"].([]any)
-	tool := tools[0].(map[string]any)
-	if tool["inputSchema"] == nil {
-		t.Error("expected schema when include_schemas=true")
+	if err := reg.Register(module); err != nil {
+		t.Fatal(err)
+	}
+	s := New(reg, ServerInfo{Name: "test", Version: "0.1.0"})
+	first := sendRequest(t, s, "tools/list", 1, nil)
+	firstResult := first.Result.(map[string]any)
+	if len(firstResult["tools"].([]any)) != toolsListPageSize || firstResult["nextCursor"] != "50" {
+		t.Fatalf("unexpected first page %+v", firstResult)
+	}
+	second := sendRequest(t, s, "tools/list", 2, map[string]any{"cursor": "50"})
+	secondResult := second.Result.(map[string]any)
+	if len(secondResult["tools"].([]any)) != 1 || secondResult["nextCursor"] != nil {
+		t.Fatalf("unexpected second page %+v", secondResult)
+	}
+	invalid := sendRequest(t, s, "tools/list", 3, map[string]any{"cursor": "bad"})
+	if invalid.Error == nil || invalid.Error.Code != -32602 {
+		t.Fatalf("expected invalid cursor error, got %+v", invalid)
 	}
 }
 
@@ -258,7 +292,7 @@ func TestResourcesListAndRead(t *testing.T) {
 	}
 	listResult := listResp.Result.(map[string]any)
 	resources := listResult["resources"].([]any)
-	if len(resources) < 2 {
+	if len(resources) != 3 {
 		t.Fatalf("expected resource catalog, got %+v", listResult)
 	}
 
@@ -271,6 +305,19 @@ func TestResourcesListAndRead(t *testing.T) {
 	block := contents[0].(map[string]any)
 	if !strings.Contains(block["text"].(string), "\"tool_count\"") {
 		t.Fatalf("expected overview JSON, got %+v", block)
+	}
+
+	compatResp := sendRequest(t, s, "resources/read", 9, map[string]any{"uri": "codexkit://catalog/compatibility"})
+	if compatResp.Error != nil {
+		t.Fatalf("unexpected compatibility resource error: %v", compatResp.Error.Message)
+	}
+	compatResult := compatResp.Result.(map[string]any)
+	compatBlock := compatResult["contents"].([]any)[0].(map[string]any)
+	compatText := compatBlock["text"].(string)
+	for _, want := range []string{"gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "under_development", "\"enabled\":false"} {
+		if !strings.Contains(compatText, want) {
+			t.Fatalf("compatibility resource missing %q: %s", want, compatText)
+		}
 	}
 }
 
@@ -388,8 +435,65 @@ func TestMetaModuleAddsHealthTool(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := result.(map[string]any)
-	if payload["resource_count"] != 2 || payload["prompt_count"] != codexkitPromptCount {
+	if payload["resource_count"] != 3 || payload["prompt_count"] != codexkitPromptCount {
 		t.Fatalf("unexpected health payload %+v", payload)
+	}
+	compat := payload["compatibility"].(map[string]any)
+	if compat["codex_version"] != "0.147.0" {
+		t.Fatalf("unexpected compatibility payload %+v", compat)
+	}
+}
+
+func TestCompatibilityPayloadPinsCodex0147Contract(t *testing.T) {
+	payload := compatibilityPayload()
+	features := payload["stable_features"].([]string)
+	wantFeatures := []string{"apps", "goals", "hooks", "multi_agent", "plugins", "skill_search", "tool_suggest"}
+	if fmt.Sprint(features) != fmt.Sprint(wantFeatures) {
+		t.Fatalf("stable features = %v, want %v", features, wantFeatures)
+	}
+	toolSearch := payload["tool_search"].(map[string]any)
+	if toolSearch["defer_loading_owner"] != "openai_client_tool_or_mcp_definition" {
+		t.Fatalf("unexpected tool-search contract %+v", toolSearch)
+	}
+	mcp := payload["mcp"].(map[string]any)
+	preview := mcp["mcp_2026_07_28"].(map[string]any)
+	if preview["enabled"] != false || preview["stage"] != "under_development" {
+		t.Fatalf("preview protocol must remain disabled: %+v", preview)
+	}
+}
+
+func TestMetaDiscoveryGroupsFiltersAndBoundsTools(t *testing.T) {
+	reg := codexkit.NewRegistry()
+	if err := reg.Register(&testModule{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Register(Module(reg, ServerInfo{Name: "test", Version: "0.1.0"})); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := reg.Call("tool_search", map[string]any{
+		"query":         "echo",
+		"namespaces":    []string{"test"},
+		"allowed_tools": []string{"test_echo"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := result.(map[string]any)
+	tools := payload["tools"].([]map[string]any)
+	if len(tools) != 1 || tools[0]["namespace"] != "test" || tools[0]["name"] != "test_echo" {
+		t.Fatalf("unexpected discovery payload %+v", payload)
+	}
+	if tools[0]["schema_available"] != true || tools[0]["approval_hint"] != "on-request" {
+		t.Fatalf("unexpected discovery metadata %+v", tools[0])
+	}
+
+	tooMany := make([]string, maxAllowedTools+1)
+	for i := range tooMany {
+		tooMany[i] = fmt.Sprintf("tool_%d", i)
+	}
+	if _, err := reg.Call("tool_catalog", map[string]any{"allowed_tools": tooMany}); err == nil || !strings.Contains(err.Error(), "at most 64") {
+		t.Fatalf("expected bounded allowed_tools error, got %v", err)
 	}
 }
 

@@ -1,7 +1,8 @@
 // Command codexkit-mcp runs the codexkit MCP server over stdio.
 //
 // It registers all ToolModules and serves tool calls via JSON-RPC 2.0,
-// following the MCP 2025-11 specification with deferred tool loading.
+// following the MCP 2025-11 specification. OpenAI clients can defer this MCP
+// server from their tool definition and discover its namespaced catalog first.
 package main
 
 import (

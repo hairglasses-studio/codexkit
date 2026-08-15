@@ -748,8 +748,8 @@ type modelLifecycleRegistry struct {
 }
 
 // modelPinScanFiles lists the repo-relative files scanned for pinned model
-// ids/aliases. .agents/roles/*.json is globbed separately since it is a
-// directory of files rather than a single fixed path.
+// ids/aliases. Agent-role files are globbed separately because they are
+// directories of files rather than fixed paths.
 var modelPinScanFiles = []string{
 	".codex/config.toml",
 	".claude/settings.json",
@@ -781,6 +781,10 @@ func (r *Report) addModelPinFreshness(repoPath string) {
 	}
 	var candidates []candidate
 	for _, m := range registry.Models {
+		status := strings.ToLower(strings.TrimSpace(m.Status))
+		if status != "deprecated" && status != "retired" {
+			continue
+		}
 		if m.ID != "" {
 			candidates = append(candidates, candidate{text: m.ID, model: m})
 		}
@@ -802,6 +806,13 @@ func (r *Report) addModelPinFreshness(repoPath string) {
 	}
 	if roleFiles, err := filepath.Glob(filepath.Join(repoPath, ".agents", "roles", "*.json")); err == nil {
 		for _, p := range roleFiles {
+			if rel, err := filepath.Rel(repoPath, p); err == nil {
+				files = append(files, rel)
+			}
+		}
+	}
+	if agentFiles, err := filepath.Glob(filepath.Join(repoPath, ".codex", "agents", "*.toml")); err == nil {
+		for _, p := range agentFiles {
 			if rel, err := filepath.Rel(repoPath, p); err == nil {
 				files = append(files, rel)
 			}
@@ -861,6 +872,10 @@ func isModelIDChar(b byte) bool {
 }
 
 func (r *Report) addModelPinVerdict(m modelLifecycleEntry, file string, today time.Time) {
+	if strings.EqualFold(strings.TrimSpace(m.Status), "retired") {
+		r.add("model_pin_freshness", false, fmt.Sprintf("retired model pin %s in %s — migrate to %s", m.ID, file, m.Replacement))
+		return
+	}
 	if m.Retires != "" {
 		if retiresDate, err := time.Parse("2006-01-02", m.Retires); err == nil {
 			days := int(retiresDate.Sub(today).Hours() / 24)

@@ -15,12 +15,15 @@ import (
 )
 
 const (
-	startMarker              = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
-	endMarker                = "# END GENERATED MCP SERVERS: codex-mcp-sync"
+	startMarker = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
+	endMarker   = "# END GENERATED MCP SERVERS: codex-mcp-sync"
 	// Matches the operator's global approval_policy = "never" posture; a
 	// generated "approve" here silently re-gates every MCP tool call and
 	// contradicts the top-level policy (reconciled 2026-08-08).
 	defaultToolsApprovalMode = "never"
+	// Existing curated fleet profiles reach 320 tools; keep the input bounded
+	// without invalidating those explicit operator-owned allowlists.
+	maxEnabledTools = 512
 )
 
 var mcpServerBlockRe = regexp.MustCompile(`(?m)^\[mcp_servers\.`)
@@ -365,6 +368,9 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 		if !ok {
 			return nil, fmt.Errorf("missing source server: %s", profile.From)
 		}
+		if err := validateToolSelection(profile); err != nil {
+			return nil, fmt.Errorf("profile %s: %w", profile.Name, err)
+		}
 
 		resolved := resolvedProfile{
 			Name:              profile.Name,
@@ -417,6 +423,38 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 		profiles = append(profiles, resolved)
 	}
 	return profiles, nil
+}
+
+func validateToolSelection(profile policyProfile) error {
+	if len(profile.EnabledTools) > maxEnabledTools {
+		return fmt.Errorf("enabled_tools must contain at most %d entries", maxEnabledTools)
+	}
+	enabled := make(map[string]bool, len(profile.EnabledTools))
+	for _, name := range profile.EnabledTools {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return fmt.Errorf("enabled_tools must not contain empty entries")
+		}
+		if enabled[name] {
+			return fmt.Errorf("enabled_tools contains duplicate %q", name)
+		}
+		enabled[name] = true
+	}
+	disabled := make(map[string]bool, len(profile.DisabledTools))
+	for _, name := range profile.DisabledTools {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return fmt.Errorf("disabled_tools must not contain empty entries")
+		}
+		if disabled[name] {
+			return fmt.Errorf("disabled_tools contains duplicate %q", name)
+		}
+		if enabled[name] {
+			return fmt.Errorf("tool %q cannot be both enabled and disabled", name)
+		}
+		disabled[name] = true
+	}
+	return nil
 }
 
 // filterCodexCompatible keeps Codex's two supported MCP launch forms: a stdio

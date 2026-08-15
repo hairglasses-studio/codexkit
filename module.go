@@ -34,8 +34,8 @@ type ToolDef struct {
 	// destructiveHint, idempotentHint, and openWorldHint.
 	Annotations map[string]any `json:"annotations,omitempty"`
 
-	// Schema is the JSON Schema for the tool's input parameters.
-	// nil means the tool takes no parameters.
+	// Schema is the JSON Schema object for the tool's input parameters.
+	// Tools without parameters still use an explicit empty object schema.
 	Schema map[string]any `json:"inputSchema,omitempty"`
 
 	// Handler executes the tool with the given parameters and returns

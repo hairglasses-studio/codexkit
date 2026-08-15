@@ -527,16 +527,16 @@ type CompactRepoScore struct {
 // CompactReport is the default, token-bounded repo_readiness_score shape.
 // Pass detail:true to the tool for the full Report shape instead.
 type CompactReport struct {
-	GeneratedAt   string              `json:"generated_at"`
-	GeneratedBy   string              `json:"generated_by"`
-	WorkspaceRoot string              `json:"workspace_root"`
-	Summary       Summary             `json:"summary"`
-	Repos         []CompactRepoScore  `json:"repos"`
-	Warnings      []string            `json:"warnings,omitempty"`
-	TotalRepos    int                 `json:"total_repos"`
-	Offset        int                 `json:"offset"`
-	Limit         int                 `json:"limit,omitempty"`
-	Truncated     bool                `json:"truncated,omitempty"`
+	GeneratedAt   string             `json:"generated_at"`
+	GeneratedBy   string             `json:"generated_by"`
+	WorkspaceRoot string             `json:"workspace_root"`
+	Summary       Summary            `json:"summary"`
+	Repos         []CompactRepoScore `json:"repos"`
+	Warnings      []string           `json:"warnings,omitempty"`
+	TotalRepos    int                `json:"total_repos"`
+	Offset        int                `json:"offset"`
+	Limit         int                `json:"limit,omitempty"`
+	Truncated     bool               `json:"truncated,omitempty"`
 }
 
 // DetailReport is the full Report shape plus pagination metadata, for

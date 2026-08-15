@@ -13,16 +13,13 @@ workspace checkout or host-specific generated artifacts.
 ```bash
 git clone https://github.com/hairglasses-studio/codexkit.git
 cd codexkit
-GOWORK=off go mod download
-GOWORK=off go vet ./...
-GOWORK=off go test ./...
-GOWORK=off go run ./cmd/codexkit baseline check .
+make ci
 ```
 
 Expected baseline shape:
 
 ```text
-.                    PASS (31 checks)
+.                    PASS
 ```
 
 ## What To Inspect

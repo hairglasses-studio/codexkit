@@ -21,3 +21,7 @@ token.json
 
 # Generated private skill mirrors stay out of the public tree.
 skills/
+# This repo's public canonical skill is an intentional tracked projection.
+!/.claude/skills/
+!/.claude/skills/codexkit/
+!/.claude/skills/codexkit/SKILL.md
