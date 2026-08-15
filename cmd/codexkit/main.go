@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/hairglasses-studio/codexkit"
-	"github.com/hairglasses-studio/codexkit/agyloop"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
 	"github.com/hairglasses-studio/codexkit/configindex"
 	"github.com/hairglasses-studio/codexkit/fleetaudit"
@@ -32,7 +30,6 @@ var registry *codexkit.Registry
 func init() {
 	registry = codexkit.NewRegistry()
 	for _, m := range []codexkit.ToolModule{
-		agyloop.Module(),
 		baselineguard.Module(),
 		configindex.Module(),
 		skillsync.Module(),
@@ -81,12 +78,6 @@ func main() {
 		runUnification(os.Args[2:])
 	case "reduction":
 		runReduction(os.Args[2:])
-	case "agy":
-		runAGY(os.Args[2:])
-	case "teamwork":
-		runTeamwork(os.Args[2:])
-	case "fleet-autopilot", "autopilot":
-		runAGYAutopilot(os.Args[2:])
 	case "bridge":
 		runBridge(os.Args[2:])
 	case "tools":
@@ -104,15 +95,6 @@ func printUsage() {
 	fmt.Println(`codexkit — Codex fleet management toolkit
 
 Commands:
-  agy loop <repo> [--model <model>] [--effort <effort>] [--max-iter <n>] [--prompt <prompt>] [--verify-cmd <cmd>] [--auto-commit] [--auto-push] [--dry-run] [--stop-on-clean] [--json]
-                                Run autonomous AGY 2.0 / Gemini 3.7 Flash Ralph Wiggum loop
-  agy teamwork <repo> [--topology <star|chain|blackboard>] [--workers <n>] [--prompt <prompt>] [--model <model>] [--auto-merge] [--auto-push] [--dry-run] [--json]
-                                Run multi-agent AGY 2.0 / Gemini 3.7 Flash teamwork session
-  agy autopilot [workspace_root] [--concurrency <n>] [--max-iter <n>] [--model <model>] [--auto-commit] [--auto-push] [--dry-run] [--json]
-                                Run fleet autopilot across all ready repositories
-  agy status <repo>             Inspect loop progress and HMAC attestation receipts
-  teamwork <repo>               Alias for codexkit agy teamwork
-  fleet-autopilot [root]        Alias for codexkit agy autopilot
   baseline check <repo|--all> [--overlay <file>]
                                 Run baseline-guard validation
   skills sync <repo>            Sync skills to .claude/skills/ and plugins/
@@ -2194,307 +2176,6 @@ func runWorkspacePrimitiveIndexCheck(args []string) (bool, error) {
 		fmt.Printf("  %-16s %-20s %s\n", findingStatus, finding.Check, finding.Message)
 	}
 	return report.Passed, nil
-}
-
-func runAGY(args []string) {
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: codexkit agy <loop|teamwork|autopilot|status> [repo] [flags]")
-		os.Exit(1)
-	}
-
-	switch args[0] {
-	case "loop":
-		runAGYLoop(args[1:])
-	case "teamwork":
-		runAGYTeamwork(args[1:])
-	case "autopilot", "fleet":
-		runAGYAutopilot(args[1:])
-	case "status":
-		runAGYStatus(args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, "unknown agy subcommand: %s\n", args[0])
-		os.Exit(1)
-	}
-}
-
-func runTeamwork(args []string) {
-	runAGYTeamwork(args)
-}
-
-func runAGYLoop(args []string) {
-	jsonOut := hasFlag(args, "--json")
-	dryRun := hasFlag(args, "--dry-run")
-	autoCommit := hasFlag(args, "--auto-commit")
-	autoPush := hasFlag(args, "--auto-push")
-	stopOnClean := hasFlag(args, "--stop-on-clean")
-
-	model, args, _, _ := takeFlagValue(args, "--model")
-	effort, args, _, _ := takeFlagValue(args, "--effort")
-	maxIterStr, args, _, _ := takeFlagValue(args, "--max-iter")
-	prompt, args, _, _ := takeFlagValue(args, "--prompt")
-	verifyCmd, args, _, _ := takeFlagValue(args, "--verify-cmd")
-
-	maxIter := 5
-	if maxIterStr != "" {
-		if val, err := strconv.Atoi(maxIterStr); err == nil && val > 0 {
-			maxIter = val
-		}
-	}
-
-	repo := "."
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		repo = args[0]
-	}
-
-	opts := agyloop.LoopOptions{
-		RepoPath:        repo,
-		Model:           model,
-		ReasoningEffort: effort,
-		MaxIterations:   maxIter,
-		Prompt:          prompt,
-		VerificationCmd: verifyCmd,
-		AutoCommit:      autoCommit,
-		AutoPush:        autoPush,
-		DryRun:          dryRun,
-		StopOnClean:     stopOnClean,
-	}
-
-	report, err := agyloop.RunLoop(context.Background(), opts)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "agy loop error: %v\n", err)
-		os.Exit(1)
-	}
-
-	if jsonOut {
-		printJSON(report)
-		return
-	}
-
-	fmt.Printf("agy loop: %s (%s, %d iterations, %d successful rounds, %.1fs)\n",
-		report.Status, report.Model, report.TotalIterations, report.SuccessfulRounds, report.DurationSeconds)
-	for _, rec := range report.Receipts {
-		pass := "PASS"
-		if !rec.VerificationPassed {
-			pass = "FAIL"
-		}
-		sig := rec.AttestationHMAC
-		if len(sig) > 16 {
-			sig = sig[:16] + "..."
-		}
-		pre := rec.GitPreSHA
-		if len(pre) > 7 {
-			pre = pre[:7]
-		}
-		post := rec.GitPostSHA
-		if len(post) > 7 {
-			post = post[:7]
-		}
-		fmt.Printf("  [iter %d] %s (pre: %s, post: %s, hmac: %s)\n",
-			rec.IterationIndex, pass, pre, post, sig)
-		if rec.ErrorReason != "" {
-			fmt.Printf("    error: %s\n", rec.ErrorReason)
-		}
-	}
-}
-
-func runAGYTeamwork(args []string) {
-	jsonOut := hasFlag(args, "--json")
-	dryRun := hasFlag(args, "--dry-run")
-	autoMerge := hasFlag(args, "--auto-merge")
-	autoPush := hasFlag(args, "--auto-push")
-
-	model, args, _, _ := takeFlagValue(args, "--model")
-	effort, args, _, _ := takeFlagValue(args, "--effort")
-	workersStr, args, _, _ := takeFlagValue(args, "--workers")
-	topologyStr, args, _, _ := takeFlagValue(args, "--topology")
-	prompt, args, _, _ := takeFlagValue(args, "--prompt")
-
-	workers := 2
-	if workersStr != "" {
-		if val, err := strconv.Atoi(workersStr); err == nil && val > 0 {
-			workers = val
-		}
-	}
-
-	topo := agyloop.TopologyStar
-	if topologyStr != "" {
-		topo = agyloop.TeamworkTopology(topologyStr)
-	}
-
-	repo := "."
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		repo = args[0]
-	}
-
-	opts := agyloop.TeamworkOptions{
-		RepoPath:        repo,
-		Topology:        topo,
-		Workers:         workers,
-		Prompt:          prompt,
-		Model:           model,
-		ReasoningEffort: effort,
-		AutoMerge:       autoMerge,
-		AutoPush:        autoPush,
-		DryRun:          dryRun,
-	}
-
-	report, err := agyloop.RunTeamwork(context.Background(), opts)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "agy teamwork error: %v\n", err)
-		os.Exit(1)
-	}
-
-	if jsonOut {
-		printJSON(report)
-		return
-	}
-
-	status := "PASS"
-	if !report.ConvergencePassed {
-		status = "FAIL"
-	}
-	fmt.Printf("agy teamwork [%s]: %s (%d workers, %s topology, %.1fs)\n",
-		report.TeamID, status, report.WorkersSpawned, report.Topology, report.DurationSeconds)
-	for _, wrk := range report.WorkerResults {
-		pass := "PASS"
-		if !wrk.Success {
-			pass = "FAIL"
-		}
-		sig := wrk.AttestationHMAC
-		if len(sig) > 16 {
-			sig = sig[:16] + "..."
-		}
-		fmt.Printf("  [%s] %s (scope: %s, hmac: %s, %.1fs)\n",
-			wrk.WorkerID, pass, wrk.Scope, sig, wrk.DurationSeconds)
-		if wrk.ErrorReason != "" {
-			fmt.Printf("    error: %s\n", wrk.ErrorReason)
-		}
-	}
-	if report.MasterReceipt != "" {
-		sig := report.MasterReceipt
-		if len(sig) > 24 {
-			sig = sig[:24] + "..."
-		}
-		fmt.Printf("  master receipt: %s\n", sig)
-	}
-}
-
-func runAGYAutopilot(args []string) {
-	jsonOut := hasFlag(args, "--json")
-	dryRun := hasFlag(args, "--dry-run")
-	autoCommit := hasFlag(args, "--auto-commit")
-	autoPush := hasFlag(args, "--auto-push")
-
-	model, args, _, _ := takeFlagValue(args, "--model")
-	effort, args, _, _ := takeFlagValue(args, "--effort")
-	concurrencyStr, args, _, _ := takeFlagValue(args, "--concurrency")
-	maxIterStr, args, _, _ := takeFlagValue(args, "--max-iter")
-	prompt, args, _, _ := takeFlagValue(args, "--prompt")
-	lanes, args, _, _ := takeFlagValue(args, "--lanes")
-
-	concurrency := 4
-	if concurrencyStr != "" {
-		if val, err := strconv.Atoi(concurrencyStr); err == nil && val > 0 {
-			concurrency = val
-		}
-	}
-
-	maxIter := 3
-	if maxIterStr != "" {
-		if val, err := strconv.Atoi(maxIterStr); err == nil && val > 0 {
-			maxIter = val
-		}
-	}
-
-	root := "."
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		root = args[0]
-	}
-
-	opts := agyloop.FleetAutopilotOptions{
-		WorkspaceRoot:   root,
-		Concurrency:     concurrency,
-		MaxIterations:   maxIter,
-		Model:           model,
-		ReasoningEffort: effort,
-		Prompt:          prompt,
-		AutoCommit:      autoCommit,
-		AutoPush:        autoPush,
-		DryRun:          dryRun,
-		IncludeLanes:    lanes,
-	}
-
-	report, err := agyloop.RunFleetAutopilot(context.Background(), opts)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "fleet autopilot error: %v\n", err)
-		os.Exit(1)
-	}
-
-	if jsonOut {
-		printJSON(report)
-		return
-	}
-
-	status := "PASS"
-	if report.CircuitBreakerOpen || report.FailedRepos > 0 {
-		status = "WARN"
-	}
-	fmt.Printf("fleet autopilot: %s (model: %s, scanned: %d, eligible: %d, success: %d, failed: %d, %.1fs)\n",
-		status, report.Model, report.TotalReposScanned, report.EligibleRepos, report.SuccessfulRepos, report.FailedRepos, report.TotalDurationSec)
-	for _, res := range report.Results {
-		repoStatus := "PASS"
-		if !res.Success {
-			repoStatus = "FAIL"
-		}
-		fmt.Printf("  %-20s %-4s (lane: %-20s score: %3d, rounds: %d/%d, %.1fs)\n",
-			res.RepoName, repoStatus, res.ReadinessLane, res.ReadinessScore, res.SuccessfulRounds, res.IterationsRun, res.DurationSeconds)
-		if res.ErrorReason != "" {
-			fmt.Printf("    error: %s\n", res.ErrorReason)
-		}
-	}
-	if report.MasterAttestation != "" {
-		sig := report.MasterAttestation
-		if len(sig) > 24 {
-			sig = sig[:24] + "..."
-		}
-		fmt.Printf("  master hmac: %s\n", sig)
-	}
-}
-
-func runAGYStatus(args []string) {
-	jsonOut := hasFlag(args, "--json")
-	repo := "."
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		repo = args[0]
-	}
-
-	progressPath := filepath.Join(repo, ".ralph", "progress.json")
-	data, err := os.ReadFile(progressPath)
-	if err != nil {
-		fmt.Printf("no active loop status found in %s\n", repo)
-		return
-	}
-
-	if jsonOut {
-		fmt.Println(string(data))
-		return
-	}
-
-	var report agyloop.LoopReport
-	if err := json.Unmarshal(data, &report); err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing %s: %v\n", progressPath, err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("repo: %s (branch: %s, model: %s, status: %s, iterations: %d, successful: %d)\n",
-		report.RepoPath, report.Branch, report.Model, report.Status, report.TotalIterations, report.SuccessfulRounds)
-	for _, rec := range report.Receipts {
-		pass := "PASS"
-		if !rec.VerificationPassed {
-			pass = "FAIL"
-		}
-		fmt.Printf("  [iter %d] %s (%s, sha: %s)\n", rec.IterationIndex, pass, rec.Timestamp, rec.GitPostSHA)
-	}
 }
 
 func runTools() {
