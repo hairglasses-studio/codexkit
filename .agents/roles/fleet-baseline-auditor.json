@@ -1,0 +1,45 @@
+{
+  "schema_version": 2,
+  "type": "role",
+  "name": "fleet-baseline-auditor",
+  "title": "Fleet Baseline Auditor",
+  "summary": "Validates workspace baseline conformance, protocol rules, and file patterns across repos.",
+  "category": "audit",
+  "execution_kind": "analysis",
+  "tool_class": "read-only",
+  "status": "active",
+  "prompt": "Audit workspace repositories for baseline compliance, required canonical instruction markers, MCP protocol targets, and configuration freshness.",
+  "provider_overrides": {
+    "codex": {
+      "surface": ".codex/agents/fleet_baseline_auditor.toml",
+      "name": "fleet_baseline_auditor",
+      "description": "Validates workspace baseline conformance across repos.",
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "high",
+      "cost_intent": "high_cost",
+      "sandbox_mode": "read-only",
+      "prompt": "Audit workspace repositories for baseline compliance using codexkit baseline check and fleetaudit tools."
+    },
+    "claude": {
+      "surface": ".claude/agents/fleet-baseline-auditor.md",
+      "name": "fleet-baseline-auditor",
+      "description": "Validates workspace baseline conformance across repos.",
+      "memory": "project",
+      "color": "cyan",
+      "skills": ["codexkit"],
+      "frontmatter": [
+        "model: sonnet",
+        "tools:",
+        "  - Read",
+        "  - Grep",
+        "  - mcp__codexkit__baseline_check",
+        "  - mcp__codexkit__baseline_check_all",
+        "  - mcp__codexkit__fleet_audit",
+        "disallowedTools:",
+        "  - Edit",
+        "  - Write"
+      ],
+      "prompt": "You are a fleet baseline auditor. Validate repos across the workspace for canonical AGENTS.md, correct protocol targets, and zero retired provider mirror files."
+    }
+  }
+}

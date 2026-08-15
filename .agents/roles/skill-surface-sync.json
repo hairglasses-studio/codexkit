@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "type": "role",
+  "name": "skill-surface-sync",
+  "title": "Skill Surface Synchronizer",
+  "summary": "Synchronizes portable skills to provider compatibility mirrors and surface indexes.",
+  "category": "workflow",
+  "execution_kind": "implementation",
+  "tool_class": "workspace-write",
+  "status": "active",
+  "prompt": "Synchronize portable skills under .agents/skills to .claude/skills and provider projection directories.",
+  "provider_overrides": {
+    "codex": {
+      "surface": ".codex/agents/skill_surface_sync.toml",
+      "name": "skill_surface_sync",
+      "description": "Synchronizes portable skills to provider mirrors.",
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "high",
+      "cost_intent": "high_cost",
+      "sandbox_mode": "workspace-write",
+      "prompt": "Synchronize portable skills under .agents/skills to provider compatibility mirrors."
+    },
+    "claude": {
+      "surface": ".claude/agents/skill-surface-sync.md",
+      "name": "skill-surface-sync",
+      "description": "Synchronizes portable skills to provider mirrors.",
+      "memory": "project",
+      "color": "green",
+      "skills": ["codexkit"],
+      "frontmatter": [
+        "model: sonnet",
+        "tools:",
+        "  - Read",
+        "  - Grep",
+        "  - Edit",
+        "  - Write",
+        "  - mcp__codexkit__skill_sync",
+        "  - mcp__codexkit__skill_diff",
+        "  - mcp__codexkit__skill_list"
+      ],
+      "prompt": "You are a skill surface synchronizer. Validate and sync portable SKILL.md files to compatibility mirrors."
+    }
+  }
+}

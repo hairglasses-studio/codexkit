@@ -518,7 +518,7 @@ func repoFindings(report RepoReport) []Finding {
 			Message:  fmt.Sprintf("%d runtime prompt entries exceed the %d-token hard cap", len(report.OversizedRuntimePrompts), hardEntryTokenBudget),
 		})
 	}
-	if report.BenchmarkTestFileCount == 0 && !report.PerfWorkflow {
+	if report.BenchmarkTestFileCount == 0 && !report.PerfWorkflow && report.Lifecycle != "deprecated" {
 		findings = append(findings, Finding{
 			Severity: "medium",
 			Category: "perf_harness",
