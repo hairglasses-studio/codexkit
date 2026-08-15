@@ -1,9 +1,0 @@
-{
-  "generator": "codexkit/scripts/gemini-settings-sync.sh",
-  "template": "templates/gemini-settings.standard.json",
-  "source_mcp_json": ".mcp.json",
-  "source_claude_settings": ".claude/settings.json",
-  "translated_hook_rules": 0,
-  "unsupported_claude_hook_rules": 0,
-  "gemini_mcp_server_count": 1
-}
