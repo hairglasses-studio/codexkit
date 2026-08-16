@@ -304,20 +304,13 @@ func renderWorkspaceCodexBlock(projection GlobalProjection) string {
 			fmt.Fprintf(&b, "# %s\n", entry.Comment)
 		}
 		fmt.Fprintf(&b, "[mcp_servers.%s]\n", entry.Name)
-		renderProviderServerTOML(&b, entry.Name, entry.Server)
-		if len(entry.EnabledTools) > 0 {
-			b.WriteString("enabled_tools = [\n")
-			for _, tool := range entry.EnabledTools {
-				fmt.Fprintf(&b, "  %s,\n", tomlQuote(tool))
-			}
-			b.WriteString("]\n")
-		}
+		renderProviderServerTOML(&b, entry.Name, entry.Server, entry.EnabledTools)
 	}
 	b.WriteString("\n" + WorkspaceGlobalEndMarker + "\n")
 	return b.String()
 }
 
-func renderProviderServerTOML(b *strings.Builder, name string, server ProviderServer) {
+func renderProviderServerTOML(b *strings.Builder, name string, server ProviderServer, enabledTools []string) {
 	renderStringValue(b, "default_tools_approval_mode", defaultToolsApprovalMode)
 	if server.Command != "" {
 		renderStringValue(b, "command", server.Command)
@@ -333,6 +326,13 @@ func renderProviderServerTOML(b *strings.Builder, name string, server ProviderSe
 	}
 	if server.URL != "" {
 		renderStringValue(b, "url", server.URL)
+	}
+	if len(enabledTools) > 0 {
+		b.WriteString("enabled_tools = [\n")
+		for _, tool := range enabledTools {
+			fmt.Fprintf(b, "  %s,\n", tomlQuote(tool))
+		}
+		b.WriteString("]\n")
 	}
 	if len(server.Env) > 0 {
 		renderStringMapSection(b, fmt.Sprintf("mcp_servers.%s.env", name), server.Env)
