@@ -8,10 +8,11 @@
 Fleet management toolkit for AI agent repos — baseline validation, skill surface sync, and MCP profile management.
 
 > **Deprecation notice:** this standalone repository is now a public
-> compatibility snapshot. Active private development moved to the centralized
-> Codex harness repository, where this module is nested under `codexkit/`.
-> The Go module path remains `github.com/hairglasses-studio/codexkit` for the
-> compatibility window, so existing installs and imports can continue to work.
+> compatibility snapshot. Active private development moved to the canonical
+> Codex harness repository at `codex-harness-staging/codexkit`, where this module
+> is nested under `codexkit/`. The Go module path remains
+> `github.com/hairglasses-studio/codexkit` for the compatibility window, so
+> existing installs and imports can continue to work.
 > See [DEPRECATED.md](DEPRECATED.md).
 >
 > **Public portfolio context:** codexkit is the sanitized public slice of a larger private fleet-management workflow. It shows the reusable validation, sync, and projection patterns without publishing private repo inventory, workstation state, credentials, or tenant details.
