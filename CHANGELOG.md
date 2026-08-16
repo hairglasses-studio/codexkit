@@ -15,6 +15,11 @@ SemVer cadence.
   `github.com/hairglasses-studio/codexkit` during the compatibility window.
 
 ### Added
+- Freeze guard (`scripts/check-freeze.sh`, `.githooks/`) enforcing the
+  deprecation notice: commits are refused unless the message carries a
+  `Freeze-Exempt: <reason>` trailer from a closed vocabulary and every changed
+  path is in that reason's allowlist. Wired into `make ci` and covered by
+  `scripts/check-freeze-self-test.sh`.
 - Performance audit module (`perfaudit`) with supporting script improvements.
 - Projection diff preview helper for global MCP overlay changes.
 - Smoke tests for the `fleetaudit` package and unit tests for `llmreduction`.

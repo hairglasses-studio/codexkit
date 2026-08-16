@@ -4,6 +4,15 @@ set -euo pipefail
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
+echo "==> freeze guard"
+# This repository is frozen (DEPRECATED.md). Install rather than merely check:
+# git hook wiring is per-checkout local config, so a tracked hook is inert
+# until core.hooksPath points at it. Making CI perform the install is what
+# keeps "CI is green" from meaning only "the guard exists somewhere".
+bash scripts/install-freeze-guard.sh
+bash scripts/check-freeze.sh --history
+bash scripts/check-freeze-self-test.sh
+
 echo "==> parse tracked JSON and TOML"
 python3 - <<'PY'
 import json

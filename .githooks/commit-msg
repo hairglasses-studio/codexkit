@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Freeze guard entry point. See scripts/check-freeze.sh and DEPRECATED.md.
+#
+# commit-msg is the earliest hook that receives the commit message, which the
+# freeze allowlist needs (the `Freeze-Exempt:` trailer). pre-commit runs before
+# the message exists and cannot do this.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+# git passes the message path relative to the repo root; the guard resolves its
+# own repo root and may cd, so hand it an absolute path.
+msg_file="$1"
+[[ "$msg_file" = /* ]] || msg_file="$(pwd)/${msg_file}"
+
+exec bash "${repo_root}/scripts/check-freeze.sh" --commit-msg "$msg_file"

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Delegating pre-commit.
+#
+# Installing the freeze guard points this repo's core.hooksPath at .githooks,
+# which OVERRIDES the fleet-wide hooks directory. Without this delegation the
+# fleet's own pre-commit would silently stop running for this repo. Resolve the
+# fleet directory dynamically from the global config so no absolute workstation
+# path is ever tracked here (see PUBLIC_BOUNDARY.md).
+set -euo pipefail
+
+hook_name="$(basename "$0")"
+repo_root="$(git rev-parse --show-toplevel)"
+delegate_dir="$(git config --global --get core.hooksPath || true)"
+
+if [[ -n "$delegate_dir" && "$delegate_dir" != "${repo_root}/.githooks" && "$delegate_dir" != ".githooks" ]]; then
+	if [[ -x "${delegate_dir}/${hook_name}" ]]; then
+		exec "${delegate_dir}/${hook_name}" "$@"
+	fi
+fi
+
+# No fleet hook to delegate to: fall back to the repo-local convention the
+# fleet hook itself uses.
+if [[ -x "${repo_root}/scripts/dev/${hook_name}" ]]; then
+	exec "${repo_root}/scripts/dev/${hook_name}" "$@"
+fi
+
+exit 0
