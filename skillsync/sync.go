@@ -604,10 +604,14 @@ func validateProjectionTarget(path string) error {
 		if err == nil && (info.Mode()&os.ModeSymlink != 0 || !info.IsDir()) {
 			return fmt.Errorf("projection parent must be a real directory, not a symlink: %s", parent)
 		}
-		if parent == filepath.Dir(parent) { break }
+		if parent == filepath.Dir(parent) {
+			break
+		}
 	}
 	info, err := os.Lstat(path)
-	if err != nil && !os.IsNotExist(err) { return fmt.Errorf("inspect projection %s: %w", path, err) }
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("inspect projection %s: %w", path, err)
+	}
 	if err == nil && !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
 		return fmt.Errorf("projection target must be a regular file or leaf symlink: %s", path)
 	}
@@ -617,19 +621,37 @@ func validateProjectionTarget(path string) error {
 // Rename replaces a leaf symlink itself; opening that symlink for writing
 // would instead overwrite its target, potentially the canonical SKILL.md.
 func writeProjectionAtomic(path string, data []byte) error {
-	if err := validateProjectionTarget(path); err != nil { return err }
+	if err := validateProjectionTarget(path); err != nil {
+		return err
+	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".skill-projection-*")
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer os.Remove(tmp.Name())
 	defer tmp.Close()
-	if _, err := tmp.Write(data); err != nil { return err }
-	if err := tmp.Chmod(0o644); err != nil { return err }
-	if err := tmp.Sync(); err != nil { return err }
-	if err := tmp.Close(); err != nil { return err }
-	if err := validateProjectionTarget(path); err != nil { return err }
-	if err := os.Rename(tmp.Name(), path); err != nil { return err }
+	if _, err := tmp.Write(data); err != nil {
+		return err
+	}
+	if err := tmp.Chmod(0o644); err != nil {
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := validateProjectionTarget(path); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return err
+	}
 	dir, err := os.Open(filepath.Dir(path))
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer dir.Close()
 	return dir.Sync()
 }
