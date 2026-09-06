@@ -17,10 +17,10 @@ import (
 const (
 	startMarker = "# BEGIN GENERATED MCP SERVERS: codex-mcp-sync"
 	endMarker   = "# END GENERATED MCP SERVERS: codex-mcp-sync"
-	// Matches the operator's global approval_policy = "never" posture; a
-	// generated "approve" here silently re-gates every MCP tool call and
-	// contradicts the top-level policy (reconciled 2026-08-08).
-	defaultToolsApprovalMode = "never"
+	// Current Codex uses "approve" to run MCP tools without a confirmation
+	// prompt. Keep it aligned with the operator's approval_policy = "never"
+	// posture instead of emitting the retired, invalid "never" enum value.
+	defaultToolsApprovalMode = "approve"
 	// Existing curated fleet profiles reach 320 tools; keep the input bounded
 	// without invalidating those explicit operator-owned allowlists.
 	maxEnabledTools = 512
@@ -30,12 +30,14 @@ var mcpServerBlockRe = regexp.MustCompile(`(?m)^\[mcp_servers\.`)
 
 // MCPServer describes one source server from .mcp.json.
 type MCPServer struct {
-	Command   string            `json:"command,omitempty"`
-	Args      []string          `json:"args,omitempty"`
-	Env       map[string]string `json:"env,omitempty"`
-	CWD       string            `json:"cwd,omitempty"`
-	Transport string            `json:"transport,omitempty"`
-	URL       string            `json:"url,omitempty"`
+	Command           string            `json:"command,omitempty"`
+	Args              []string          `json:"args,omitempty"`
+	Env               map[string]string `json:"env,omitempty"`
+	CWD               string            `json:"cwd,omitempty"`
+	Transport         string            `json:"transport,omitempty"`
+	URL               string            `json:"url,omitempty"`
+	Disabled          *bool             `json:"disabled,omitempty"`
+	StartupTimeoutSec *int              `json:"startup_timeout_sec,omitempty"`
 }
 
 type MCPFile struct {
@@ -332,13 +334,15 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 				return nil, fmt.Errorf("profile %s resolved to an empty command", name)
 			}
 			profiles = append(profiles, resolvedProfile{
-				Name:      name,
-				Command:   source.Command,
-				Args:      append([]string(nil), source.Args...),
-				CWD:       source.CWD,
-				Env:       cloneEnv(source.Env),
-				Transport: source.Transport,
-				URL:       source.URL,
+				Name:              name,
+				Command:           source.Command,
+				Args:              append([]string(nil), source.Args...),
+				CWD:               source.CWD,
+				Env:               cloneEnv(source.Env),
+				Transport:         source.Transport,
+				URL:               source.URL,
+				Enabled:           enabledFromDisabled(source.Disabled),
+				StartupTimeoutSec: source.StartupTimeoutSec,
 			})
 		}
 		return profiles, nil
@@ -381,9 +385,9 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 			Env:               cloneEnv(source.Env),
 			Transport:         source.Transport,
 			URL:               source.URL,
-			Enabled:           profile.Enabled,
+			Enabled:           firstBool(profile.Enabled, enabledFromDisabled(source.Disabled)),
 			Required:          profile.Required,
-			StartupTimeoutSec: profile.StartupTimeoutSec,
+			StartupTimeoutSec: firstInt(profile.StartupTimeoutSec, source.StartupTimeoutSec),
 			ToolTimeoutSec:    profile.ToolTimeoutSec,
 			EnabledTools:      append([]string(nil), profile.EnabledTools...),
 			DisabledTools:     append([]string(nil), profile.DisabledTools...),
@@ -423,6 +427,28 @@ func resolveProfiles(repoPath string, mcpFile *MCPFile) ([]resolvedProfile, erro
 		profiles = append(profiles, resolved)
 	}
 	return profiles, nil
+}
+
+func enabledFromDisabled(disabled *bool) *bool {
+	if disabled == nil {
+		return nil
+	}
+	enabled := !*disabled
+	return &enabled
+}
+
+func firstBool(primary, fallback *bool) *bool {
+	if primary != nil {
+		return primary
+	}
+	return fallback
+}
+
+func firstInt(primary, fallback *int) *int {
+	if primary != nil {
+		return primary
+	}
+	return fallback
 }
 
 func validateToolSelection(profile policyProfile) error {

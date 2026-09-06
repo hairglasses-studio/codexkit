@@ -61,13 +61,14 @@ type globalMCPFile struct {
 }
 
 type globalMCPServer struct {
-	Command   string            `json:"command,omitempty"`
-	Args      []string          `json:"args,omitempty"`
-	Env       map[string]string `json:"env,omitempty"`
-	Headers   map[string]string `json:"headers,omitempty"`
-	Transport string            `json:"transport,omitempty"`
-	URL       string            `json:"url,omitempty"`
-	CWD       string            `json:"cwd,omitempty"`
+	Command           string            `json:"command,omitempty"`
+	Args              []string          `json:"args,omitempty"`
+	Env               map[string]string `json:"env,omitempty"`
+	StartupTimeoutSec *int              `json:"startup_timeout_sec,omitempty"`
+	Headers           map[string]string `json:"headers,omitempty"`
+	Transport         string            `json:"transport,omitempty"`
+	URL               string            `json:"url,omitempty"`
+	CWD               string            `json:"cwd,omitempty"`
 }
 
 type globalServerCard struct {

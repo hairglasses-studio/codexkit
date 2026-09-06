@@ -602,52 +602,64 @@ func purgeSkillDirs(report *SyncReport, mode syncMode, baseDir, label string, ma
 }
 
 func validatePortableFrontmatter(path string, content []byte) error {
-	lines, _, ok := splitFrontmatter(content)
-	if !ok {
-		return fmt.Errorf("missing frontmatter in %s", path)
+	return ValidateSourceFrontmatter(path, content)
+}
+
+// ValidateSourceFrontmatter validates YAML structurally so comments and nested
+// metadata cannot be mistaken for unsupported top-level provider keys.
+func ValidateSourceFrontmatter(path string, content []byte) error {
+	projection, err := parseSkillProjection(content)
+	if err != nil {
+		return fmt.Errorf("non-portable frontmatter in %s: %w", path, err)
 	}
-	inList := false
-	inMetadata := false
-	inBlock := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		if lineHasIndent(line) {
-			if inList && strings.HasPrefix(trimmed, "- ") {
-				continue
-			}
-			if inMetadata || inBlock {
-				continue
-			}
-			return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
-		}
-		inMetadata = false
-		inBlock = false
-		if strings.HasPrefix(trimmed, "- ") {
-			if !inList {
-				return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
-			}
-			continue
-		}
-		parts := strings.SplitN(trimmed, ":", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
-		}
-		key := strings.TrimSpace(parts[0])
+	for key := range projection.Frontmatter {
 		if !codexkit.SkillSourceFrontmatterKeys[key] {
 			return fmt.Errorf("non-portable frontmatter in %s: %s", path, key)
 		}
-		value := strings.TrimSpace(parts[1])
-		if key == "allowed-tools" && value != "" {
-			return fmt.Errorf("non-portable frontmatter in %s: __INVALID__", path)
-		}
-		inList = value == "" && isYAMLListFrontmatterKey(key)
-		inMetadata = key == "metadata"
-		inBlock = isYAMLBlockScalar(value)
 	}
-	return nil
+	_, err = claudeExtensions(projection.Frontmatter)
+	return err
+}
+
+// claudeExtensions projects namespaced portable metadata into native Claude
+// fields without treating arbitrary metadata as executable provider settings.
+func claudeExtensions(raw map[string]any) (map[string]any, error) {
+	out := map[string]any{}
+	metadata, _ := raw["metadata"].(map[string]any)
+	for key, value := range metadata {
+		if !strings.HasPrefix(key, "hg.claude.") {
+			continue
+		}
+		encoded, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("%s must be a string", key)
+		}
+		field := strings.TrimPrefix(key, "hg.claude.")
+		switch field {
+		case "disallowed-tools":
+			var tools []string
+			if err := json.Unmarshal([]byte(encoded), &tools); err != nil || tools == nil {
+				return nil, fmt.Errorf("%s must encode a JSON array of tool names", key)
+			}
+			for _, tool := range tools {
+				if strings.TrimSpace(tool) == "" {
+					return nil, fmt.Errorf("%s contains an empty tool name", key)
+				}
+			}
+			out[field] = tools
+		case "user-invocable", "disable-model-invocation":
+			if encoded != "true" && encoded != "false" {
+				return nil, fmt.Errorf("%s must be true or false", key)
+			}
+			out[field] = encoded == "true"
+		default:
+			return nil, fmt.Errorf("unsupported Claude metadata extension %s", key)
+		}
+		if _, exists := raw[field]; exists {
+			return nil, fmt.Errorf("duplicate Claude setting %s in metadata and frontmatter", field)
+		}
+	}
+	return out, nil
 }
 
 func lineHasIndent(line string) bool {
@@ -726,6 +738,9 @@ func parseSkillProjection(content []byte) (skillProjection, error) {
 	if description == "" {
 		return skillProjection{}, fmt.Errorf("missing description frontmatter")
 	}
+	if _, err := claudeExtensions(raw); err != nil {
+		return skillProjection{}, err
+	}
 	return skillProjection{
 		Name:         name,
 		Description:  description,
@@ -751,6 +766,12 @@ func renderSkill(name, description, canonicalName string, projection skillProjec
 				continue
 			}
 			writeYAMLFrontmatterValue(&b, key, value)
+		}
+	}
+	extensions, _ := claudeExtensions(projection.Frontmatter) // validated before rendering
+	for _, field := range []string{"disallowed-tools", "user-invocable", "disable-model-invocation"} {
+		if value, ok := extensions[field]; ok {
+			writeYAMLFrontmatterValue(&b, field, value)
 		}
 	}
 	if len(projection.AllowedTools) > 0 {

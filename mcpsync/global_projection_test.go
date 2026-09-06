@@ -158,8 +158,11 @@ func TestSyncGlobalProviderOverlaysWritesProviderTargets(t *testing.T) {
 	if !strings.Contains(codexContent, "enabled_tools = [") || !strings.Contains(codexContent, `"app_click"`) {
 		t.Fatalf("codex overlay missing enabled tools:\n%s", codexContent)
 	}
-	if !strings.Contains(codexContent, `default_tools_approval_mode = "never"`) {
+	if !strings.Contains(codexContent, `default_tools_approval_mode = "approve"`) {
 		t.Fatalf("codex overlay missing approve-by-default MCP policy:\n%s", codexContent)
+	}
+	if !strings.Contains(codexContent, "startup_timeout_sec = 120") {
+		t.Fatalf("codex overlay missing inherited startup timeout:\n%s", codexContent)
 	}
 
 	claudeData, err := os.ReadFile(claudePath)
@@ -219,6 +222,7 @@ func setupGlobalProjectionWorkspace(t *testing.T) string {
   "mcpServers": {
     "app": {
       "command": "./run-mcp.sh",
+      "startup_timeout_sec": 120,
       "env": {"APP_ENV": "test"}
     }
   }

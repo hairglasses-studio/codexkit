@@ -62,7 +62,7 @@ func TestSync_CreatesServerBlocks(t *testing.T) {
 	if !strings.Contains(content, "[mcp_servers.filesystem]") {
 		t.Error("expected [mcp_servers.filesystem] in config.toml")
 	}
-	if got := strings.Count(content, `default_tools_approval_mode = "never"`); got != 2 {
+	if got := strings.Count(content, `default_tools_approval_mode = "approve"`); got != 2 {
 		t.Errorf("expected approve-by-default for both generated servers, got %d:\n%s", got, content)
 	}
 
@@ -75,6 +75,45 @@ func TestSync_CreatesServerBlocks(t *testing.T) {
 	}
 	if updated != 2 {
 		t.Errorf("expected 2 generated profile updates, got %d", updated)
+	}
+}
+
+func TestSync_PreservesDisabledStateAndStartupTimeout(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, ".mcp.json", `{
+  "mcpServers": {
+    "available": {
+      "command": "available-mcp",
+      "disabled": false,
+      "startup_timeout_sec": 120
+    },
+    "deferred": {
+      "command": "deferred-mcp",
+      "disabled": true
+    }
+  }
+}`)
+	writeFile(t, dir, ".codex/config.toml", "")
+
+	report := Sync(dir, false)
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", report.Errors)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, want := range []string{
+		"[mcp_servers.available]",
+		"enabled = true",
+		"startup_timeout_sec = 120",
+		"[mcp_servers.deferred]",
+		"enabled = false",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("expected config to contain %q\n%s", want, content)
+		}
 	}
 }
 
@@ -262,7 +301,7 @@ func TestSync_HTTPTransport(t *testing.T) {
 	if !strings.Contains(content, `[mcp_servers.remote]`) {
 		t.Error("HTTP profile should appear in config.toml")
 	}
-	if !strings.Contains(content, `default_tools_approval_mode = "never"`) {
+	if !strings.Contains(content, `default_tools_approval_mode = "approve"`) {
 		t.Error("HTTP profile should inherit the approve-by-default tool policy")
 	}
 }

@@ -74,13 +74,14 @@ type ProviderProjectionEntry struct {
 }
 
 type ProviderServer struct {
-	Command   string            `json:"command,omitempty"`
-	Args      []string          `json:"args,omitempty"`
-	CWD       string            `json:"cwd,omitempty"`
-	Env       map[string]string `json:"env,omitempty"`
-	Transport string            `json:"transport,omitempty"`
-	URL       string            `json:"url,omitempty"`
-	Headers   map[string]string `json:"headers,omitempty"`
+	Command           string            `json:"command,omitempty"`
+	Args              []string          `json:"args,omitempty"`
+	CWD               string            `json:"cwd,omitempty"`
+	Env               map[string]string `json:"env,omitempty"`
+	Transport         string            `json:"transport,omitempty"`
+	URL               string            `json:"url,omitempty"`
+	Headers           map[string]string `json:"headers,omitempty"`
+	StartupTimeoutSec *int              `json:"startup_timeout_sec,omitempty"`
 }
 
 type GlobalProjectionCheckReport struct {
@@ -432,12 +433,13 @@ func (b *providerProjectionBuilder) addRepoProfiles(repoName, repoPath string) e
 		}
 		resolved := resolveProviderProfile(source, profile)
 		server := normalizeGlobalServer(repoPath, globalMCPServer{
-			Command:   resolved.Command,
-			Args:      resolved.Args,
-			Env:       resolved.Env,
-			CWD:       resolved.CWD,
-			Transport: resolved.Transport,
-			URL:       resolved.URL,
+			Command:           resolved.Command,
+			Args:              resolved.Args,
+			Env:               resolved.Env,
+			CWD:               resolved.CWD,
+			Transport:         resolved.Transport,
+			URL:               resolved.URL,
+			StartupTimeoutSec: resolved.StartupTimeoutSec,
 		}, b.home)
 		globalStem := profile.Name
 		if profile.GlobalName != "" {
@@ -475,12 +477,13 @@ func (b *providerProjectionBuilder) addRepoProfiles(repoName, repoPath string) e
 		}
 		if profile.GlobalRawSource {
 			rawServer := normalizeGlobalServer(repoPath, globalMCPServer{
-				Command:   source.Command,
-				Args:      source.Args,
-				Env:       source.Env,
-				CWD:       source.CWD,
-				Transport: source.Transport,
-				URL:       source.URL,
+				Command:           source.Command,
+				Args:              source.Args,
+				Env:               source.Env,
+				CWD:               source.CWD,
+				Transport:         source.Transport,
+				URL:               source.URL,
+				StartupTimeoutSec: source.StartupTimeoutSec,
 			}, b.home)
 			rawEntry := ProviderProjectionEntry{
 				SourceRepo:    repoName,
@@ -502,15 +505,17 @@ func (b *providerProjectionBuilder) addRepoProfiles(repoName, repoPath string) e
 
 func resolveProviderProfile(source MCPServer, profile policyProfile) resolvedProfile {
 	resolved := resolvedProfile{
-		Name:         profile.Name,
-		Comment:      profile.Comment,
-		Command:      source.Command,
-		Args:         append([]string(nil), source.Args...),
-		CWD:          source.CWD,
-		Env:          cloneEnv(source.Env),
-		Transport:    source.Transport,
-		URL:          source.URL,
-		EnabledTools: append([]string(nil), profile.EnabledTools...),
+		Name:              profile.Name,
+		Comment:           profile.Comment,
+		Command:           source.Command,
+		Args:              append([]string(nil), source.Args...),
+		CWD:               source.CWD,
+		Env:               cloneEnv(source.Env),
+		Transport:         source.Transport,
+		URL:               source.URL,
+		Enabled:           firstBool(profile.Enabled, enabledFromDisabled(source.Disabled)),
+		StartupTimeoutSec: firstInt(profile.StartupTimeoutSec, source.StartupTimeoutSec),
+		EnabledTools:      append([]string(nil), profile.EnabledTools...),
 	}
 	if profile.Override != nil {
 		if strings.TrimSpace(profile.Override.Command) != "" {
@@ -618,13 +623,14 @@ func providerDisplayName(provider string) string {
 
 func providerServer(server globalMCPServer) ProviderServer {
 	return ProviderServer{
-		Command:   server.Command,
-		Args:      append([]string{}, server.Args...),
-		CWD:       server.CWD,
-		Env:       cloneStringMap(server.Env),
-		Transport: server.Transport,
-		URL:       server.URL,
-		Headers:   cloneStringMap(server.Headers),
+		Command:           server.Command,
+		Args:              append([]string{}, server.Args...),
+		CWD:               server.CWD,
+		Env:               cloneStringMap(server.Env),
+		Transport:         server.Transport,
+		URL:               server.URL,
+		Headers:           cloneStringMap(server.Headers),
+		StartupTimeoutSec: server.StartupTimeoutSec,
 	}
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/hairglasses-studio/codexkit/skillsync"
 	"github.com/hairglasses-studio/codexkit/workspace"
 	toml "github.com/pelletier/go-toml/v2"
+	"gopkg.in/yaml.v3"
 )
 
 // nowFunc is the injectable clock used by lifecycle/deprecation checks.
@@ -351,16 +352,42 @@ func (r *Report) addAGYAgentLayout(repoPath string) {
 	if err != nil {
 		return
 	}
+	seen := map[string]string{}
 	for _, entry := range entries {
-		if !entry.IsDir() {
-			r.add("agy_agent_layout", false, fmt.Sprintf("%s must be a directory containing agent.md", entry.Name()))
+		path := filepath.Join(agentsDir, entry.Name())
+		if entry.IsDir() {
+			path = filepath.Join(path, "agent.md")
+		} else if filepath.Ext(path) != ".md" {
 			continue
 		}
-		agentPath := filepath.Join(agentsDir, entry.Name(), "agent.md")
-		if info, statErr := os.Stat(agentPath); statErr != nil || info.IsDir() {
-			r.add("agy_agent_layout", false, fmt.Sprintf("missing: .agents/agents/%s/agent.md", entry.Name()))
+		data, err := os.ReadFile(path)
+		if err != nil {
+			r.add("agy_agent_layout", false, fmt.Sprintf("read %s: %v", path, err))
 			continue
 		}
+		content := strings.ReplaceAll(string(data), "\r\n", "\n")
+		if !strings.HasPrefix(content, "---\n") {
+			r.add("agy_agent_layout", false, entry.Name()+": missing YAML frontmatter")
+			continue
+		}
+		end := strings.Index(content[4:], "\n---")
+		if end < 0 {
+			r.add("agy_agent_layout", false, entry.Name()+": unterminated YAML frontmatter")
+			continue
+		}
+		var meta struct {
+			Name        string `yaml:"name"`
+			Description string `yaml:"description"`
+		}
+		if err := yaml.Unmarshal([]byte(content[4:4+end]), &meta); err != nil || strings.TrimSpace(meta.Name) == "" || strings.TrimSpace(meta.Description) == "" {
+			r.add("agy_agent_layout", false, entry.Name()+": invalid YAML or missing name/description")
+			continue
+		}
+		if previous, exists := seen[meta.Name]; exists {
+			r.add("agy_agent_layout", false, fmt.Sprintf("duplicate agent identity %s: %s and %s", meta.Name, previous, entry.Name()))
+			continue
+		}
+		seen[meta.Name] = entry.Name()
 		r.add("agy_agent_layout", true, entry.Name())
 	}
 }
@@ -625,49 +652,8 @@ func (r *Report) addSkillPortability(repoPath string) {
 		if err != nil {
 			continue
 		}
-		content := string(data)
-		if !strings.HasPrefix(content, "---\n") {
-			continue // no frontmatter
-		}
-		endIdx := strings.Index(content[4:], "\n---")
-		if endIdx < 0 {
-			continue
-		}
-		frontmatter := content[4 : 4+endIdx]
-		nonPortable := []string{}
-		inBlock := false
-		inList := false
-		for _, line := range strings.Split(frontmatter, "\n") {
-			trimmed := strings.TrimSpace(line)
-			if trimmed == "" {
-				continue
-			}
-			if inBlock {
-				if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
-					continue
-				}
-				inBlock = false
-			}
-			if inList {
-				if strings.HasPrefix(trimmed, "- ") {
-					continue
-				}
-				inList = false
-			}
-			parts := strings.SplitN(trimmed, ":", 2)
-			if len(parts) < 2 {
-				continue
-			}
-			key := strings.TrimSpace(parts[0])
-			if !codexkit.SkillSourceFrontmatterKeys[key] {
-				nonPortable = append(nonPortable, key)
-			}
-			value := strings.TrimSpace(parts[1])
-			inBlock = value == "|" || value == "|-" || value == "|+" || value == ">" || value == ">-" || value == ">+"
-			inList = value == "" && (key == "allowed-tools" || key == "triggers" || key == "see_also")
-		}
-		if len(nonPortable) > 0 {
-			r.add("skill_portability", false, fmt.Sprintf("%s: non-portable keys: %s", entry.Name(), strings.Join(nonPortable, ", ")))
+		if err := skillsync.ValidateSourceFrontmatter(skillPath, data); err != nil {
+			r.add("skill_portability", false, fmt.Sprintf("%s: %v", entry.Name(), err))
 		} else {
 			r.add("skill_portability", true, entry.Name())
 		}
@@ -734,12 +720,13 @@ func (r *Report) addSkillSurface(repoPath string) {
 // modelLifecycleEntry is one tracked model pin in the workspace-level
 // model-lifecycle registry.
 type modelLifecycleEntry struct {
-	ID          string   `json:"id"`
-	Aliases     []string `json:"aliases"`
-	Provider    string   `json:"provider"`
-	Status      string   `json:"status"`
-	Retires     string   `json:"retires"`
-	Replacement string   `json:"replacement"`
+	ID               string   `json:"id"`
+	Aliases          []string `json:"aliases"`
+	Provider         string   `json:"provider"`
+	Status           string   `json:"status"`
+	Retires          string   `json:"retires"`
+	Replacement      string   `json:"replacement"`
+	PolicyDisallowed bool     `json:"policy_disallowed,omitempty"`
 }
 
 type modelLifecycleRegistry struct {
@@ -763,7 +750,16 @@ var modelPinScanFiles = []string{
 // A missing or unparseable registry is not a failure — it just means the
 // fleet-wide deprecation clock data isn't available yet.
 func (r *Report) addModelPinFreshness(repoPath string) {
-	registryPath := filepath.Join(filepath.Dir(filepath.Clean(repoPath)), "workspace", "model-lifecycle.json")
+	registryRoot := filepath.Dir(filepath.Clean(repoPath))
+	if explicit := os.Getenv("CODEXKIT_WORKSPACE_ROOT"); explicit != "" {
+		registryRoot = explicit
+	} else if home, err := os.UserHomeDir(); err == nil {
+		managedRoot := filepath.Join(home, ".codex", "worktrees") + string(filepath.Separator)
+		if strings.HasPrefix(filepath.Clean(repoPath), managedRoot) {
+			registryRoot = workspace.DefaultRoot()
+		}
+	}
+	registryPath := filepath.Join(registryRoot, "workspace", "model-lifecycle.json")
 	data, err := os.ReadFile(registryPath)
 	if err != nil {
 		r.add("model_pin_freshness", true, "model lifecycle registry absent — skipping")
@@ -771,7 +767,7 @@ func (r *Report) addModelPinFreshness(repoPath string) {
 	}
 	var registry modelLifecycleRegistry
 	if err := json.Unmarshal(data, &registry); err != nil {
-		r.add("model_pin_freshness", true, "model lifecycle registry absent — skipping")
+		r.add("model_pin_freshness", false, "model lifecycle registry contains invalid JSON")
 		return
 	}
 
@@ -782,7 +778,7 @@ func (r *Report) addModelPinFreshness(repoPath string) {
 	var candidates []candidate
 	for _, m := range registry.Models {
 		status := strings.ToLower(strings.TrimSpace(m.Status))
-		if status != "deprecated" && status != "retired" {
+		if !m.PolicyDisallowed && status != "deprecated" && status != "retired" {
 			continue
 		}
 		if m.ID != "" {
@@ -872,6 +868,10 @@ func isModelIDChar(b byte) bool {
 }
 
 func (r *Report) addModelPinVerdict(m modelLifecycleEntry, file string, today time.Time) {
+	if m.PolicyDisallowed {
+		r.add("model_pin_freshness", false, fmt.Sprintf("model pin %s in %s violates fleet model policy — migrate to %s", m.ID, file, m.Replacement))
+		return
+	}
 	if strings.EqualFold(strings.TrimSpace(m.Status), "retired") {
 		r.add("model_pin_freshness", false, fmt.Sprintf("retired model pin %s in %s — migrate to %s", m.ID, file, m.Replacement))
 		return

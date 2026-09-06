@@ -327,6 +327,9 @@ func renderProviderServerTOML(b *strings.Builder, name string, server ProviderSe
 	if server.URL != "" {
 		renderStringValue(b, "url", server.URL)
 	}
+	if server.StartupTimeoutSec != nil {
+		fmt.Fprintf(b, "startup_timeout_sec = %d\n", *server.StartupTimeoutSec)
+	}
 	if len(enabledTools) > 0 {
 		b.WriteString("enabled_tools = [\n")
 		for _, tool := range enabledTools {
