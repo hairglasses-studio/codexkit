@@ -422,6 +422,32 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 		return report
 	}
 	report.RepoPath = absRepoPath
+	// Historical mirrors can be directory symlinks into .agents/skills. Check
+	// every output before writing any skill so one invalid alias cannot leave a
+	// partially applied surface or overwrite the canonical source through it.
+	var targets []string
+	for _, skill := range surface.Skills {
+		if skill.ClaudeIncludeCanonical {
+			targets = append(targets, filepath.Join(absRepoPath, ".claude", "skills", skill.Name, "SKILL.md"))
+		}
+		for _, alias := range skill.ClaudeAliases {
+			targets = append(targets, filepath.Join(absRepoPath, ".claude", "skills", alias.Name, "SKILL.md"))
+		}
+		if normalized := normalizedSkillName(skill.Name); normalized != skill.Name {
+			targets = append(targets, filepath.Join(absRepoPath, ".claude", "skills", normalized, "SKILL.md"))
+		}
+		if skill.ExportPlugin {
+			targets = append(targets, filepath.Join(absRepoPath, "plugins", surface.PluginRoot, "skills", skill.Name, "SKILL.md"))
+		}
+	}
+	for _, target := range targets {
+		if err := validateProjectionTarget(target); err != nil {
+			report.Errors = append(report.Errors, err.Error())
+		}
+	}
+	if len(report.Errors) != 0 {
+		return report
+	}
 
 	claudeDirs := map[string]struct{}{}
 	pluginDirs := map[string]struct{}{}
@@ -526,8 +552,17 @@ func registerDir(registry map[string]struct{}, name, label string) error {
 }
 
 func syncContent(report *SyncReport, mode syncMode, srcPath, dstPath, rendered, label string) {
-	existing, err := os.ReadFile(dstPath)
-	if err == nil && bytes.Equal(existing, []byte(rendered)) {
+	if err := validateProjectionTarget(dstPath); err != nil {
+		report.Errors = append(report.Errors, err.Error())
+		return
+	}
+	info, err := os.Lstat(dstPath)
+	isSymlink := err == nil && info.Mode()&os.ModeSymlink != 0
+	var existing []byte
+	if err == nil && !isSymlink {
+		existing, err = os.ReadFile(dstPath)
+	}
+	if err == nil && !isSymlink && bytes.Equal(existing, []byte(rendered)) {
 		report.Actions = append(report.Actions, SyncAction{
 			Action:  "unchanged",
 			SrcPath: srcPath,
@@ -555,12 +590,48 @@ func syncContent(report *SyncReport, mode syncMode, srcPath, dstPath, rendered, 
 		report.Errors = append(report.Errors, fmt.Sprintf("mkdir %s: %v", filepath.Dir(dstPath), err))
 		return
 	}
-	if fi, err := os.Lstat(dstPath); err == nil && (fi.Mode()&os.ModeSymlink != 0 || fi.IsDir()) {
-		_ = os.RemoveAll(dstPath)
-	}
-	if err := os.WriteFile(dstPath, []byte(rendered), 0o644); err != nil {
+	if err := writeProjectionAtomic(dstPath, []byte(rendered)); err != nil {
 		report.Errors = append(report.Errors, fmt.Sprintf("write %s: %v", dstPath, err))
 	}
+}
+
+func validateProjectionTarget(path string) error {
+	for parent := filepath.Dir(path); ; parent = filepath.Dir(parent) {
+		info, err := os.Lstat(parent)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("inspect projection parent %s: %w", parent, err)
+		}
+		if err == nil && (info.Mode()&os.ModeSymlink != 0 || !info.IsDir()) {
+			return fmt.Errorf("projection parent must be a real directory, not a symlink: %s", parent)
+		}
+		if parent == filepath.Dir(parent) { break }
+	}
+	info, err := os.Lstat(path)
+	if err != nil && !os.IsNotExist(err) { return fmt.Errorf("inspect projection %s: %w", path, err) }
+	if err == nil && !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
+		return fmt.Errorf("projection target must be a regular file or leaf symlink: %s", path)
+	}
+	return nil
+}
+
+// Rename replaces a leaf symlink itself; opening that symlink for writing
+// would instead overwrite its target, potentially the canonical SKILL.md.
+func writeProjectionAtomic(path string, data []byte) error {
+	if err := validateProjectionTarget(path); err != nil { return err }
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".skill-projection-*")
+	if err != nil { return err }
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	if _, err := tmp.Write(data); err != nil { return err }
+	if err := tmp.Chmod(0o644); err != nil { return err }
+	if err := tmp.Sync(); err != nil { return err }
+	if err := tmp.Close(); err != nil { return err }
+	if err := validateProjectionTarget(path); err != nil { return err }
+	if err := os.Rename(tmp.Name(), path); err != nil { return err }
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil { return err }
+	defer dir.Close()
+	return dir.Sync()
 }
 
 func purgeSkillDirs(report *SyncReport, mode syncMode, baseDir, label string, managed bool, expected map[string]struct{}) {
