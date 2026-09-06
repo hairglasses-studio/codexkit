@@ -1,0 +1,14 @@
+{
+  "hooks": [
+    {
+      "name": "pre-commit-ownership-check",
+      "command": "bin/convention-ownership-check",
+      "events": ["pre-commit"]
+    },
+    {
+      "name": "pre-commit-inventory-surfaces",
+      "command": "bin/inventory-agy-surfaces",
+      "events": ["pre-commit"]
+    }
+  ]
+}
