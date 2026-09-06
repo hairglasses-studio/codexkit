@@ -55,3 +55,32 @@ func TestNativeMetadataRejectsInvalidRestrictions(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeMetadataRejectsMalformedContainersWithoutLosingRestrictions(t *testing.T) {
+	for _, metadata := range []string{
+		"metadata: null",
+		"metadata: text",
+		"metadata: [text]",
+		"metadata:\n  1: x\n  hg.claude.disallowed-tools: '[\"Bash\"]'",
+		"metadata:\n  true: x\n  hg.claude.disallowed-tools: '[\"Bash\"]'",
+	} {
+		t.Run(metadata, func(t *testing.T) {
+			dir := setupSyncRepo(t)
+			source := "---\nname: myskill\ndescription: Restrictions must never be silently dropped.\n" + metadata + "\n---\nBody\n"
+			writeFile(t, dir, ".agents/skills/myskill/SKILL.md", source)
+			if err := ValidateSourceFrontmatter("SKILL.md", []byte(source)); err == nil {
+				t.Fatal("malformed metadata accepted")
+			}
+			target := filepath.Join(dir, ".claude/skills/myskill/SKILL.md")
+			writeFile(t, dir, ".claude/skills/myskill/SKILL.md", "existing restriction-bearing projection")
+			report := SyncWithOptions(dir, false, Options{ValidatorMode: ValidatorOff})
+			if len(report.Errors) == 0 {
+				t.Fatal("malformed metadata projected without error")
+			}
+			data, err := os.ReadFile(target)
+			if err != nil || string(data) != "existing restriction-bearing projection" {
+				t.Fatalf("invalid source replaced existing projection: %q %v", data, err)
+			}
+		})
+	}
+}

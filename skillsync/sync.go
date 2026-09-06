@@ -625,7 +625,14 @@ func ValidateSourceFrontmatter(path string, content []byte) error {
 // fields without treating arbitrary metadata as executable provider settings.
 func claudeExtensions(raw map[string]any) (map[string]any, error) {
 	out := map[string]any{}
-	metadata, _ := raw["metadata"].(map[string]any)
+	value, present := raw["metadata"]
+	if !present {
+		return out, nil
+	}
+	metadata, ok := value.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("metadata must be a mapping with string keys")
+	}
 	for key, value := range metadata {
 		if !strings.HasPrefix(key, "hg.claude.") {
 			continue
