@@ -270,11 +270,32 @@ func compactProviderServer(server ProviderServer) map[string]any {
 	}
 	if server.URL != "" {
 		out["url"] = server.URL
+		// Claude Code reads "type" (stdio|http|sse); "transport" above is the
+		// Codex spelling. Without "type" a url-only entry is skipped by
+		// `claude doctor` / `claude mcp list` with no error at all, which is
+		// how studio_context7_docs and studio_openai-developer-docs sat in
+		// ~/.claude.json looking correct while being unusable. Gemini ignores
+		// the extra key.
+		out["type"] = remoteServerType(server.Transport)
 	}
 	if len(server.Headers) > 0 {
 		out["headers"] = cloneStringMap(server.Headers)
 	}
 	return out
+}
+
+// remoteServerType maps a Codex-style transport onto the Claude Code "type"
+// value for a URL-backed MCP server. An empty or unrecognized transport falls
+// back to "http", the shape every remote entry in this projection uses today.
+func remoteServerType(transport string) string {
+	switch strings.ToLower(strings.TrimSpace(transport)) {
+	case "sse":
+		return "sse"
+	case "http", "streamable-http", "streamable_http", "":
+		return "http"
+	default:
+		return "http"
+	}
 }
 
 func marshalJSONFile(value any) ([]byte, error) {
