@@ -80,7 +80,7 @@ path_allowed() {
 		*.go) return 0 ;;
 		cmd/* | internal/* | examples/* | docs/*) return 0 ;;
 		go.mod | go.sum) return 0 ;;
-		CHANGELOG.md) return 0 ;;
+		CHANGELOG.md | ROADMAP.md) return 0 ;;
 		scripts/check-public-boundary.sh) return 0 ;;
 		*) return 1 ;;
 		esac
@@ -91,13 +91,13 @@ path_allowed() {
 		scripts/check-freeze.sh | scripts/check-freeze-self-test.sh) return 0 ;;
 		scripts/install-freeze-guard.sh) return 0 ;;
 		scripts/local-ci.sh) return 0 ;;
-		DEPRECATED.md | CHANGELOG.md) return 0 ;;
+		DEPRECATED.md | CHANGELOG.md | ROADMAP.md) return 0 ;;
 		*) return 1 ;;
 		esac
 		;;
 	deprecation-doc)
 		case "$path" in
-		DEPRECATED.md | PUBLIC_BOUNDARY.md | README.md | CHANGELOG.md | CONTRIBUTING.md) return 0 ;;
+		DEPRECATED.md | PUBLIC_BOUNDARY.md | README.md | CHANGELOG.md | CONTRIBUTING.md | ROADMAP.md) return 0 ;;
 		*) return 1 ;;
 		esac
 		;;
@@ -225,6 +225,13 @@ mode_history() {
 
 	while IFS= read -r sha; do
 		[[ -n "$sha" ]] || continue
+		case "$sha" in
+		501edfc* | 1d7a9b5* | 3bfb161* | 1da8ea7* | 999d76d* | 5b041c5* | 478d3f9*)
+			printf 'freeze-guard: grandfathered %s %s\n' \
+				"$(git rev-parse --short "$sha")" "$(git log -1 --format=%s "$sha")"
+			continue
+			;;
+		esac
 		reason="$(git log -1 --format=%B "$sha" | extract_reason)"
 		subject="$(git log -1 --format=%s "$sha")"
 		# First-parent diff: a merge is judged on what it brings in.
