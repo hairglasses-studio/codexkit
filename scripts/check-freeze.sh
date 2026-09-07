@@ -78,7 +78,7 @@ path_allowed() {
 	public-boundary-compat)
 		case "$path" in
 		*.go) return 0 ;;
-		cmd/* | internal/* | examples/* | docs/*) return 0 ;;
+		cmd/* | internal/* | examples/* | docs/* | .agents/roles/*) return 0 ;;
 		go.mod | go.sum) return 0 ;;
 		CHANGELOG.md | ROADMAP.md) return 0 ;;
 		scripts/check-public-boundary.sh) return 0 ;;
