@@ -49,8 +49,8 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 
 ### Recommended Work
 - [ ] [Typed MCP core] Replace handwritten `map[string]any` tool contracts and manual JSON-RPC plumbing with a shared typed handler/core approach.
-- [ ] [Self-hosting] Keep `.mcp.json`, CLI entrypoints, and any server front door aligned so the repo can introspect itself consistently.
-- [ ] [Explorer] Add a discovery-first contract front door for commands, profiles, skills, providers, and generated config artifacts.
+- [x] [Self-hosting] Keep `.mcp.json`, CLI entrypoints, and any server front door aligned so the repo can introspect itself consistently. <!-- aligned: .mcp.json runs scripts/run-codexkit-mcp.sh pointing to cmd/codexkit-mcp with auto-build and GOWORK=off isolation -->
+- [x] [Explorer] Add a discovery-first contract front door for commands, profiles, skills, providers, and generated config artifacts. <!-- shipped: mcpserver/meta_module.go implements tool_catalog, tool_search, tool_schema, and server_health; surfaceindex and primitiveindex expose workspace-wide asset introspection -->
 - [ ] [Telemetry] Record routing, model/profile selection, and verification outcomes in a searchable store instead of transient CLI output only.
 - [x] [Prompt packs] Add a small prompt/runbook pack for config generation, baseline validation, and recovery flows.
 
