@@ -51,7 +51,7 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 - [x] [Typed MCP core] Replace handwritten `map[string]any` tool contracts and manual JSON-RPC plumbing with a shared typed handler/core approach. <!-- shipped: module.go implements generic TypedHandler[T any] and DecodeParams[T any] tested in module_test.go -->
 - [x] [Self-hosting] Keep `.mcp.json`, CLI entrypoints, and any server front door aligned so the repo can introspect itself consistently. <!-- aligned: .mcp.json runs scripts/run-codexkit-mcp.sh pointing to cmd/codexkit-mcp with auto-build and GOWORK=off isolation -->
 - [x] [Explorer] Add a discovery-first contract front door for commands, profiles, skills, providers, and generated config artifacts. <!-- shipped: mcpserver/meta_module.go implements tool_catalog, tool_search, tool_schema, and server_health; surfaceindex and primitiveindex expose workspace-wide asset introspection -->
-- [ ] [Telemetry] Record routing, model/profile selection, and verification outcomes in a searchable store instead of transient CLI output only.
+- [x] [Telemetry] Record routing, model/profile selection, and verification outcomes in a searchable store instead of transient CLI output only. <!-- shipped: telemetry package provides durable JSONL store with record/list/search tools, CLI commands, and automatic baseline verification outcome capture -->
 - [x] [Prompt packs] Add a small prompt/runbook pack for config generation, baseline validation, and recovery flows.
 
 ### Rationale Snapshot

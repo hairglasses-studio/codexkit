@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
@@ -21,6 +22,7 @@ import (
 	"github.com/hairglasses-studio/codexkit/skillsync"
 	"github.com/hairglasses-studio/codexkit/sourcecontract"
 	"github.com/hairglasses-studio/codexkit/surfaceindex"
+	"github.com/hairglasses-studio/codexkit/telemetry"
 	"github.com/hairglasses-studio/codexkit/unificationaudit"
 	"github.com/hairglasses-studio/codexkit/workspace"
 )
@@ -41,6 +43,7 @@ func init() {
 		reporeadiness.Module(),
 		sourcecontract.Module(),
 		surfaceindex.Module(),
+		telemetry.Module(),
 		unificationaudit.Module(),
 		workspace.Module(),
 	} {
@@ -78,6 +81,8 @@ func main() {
 		runUnification(os.Args[2:])
 	case "reduction":
 		runReduction(os.Args[2:])
+	case "telemetry":
+		runTelemetry(os.Args[2:])
 	case "bridge":
 		runBridge(os.Args[2:])
 	case "tools":
@@ -157,6 +162,12 @@ Commands:
                                  Inventory functions, entrypoints, and obvious callers for one shell file
   reduction <audit|dedup|plan|apply|verify> [root] [--json] [--all-scopes] [--max-repos <n>] [--limit <n>] [--execute]
                                  Run LLM-surface reduction ranking and tranche planning helpers
+  telemetry record [--event-type <type>] [--repo <repo>] [--provider <p>] [--model <m>] [--status <s>] [--decision <d>]
+                                 Record a Codex routing, model selection, or verification event
+  telemetry list [--event-type <type>] [--repo <repo>] [--status <s>] [--since <dur|time>] [--limit <n>] [--json]
+                                 List and filter recorded telemetry events
+  telemetry search <query> [--limit <n>] [--json]
+                                 Search recorded telemetry events across all fields
   bridge <subcommand>           Compatibility wrapper for legacy parity entrypoints
   tools                         List all registered tools
   help                          Show this help`)
@@ -237,6 +248,23 @@ func runBaseline(args []string) {
 	for i, repoPath := range paths {
 		report := reports[i]
 		repoName := filepath.Base(repoPath)
+
+		status := "pass"
+		if !report.Passed {
+			status = "fail"
+		}
+		_, _ = telemetry.Record("", telemetry.Event{
+			EventType: telemetry.EventTypeVerification,
+			Repo:      repoPath,
+			Provider:  "codex",
+			CheckType: "baseline",
+			Status:    status,
+			Findings:  report.Failed,
+			Metadata: map[string]any{
+				"total_checks":  report.Total,
+				"failed_checks": report.Failed,
+			},
+		})
 
 		if jsonOut {
 			if !report.Passed {
@@ -2189,4 +2217,190 @@ func printJSON(v any) {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(v)
+}
+
+func runTelemetry(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit telemetry <record|list|search> [flags]")
+		os.Exit(1)
+	}
+
+	sub := args[0]
+	subArgs := args[1:]
+
+	switch sub {
+	case "record":
+		runTelemetryRecord(subArgs)
+	case "list":
+		runTelemetryList(subArgs)
+	case "search":
+		runTelemetrySearch(subArgs)
+	default:
+		fmt.Fprintf(os.Stderr, "unknown telemetry subcommand: %s\n", sub)
+		os.Exit(1)
+	}
+}
+
+func runTelemetryRecord(args []string) {
+	storePath, args, _, _ := takeFlagValue(args, "--store-path")
+	eventType, args, _, _ := takeFlagValue(args, "--event-type")
+	repo, args, _, _ := takeFlagValue(args, "--repo")
+	provider, args, _, _ := takeFlagValue(args, "--provider")
+	model, args, _, _ := takeFlagValue(args, "--model")
+	profile, args, _, _ := takeFlagValue(args, "--profile")
+	role, args, _, _ := takeFlagValue(args, "--role")
+	decision, args, _, _ := takeFlagValue(args, "--decision")
+	checkType, args, _, _ := takeFlagValue(args, "--check-type")
+	status, args, _, _ := takeFlagValue(args, "--status")
+	errStr, args, _, _ := takeFlagValue(args, "--error")
+	durStr, args, _, _ := takeFlagValue(args, "--duration-ms")
+	findingsStr, _, _, _ := takeFlagValue(args, "--findings")
+
+	if eventType == "" {
+		eventType = telemetry.EventTypeRouting
+	}
+
+	var dur float64
+	if durStr != "" {
+		dur, _ = strconv.ParseFloat(durStr, 64)
+	}
+	var findings int
+	if findingsStr != "" {
+		findings, _ = strconv.Atoi(findingsStr)
+	}
+
+	ev := telemetry.Event{
+		EventType:  eventType,
+		Repo:       repo,
+		Provider:   provider,
+		Model:      model,
+		Profile:    profile,
+		Role:       role,
+		Decision:   decision,
+		CheckType:  checkType,
+		Status:     status,
+		DurationMS: dur,
+		Findings:   findings,
+		Error:      errStr,
+	}
+
+	rec, err := telemetry.Record(storePath, ev)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error recording telemetry: %v\n", err)
+		os.Exit(1)
+	}
+	printJSON(rec)
+}
+
+func runTelemetryList(args []string) {
+	storePath, args, _, _ := takeFlagValue(args, "--store-path")
+	eventType, args, _, _ := takeFlagValue(args, "--event-type")
+	repo, args, _, _ := takeFlagValue(args, "--repo")
+	provider, args, _, _ := takeFlagValue(args, "--provider")
+	status, args, _, _ := takeFlagValue(args, "--status")
+	sinceStr, args, _, _ := takeFlagValue(args, "--since")
+	limitStr, args, _, _ := takeFlagValue(args, "--limit")
+	jsonOut := hasFlag(args, "--json")
+
+	limit := 50
+	if limitStr != "" {
+		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	var sinceTime time.Time
+	if sinceStr != "" {
+		if dur, err := time.ParseDuration(sinceStr); err == nil {
+			sinceTime = time.Now().Add(-dur)
+		} else if t, err := time.Parse(time.RFC3339Nano, sinceStr); err == nil {
+			sinceTime = t
+		} else if t, err := time.Parse(time.RFC3339, sinceStr); err == nil {
+			sinceTime = t
+		}
+	}
+
+	filter := telemetry.Filter{
+		EventType: eventType,
+		Repo:      repo,
+		Provider:  provider,
+		Status:    status,
+		Since:     sinceTime,
+		Limit:     limit,
+	}
+
+	events, err := telemetry.Query(storePath, filter)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error querying telemetry: %v\n", err)
+		os.Exit(1)
+	}
+
+	if jsonOut {
+		printJSON(events)
+		return
+	}
+
+	if len(events) == 0 {
+		fmt.Println("No matching telemetry events found.")
+		return
+	}
+
+	fmt.Printf("Telemetry Events (%d):\n", len(events))
+	for _, ev := range events {
+		fmt.Printf("  [%s] %s | type: %-14s | repo: %-20s | status: %-5s | model: %s\n",
+			ev.Timestamp[:19], ev.ID, ev.EventType, ev.Repo, ev.Status, ev.Model)
+		if ev.Decision != "" {
+			fmt.Printf("    decision: %s\n", ev.Decision)
+		}
+		if ev.Error != "" {
+			fmt.Printf("    error: %s\n", ev.Error)
+		}
+	}
+}
+
+func runTelemetrySearch(args []string) {
+	storePath, args, _, _ := takeFlagValue(args, "--store-path")
+	limitStr, args, _, _ := takeFlagValue(args, "--limit")
+	jsonOut := hasFlag(args, "--json")
+
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit telemetry search <query> [--limit <n>] [--json]")
+		os.Exit(1)
+	}
+	query := args[0]
+
+	limit := 50
+	if limitStr != "" {
+		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	events, err := telemetry.Search(storePath, query, limit)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error searching telemetry: %v\n", err)
+		os.Exit(1)
+	}
+
+	if jsonOut {
+		printJSON(events)
+		return
+	}
+
+	if len(events) == 0 {
+		fmt.Printf("No telemetry events matching %q found.\n", query)
+		return
+	}
+
+	fmt.Printf("Telemetry Search Results for %q (%d):\n", query, len(events))
+	for _, ev := range events {
+		fmt.Printf("  [%s] %s | type: %-14s | repo: %-20s | status: %-5s | model: %s\n",
+			ev.Timestamp[:19], ev.ID, ev.EventType, ev.Repo, ev.Status, ev.Model)
+		if ev.Decision != "" {
+			fmt.Printf("    decision: %s\n", ev.Decision)
+		}
+		if ev.Error != "" {
+			fmt.Printf("    error: %s\n", ev.Error)
+		}
+	}
 }

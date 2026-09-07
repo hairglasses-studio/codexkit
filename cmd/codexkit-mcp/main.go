@@ -21,6 +21,7 @@ import (
 	"github.com/hairglasses-studio/codexkit/skillsync"
 	"github.com/hairglasses-studio/codexkit/sourcecontract"
 	"github.com/hairglasses-studio/codexkit/surfaceindex"
+	"github.com/hairglasses-studio/codexkit/telemetry"
 	"github.com/hairglasses-studio/codexkit/unificationaudit"
 	"github.com/hairglasses-studio/codexkit/workspace"
 )
@@ -39,6 +40,7 @@ func main() {
 		reporeadiness.Module(),
 		sourcecontract.Module(),
 		surfaceindex.Module(),
+		telemetry.Module(),
 		unificationaudit.Module(),
 		workspace.Module(),
 	}

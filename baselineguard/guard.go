@@ -68,7 +68,6 @@ var RetiredProviderMirrors = []string{
 	"GEMINI.md",
 	".gemini/settings.json",
 	".github/copilot-instructions.md",
-	".clinerules",
 }
 
 // PortableFrontmatterKeys re-exports the canonical source-key set from the top-level package.
@@ -221,7 +220,7 @@ func remediationForCheck(repoPath, check string) []Remediation {
 	case "retired_provider_mirror":
 		return []Remediation{{
 			Kind:    "edit",
-			Message: "remove retired provider mirror files (GEMINI.md, .gemini/settings.json, .github/copilot-instructions.md, .clinerules)",
+			Message: "remove retired provider mirror files (GEMINI.md, .gemini/settings.json, .github/copilot-instructions.md)",
 		}}
 	case "agy_agent_layout":
 		return []Remediation{{
