@@ -107,4 +107,3 @@ func TestCompactAndDetailPagination(t *testing.T) {
 		t.Fatalf("expected repo2 with total 3; got: %+v", detail)
 	}
 }
-
