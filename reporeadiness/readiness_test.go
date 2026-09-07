@@ -87,3 +87,24 @@ func runReadinessGit(t *testing.T, path string, args ...string) {
 		t.Fatalf("git %v failed: %v\n%s", args, err, out)
 	}
 }
+
+func TestCompactAndDetailPagination(t *testing.T) {
+	report := Report{
+		Repos: []RepoScore{
+			{RepoName: "repo1", Score: 95, Lane: LaneFullAutoCandidate},
+			{RepoName: "repo2", Score: 85, Lane: LaneReviewOnly},
+			{RepoName: "repo3", Score: 40, Lane: LaneCleanupFirst},
+		},
+	}
+
+	compact := report.Compact(2, 0)
+	if len(compact.Repos) != 2 || compact.TotalRepos != 3 || !compact.Truncated {
+		t.Fatalf("expected 2 sliced repos, total 3, truncated true; got: %+v", compact)
+	}
+
+	detail := report.Detail(1, 1)
+	if len(detail.Report.Repos) != 1 || detail.Report.Repos[0].RepoName != "repo2" || detail.TotalRepos != 3 {
+		t.Fatalf("expected repo2 with total 3; got: %+v", detail)
+	}
+}
+
