@@ -14,7 +14,7 @@
       "surface": ".codex/agents/mcp_protocol_engineer.toml",
       "name": "mcp_protocol_engineer",
       "description": "Maintains and modernizes MCP server definitions and configs.",
-      "model": "gpt-5.5",
+      "model": "gpt-5.6-sol",
       "model_reasoning_effort": "high",
       "cost_intent": "high_cost",
       "sandbox_mode": "workspace-write",

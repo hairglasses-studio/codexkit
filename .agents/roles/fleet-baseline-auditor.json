@@ -14,7 +14,7 @@
       "surface": ".codex/agents/fleet_baseline_auditor.toml",
       "name": "fleet_baseline_auditor",
       "description": "Validates workspace baseline conformance across repos.",
-      "model": "gpt-5.5",
+      "model": "gpt-5.6-sol",
       "model_reasoning_effort": "high",
       "cost_intent": "high_cost",
       "sandbox_mode": "read-only",

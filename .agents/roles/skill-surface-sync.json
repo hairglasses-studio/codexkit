@@ -14,7 +14,7 @@
       "surface": ".codex/agents/skill_surface_sync.toml",
       "name": "skill_surface_sync",
       "description": "Synchronizes portable skills to provider mirrors.",
-      "model": "gpt-5.5",
+      "model": "gpt-5.6-sol",
       "model_reasoning_effort": "high",
       "cost_intent": "high_cost",
       "sandbox_mode": "workspace-write",
