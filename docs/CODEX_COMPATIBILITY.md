@@ -1,4 +1,4 @@
-# Codex 0.147.0 compatibility
+# Codex 0.154.0 compatibility
 
 This repository targets the following explicit current contract:
 
@@ -6,7 +6,7 @@ This repository targets the following explicit current contract:
 - `gpt-5.6-terra` is the balanced route for broad scans and research.
 - `gpt-5.6-luna` is the efficient route for narrow, low-cost work.
 - `apps`, `goals`, `hooks`, `multi_agent`, `plugins`, `skill_search`, and
-  `tool_suggest` are stable in Codex 0.147.0.
+  `tool_suggest` are stable in Codex 0.154.0.
 - Tool Search is available; its old feature toggle is a removed compatibility
   no-op. The client sets `defer_loading` on function namespaces or MCP server
   definitions.
@@ -34,7 +34,7 @@ tools.
 - [OpenAI latest-model guide](https://developers.openai.com/api/docs/guides/latest-model)
 - [OpenAI Tool Search guide](https://developers.openai.com/api/docs/guides/tools-tool-search)
 - [OpenAI MCP and connectors guide](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)
-- [Codex 0.147.0 release](https://github.com/openai/codex/releases/tag/rust-v0.147.0)
-- [Codex 0.147.0 feature registry](https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/features/src/lib.rs)
+- [Codex 0.154.0 release](https://github.com/openai/codex/releases/tag/rust-v0.154.0)
+- [Codex 0.154.0 feature registry](https://github.com/openai/codex/blob/rust-v0.154.0/codex-rs/features/src/lib.rs)
 - [MCP Go SDK v1.7.0 release](https://github.com/modelcontextprotocol/go-sdk/releases/tag/v1.7.0)
 - [MCP Go SDK v1.7.0 server implementation](https://github.com/modelcontextprotocol/go-sdk/blob/v1.7.0/mcp/server.go)
