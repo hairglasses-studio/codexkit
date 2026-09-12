@@ -106,10 +106,10 @@ Commands:
   skills diff <repo>            Show what skill sync would change
   skills check <repo>           Fail when managed skill mirrors drift
   skills list <repo>            List skills from surface.yaml
-  mcp sync <repo>               Sync .mcp.json to .codex/config.toml
-  mcp diff <repo>               Show what MCP sync would change
-  mcp check <repo>              Fail when the generated MCP block drifts
-  mcp list <repo>               List MCP servers from .mcp.json
+  mcp sync [repo|--all]         Sync .mcp.json to .codex/config.toml
+  mcp diff [repo|--all]         Show what MCP sync would change
+  mcp check [repo|--all]        Fail when the generated MCP block drifts
+  mcp list [repo|--all]         List MCP servers from .mcp.json
   provider check <repo>         Verify legacy provider settings during migration
   provider diff <repo>          Show legacy provider settings drift without writing
   provider sync <repo>          Apply legacy provider settings parity during migration
@@ -413,7 +413,7 @@ func shellQuote(value string) string {
 }
 
 func runSkills(args []string) {
-	if len(args) < 2 {
+	if len(args) < 1 {
 		printSkillsUsage()
 		os.Exit(1)
 	}
@@ -437,7 +437,7 @@ func runSkills(args []string) {
 			}
 			validatorMode = mode
 		default:
-			if strings.HasPrefix(arg, "-") {
+			if strings.HasPrefix(arg, "-") && arg != "--all" {
 				fmt.Fprintf(os.Stderr, "unknown skills flag: %s\n", arg)
 				os.Exit(1)
 			}
@@ -448,9 +448,101 @@ func runSkills(args []string) {
 			repoPath = arg
 		}
 	}
-	if repoPath == "" {
-		printSkillsUsage()
-		os.Exit(1)
+
+	if repoPath == "" || repoPath == "--all" || repoPath == "all" {
+		home, _ := os.UserHomeDir()
+		studioDir := filepath.Join(home, "hairglasses-studio")
+		if root := os.Getenv("HAIRGLASSES_STUDIO_ROOT"); root != "" {
+			studioDir = root
+		}
+		paths, err := baselineguard.DiscoverWorkspaceTargets(studioDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error discovering baseline targets in %s: %v\n", studioDir, err)
+			os.Exit(1)
+		}
+
+		switch cmd {
+		case "sync":
+			var reports []skillsync.SyncReport
+			for _, p := range paths {
+				if _, err := os.Stat(filepath.Join(p, ".agents", "skills", "surface.yaml")); err != nil {
+					reports = append(reports, skillsync.SyncReport{
+						RepoPath: p,
+						Actions: []skillsync.SyncAction{
+							{Action: "unchanged", Message: "no .agents/skills/surface.yaml defined; nothing to sync"},
+						},
+					})
+					continue
+				}
+				reports = append(reports, skillsync.Sync(p, false))
+			}
+			printJSON(reports)
+		case "diff":
+			var reports []skillsync.SyncReport
+			for _, p := range paths {
+				if _, err := os.Stat(filepath.Join(p, ".agents", "skills", "surface.yaml")); err != nil {
+					reports = append(reports, skillsync.SyncReport{
+						RepoPath: p,
+						DryRun:   true,
+						Actions: []skillsync.SyncAction{
+							{Action: "unchanged", Message: "no .agents/skills/surface.yaml defined; nothing to sync"},
+						},
+					})
+					continue
+				}
+				reports = append(reports, skillsync.Diff(p))
+			}
+			printJSON(reports)
+		case "check":
+			allClean := true
+			for _, p := range paths {
+				if _, err := os.Stat(filepath.Join(p, ".agents", "skills", "surface.yaml")); err != nil {
+					continue
+				}
+				report := skillsync.CheckWithOptions(p, skillsync.Options{ValidatorMode: validatorMode})
+				if !quietWarnings {
+					for _, warning := range report.Warnings {
+						fmt.Fprintf(os.Stderr, "[%s] %s\n", filepath.Base(p), warning)
+					}
+				}
+				if len(report.Errors) > 0 {
+					allClean = false
+					for _, err := range report.Errors {
+						fmt.Fprintf(os.Stderr, "[%s] %s\n", filepath.Base(p), err)
+					}
+				}
+				if report.PendingChanges {
+					allClean = false
+					for _, action := range report.Actions {
+						if action.Action == "unchanged" {
+							continue
+						}
+						fmt.Fprintf(os.Stderr, "[%s] %s\n", filepath.Base(p), action.Message)
+					}
+				}
+			}
+			if !allClean {
+				os.Exit(1)
+			}
+		case "list":
+			for _, p := range paths {
+				if _, err := os.Stat(filepath.Join(p, ".agents", "skills", "surface.yaml")); err != nil {
+					continue
+				}
+				names, err := skillsync.List(p)
+				if err != nil {
+					continue
+				}
+				fmt.Printf("[%s]\n", filepath.Base(p))
+				for _, name := range names {
+					fmt.Printf("  %s\n", name)
+				}
+			}
+		default:
+			fmt.Fprintf(os.Stderr, "unknown skills command: %s\n", cmd)
+			os.Exit(1)
+		}
+		return
 	}
 
 	switch cmd {
@@ -498,16 +590,105 @@ func runSkills(args []string) {
 }
 
 func printSkillsUsage() {
-	fmt.Fprintln(os.Stderr, "usage: codexkit skills <sync|diff|check|list> <repo_path> [--quiet-warnings] [--skill-validator=auto|host|pinned|off]")
+	fmt.Fprintln(os.Stderr, "usage: codexkit skills <sync|diff|check|list> [repo_path|--all] [--quiet-warnings] [--skill-validator=auto|host|pinned|off]")
 }
 
 func runMCP(args []string) {
-	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: codexkit mcp <sync|diff|check|list> <repo_path>")
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit mcp <sync|diff|check|list> [repo_path|--all]")
 		os.Exit(1)
 	}
 
-	cmd, repoPath := args[0], args[1]
+	cmd := args[0]
+	repoPath := ""
+	if len(args) > 1 {
+		repoPath = args[1]
+	}
+
+	if repoPath == "" || repoPath == "--all" || repoPath == "all" {
+		home, _ := os.UserHomeDir()
+		studioDir := filepath.Join(home, "hairglasses-studio")
+		if root := os.Getenv("HAIRGLASSES_STUDIO_ROOT"); root != "" {
+			studioDir = root
+		}
+		paths, err := baselineguard.DiscoverWorkspaceTargets(studioDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error discovering baseline targets in %s: %v\n", studioDir, err)
+			os.Exit(1)
+		}
+
+		switch cmd {
+		case "sync":
+			var reports []mcpsync.SyncReport
+			for _, p := range paths {
+				if _, err := os.Stat(filepath.Join(p, ".mcp.json")); err != nil {
+					reports = append(reports, mcpsync.SyncReport{
+						RepoPath: p,
+						Actions: []mcpsync.SyncAction{
+							{Action: "unchanged", Server: "mcp", Message: "no .mcp.json defined; nothing to sync"},
+						},
+					})
+					continue
+				}
+				reports = append(reports, mcpsync.Sync(p, false))
+			}
+			printJSON(reports)
+		case "diff":
+			var reports []mcpsync.SyncReport
+			for _, p := range paths {
+				if _, err := os.Stat(filepath.Join(p, ".mcp.json")); err != nil {
+					reports = append(reports, mcpsync.SyncReport{
+						RepoPath: p,
+						DryRun:   true,
+						Actions: []mcpsync.SyncAction{
+							{Action: "unchanged", Server: "mcp", Message: "no .mcp.json defined; nothing to sync"},
+						},
+					})
+					continue
+				}
+				reports = append(reports, mcpsync.Diff(p))
+			}
+			printJSON(reports)
+		case "check":
+			hasDiff := false
+			for _, p := range paths {
+				if _, err := os.Stat(filepath.Join(p, ".mcp.json")); err != nil {
+					continue
+				}
+				diffText, err := mcpsync.DiffText(p)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error in %s: %v\n", p, err)
+					os.Exit(1)
+				}
+				if diffText != "" {
+					fmt.Fprintf(os.Stdout, "--- %s ---\n%s", p, diffText)
+					hasDiff = true
+				}
+			}
+			if hasDiff {
+				os.Exit(1)
+			}
+		case "list":
+			for _, p := range paths {
+				if _, err := os.Stat(filepath.Join(p, ".mcp.json")); err != nil {
+					continue
+				}
+				names, err := mcpsync.List(p)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error in %s: %v\n", p, err)
+					os.Exit(1)
+				}
+				for _, name := range names {
+					fmt.Printf("%s: %s\n", filepath.Base(p), name)
+				}
+			}
+		default:
+			fmt.Fprintf(os.Stderr, "unknown mcp command: %s\n", cmd)
+			os.Exit(1)
+		}
+		return
+	}
+
 	switch cmd {
 	case "sync":
 		report := mcpsync.Sync(repoPath, false)
