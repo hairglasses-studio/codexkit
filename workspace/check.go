@@ -235,6 +235,10 @@ func repoDirectoryRequired(repo Repo, decision ConsolidationDecision) bool {
 //
 // Returns an empty owner if repoName can't be resolved to a manifest repo.
 func resolveGoWorkOwner(root, repoName string, manifestRepos map[string]Repo) (owner, kind string) {
+	if strings.HasPrefix(repoName, "internal/") || strings.HasPrefix(repoName, "tools/") || repoName == "tests" {
+		return "hairglasses-studio", "workspace internal module"
+	}
+
 	if idx := strings.Index(repoName, "/"); idx > 0 {
 		first := repoName[:idx]
 		if _, ok := manifestRepos[first]; ok {
