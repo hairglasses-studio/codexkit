@@ -6,6 +6,7 @@ import (
 
 type RunResult struct {
 	InstanceID string        `json:"instance_id"`
+	AgentID    int           `json:"agent_id,omitempty"`
 	Command    []string      `json:"command"`
 	ExitCode   int           `json:"exit_code"`
 	Stdout     string        `json:"stdout"`

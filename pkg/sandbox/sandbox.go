@@ -13,6 +13,23 @@ import (
 	"time"
 )
 
+const (
+	Agent51ID       = 51
+	Agent51Name     = "Agent 51: Bubblewrap unprivileged user namespace runtime manager"
+	DefaultHostname = "codexkit-agent-51"
+)
+
+type Manager = Sandbox
+type RuntimeManager = Sandbox
+
+func NewRuntimeManager(cfg Config) (*Sandbox, error) {
+	return New(cfg)
+}
+
+func NewManager(cfg Config) (*Sandbox, error) {
+	return New(cfg)
+}
+
 type Sandbox struct {
 	cfg             Config
 	ephemeralDir    string
@@ -33,7 +50,7 @@ func New(cfg Config) (*Sandbox, error) {
 		cfg.InstanceID = generateInstanceID()
 	}
 	if cfg.Hostname == "" {
-		cfg.Hostname = "codexkit-agent-P26"
+		cfg.Hostname = DefaultHostname
 	}
 	if cfg.RootMode == "" {
 		cfg.RootMode = RootModeHostRO
@@ -69,7 +86,151 @@ func (s *Sandbox) WorkDir() string {
 	return s.cfg.HostWorkDir
 }
 
+func (s *Sandbox) AgentID() int {
+	return Agent51ID
+}
+
+func (s *Sandbox) AgentName() string {
+	return Agent51Name
+}
+
+func (s *Sandbox) Generator() *BwrapArgGenerator {
+	return NewBwrapArgGenerator(s.cfg)
+}
+
+func (s *Sandbox) ArgGenerator() *BwrapArgGenerator {
+	return NewBwrapArgGenerator(s.cfg)
+}
+
 func (s *Sandbox) BuildBwrapArgs(command []string) ([]string, []*os.File, error) {
+	return NewBwrapArgGenerator(s.cfg).GenerateArgs(command)
+}
+
+func GenerateBwrapArgs(cfg Config, command []string) ([]string, []*os.File, error) {
+	return NewBwrapArgGenerator(cfg).GenerateArgs(command)
+}
+
+type BwrapArgGenerator struct {
+	cfg Config
+}
+
+type ArgGenerator = BwrapArgGenerator
+type ArgumentGenerator = BwrapArgGenerator
+
+func NewBwrapArgGenerator(cfg Config) *BwrapArgGenerator {
+	return &BwrapArgGenerator{cfg: cfg}
+}
+
+func NewArgGenerator(cfg Config) *BwrapArgGenerator {
+	return &BwrapArgGenerator{cfg: cfg}
+}
+
+func NewArgumentGenerator(cfg Config) *BwrapArgGenerator {
+	return &BwrapArgGenerator{cfg: cfg}
+}
+
+func (g *BwrapArgGenerator) Config() Config {
+	return g.cfg
+}
+
+func (g *BwrapArgGenerator) WithUnshareAll(val bool) *BwrapArgGenerator {
+	g.cfg.UnshareAll = val
+	return g
+}
+
+func (g *BwrapArgGenerator) WithDieWithParent(val bool) *BwrapArgGenerator {
+	g.cfg.DieWithParent = val
+	return g
+}
+
+func (g *BwrapArgGenerator) WithRoBind(source, destination string) *BwrapArgGenerator {
+	g.cfg.Mounts = append(g.cfg.Mounts, Mount{
+		Type:        MountTypeRoBind,
+		Source:      source,
+		Destination: destination,
+	})
+	return g
+}
+
+func (g *BwrapArgGenerator) WithTmpfs(destination string) *BwrapArgGenerator {
+	g.cfg.TmpfsPaths = append(g.cfg.TmpfsPaths, destination)
+	return g
+}
+
+func (g *BwrapArgGenerator) WithBind(source, destination string) *BwrapArgGenerator {
+	g.cfg.Mounts = append(g.cfg.Mounts, Mount{
+		Type:        MountTypeBind,
+		Source:      source,
+		Destination: destination,
+	})
+	return g
+}
+
+func (g *BwrapArgGenerator) WithShareNet(val bool) *BwrapArgGenerator {
+	g.cfg.ShareNet = val
+	return g
+}
+
+func (g *BwrapArgGenerator) WithNewSession(val bool) *BwrapArgGenerator {
+	g.cfg.NewSession = val
+	return g
+}
+
+func (g *BwrapArgGenerator) WithHostname(name string) *BwrapArgGenerator {
+	g.cfg.Hostname = name
+	return g
+}
+
+func (g *BwrapArgGenerator) WithUID(uid uint32) *BwrapArgGenerator {
+	g.cfg.UID = uid
+	return g
+}
+
+func (g *BwrapArgGenerator) WithGID(gid uint32) *BwrapArgGenerator {
+	g.cfg.GID = gid
+	return g
+}
+
+func (g *BwrapArgGenerator) WithWorkDir(hostDir, containerDir string) *BwrapArgGenerator {
+	g.cfg.HostWorkDir = hostDir
+	g.cfg.ContainerWorkDir = containerDir
+	return g
+}
+
+func (g *BwrapArgGenerator) WithEnv(k, v string) *BwrapArgGenerator {
+	if g.cfg.Env == nil {
+		g.cfg.Env = make(map[string]string)
+	}
+	g.cfg.Env[k] = v
+	return g
+}
+
+func (g *BwrapArgGenerator) WithClearEnv(clear bool) *BwrapArgGenerator {
+	g.cfg.ClearEnv = clear
+	return g
+}
+
+func (g *BwrapArgGenerator) Generate(command []string) ([]string, []*os.File, error) {
+	return g.GenerateArgs(command)
+}
+
+func (g *BwrapArgGenerator) Build(command []string) ([]string, []*os.File, error) {
+	return g.GenerateArgs(command)
+}
+
+func (g *BwrapArgGenerator) BuildArgs(command []string) ([]string, []*os.File, error) {
+	return g.GenerateArgs(command)
+}
+
+func (g *BwrapArgGenerator) Args(command ...string) ([]string, error) {
+	args, files, err := g.GenerateArgs(command)
+	for _, f := range files {
+		_ = f.Close()
+	}
+	return args, err
+}
+
+func (g *BwrapArgGenerator) GenerateArgs(command []string) ([]string, []*os.File, error) {
 	if len(command) == 0 {
 		return nil, nil, errors.New("command cannot be empty")
 	}
@@ -77,32 +238,49 @@ func (s *Sandbox) BuildBwrapArgs(command []string) ([]string, []*os.File, error)
 	var args []string
 	var extraFiles []*os.File
 
-	if s.cfg.UnshareUser {
-		args = append(args, "--unshare-user", "--uid", fmt.Sprint(s.cfg.UID), "--gid", fmt.Sprint(s.cfg.GID))
+	if g.cfg.UnshareAll {
+		args = append(args, "--unshare-all")
+		if !g.cfg.UnshareNet || g.cfg.ShareNet {
+			args = append(args, "--share-net")
+		}
+		if g.cfg.UnshareUser || g.cfg.UID != 0 || g.cfg.GID != 0 {
+			args = append(args, "--uid", fmt.Sprint(g.cfg.UID), "--gid", fmt.Sprint(g.cfg.GID))
+		}
+		if g.cfg.Hostname != "" {
+			args = append(args, "--hostname", g.cfg.Hostname)
+		}
+	} else {
+		if g.cfg.UnshareUser {
+			args = append(args, "--unshare-user", "--uid", fmt.Sprint(g.cfg.UID), "--gid", fmt.Sprint(g.cfg.GID))
+		}
+		if g.cfg.UnsharePID {
+			args = append(args, "--unshare-pid")
+		}
+		if g.cfg.UnshareIPC {
+			args = append(args, "--unshare-ipc")
+		}
+		if g.cfg.UnshareNet {
+			args = append(args, "--unshare-net")
+		}
+		if g.cfg.UnshareUTS {
+			args = append(args, "--unshare-uts")
+			if g.cfg.Hostname != "" {
+				args = append(args, "--hostname", g.cfg.Hostname)
+			}
+		}
+		if g.cfg.UnshareCgroup {
+			args = append(args, "--unshare-cgroup-try")
+		}
 	}
-	if s.cfg.UnsharePID {
-		args = append(args, "--unshare-pid")
-	}
-	if s.cfg.UnshareIPC {
-		args = append(args, "--unshare-ipc")
-	}
-	if s.cfg.UnshareNet {
-		args = append(args, "--unshare-net")
-	}
-	if s.cfg.UnshareUTS {
-		args = append(args, "--unshare-uts", "--hostname", s.cfg.Hostname)
-	}
-	if s.cfg.UnshareCgroup {
-		args = append(args, "--unshare-cgroup-try")
-	}
-	if s.cfg.DieWithParent {
+
+	if g.cfg.DieWithParent {
 		args = append(args, "--die-with-parent")
 	}
-	if s.cfg.NewSession {
+	if g.cfg.NewSession {
 		args = append(args, "--new-session")
 	}
 
-	if s.cfg.RootMode == RootModeMinimal {
+	if g.cfg.RootMode == RootModeMinimal {
 		args = append(args,
 			"--tmpfs", "/",
 			"--ro-bind", "/usr", "/usr",
@@ -118,31 +296,31 @@ func (s *Sandbox) BuildBwrapArgs(command []string) ([]string, []*os.File, error)
 
 	args = append(args, "--dev", "/dev", "--proc", "/proc")
 
-	for _, tmpPath := range s.cfg.TmpfsPaths {
+	for _, tmpPath := range g.cfg.TmpfsPaths {
 		args = append(args, "--tmpfs", tmpPath)
 	}
 
-	if s.cfg.HostWorkDir != "" {
-		targetDir := s.cfg.ContainerWorkDir
+	if g.cfg.HostWorkDir != "" {
+		targetDir := g.cfg.ContainerWorkDir
 		if targetDir == "" {
-			targetDir = s.cfg.HostWorkDir
+			targetDir = g.cfg.HostWorkDir
 		}
 
-		if s.cfg.RootMode == RootModeHostRO {
+		if g.cfg.RootMode == RootModeHostRO {
 			if strings.HasPrefix(targetDir, "/tmp") || strings.HasPrefix(targetDir, "/dev/shm") {
-				args = append(args, "--dir", targetDir, "--bind", s.cfg.HostWorkDir, targetDir, "--chdir", targetDir)
-			} else if targetDir == s.cfg.HostWorkDir {
-				args = append(args, "--bind", s.cfg.HostWorkDir, targetDir, "--chdir", targetDir)
+				args = append(args, "--dir", targetDir, "--bind", g.cfg.HostWorkDir, targetDir, "--chdir", targetDir)
+			} else if targetDir == g.cfg.HostWorkDir {
+				args = append(args, "--bind", g.cfg.HostWorkDir, targetDir, "--chdir", targetDir)
 			} else {
 				fallbackTarget := "/tmp/agent-work"
-				args = append(args, "--dir", fallbackTarget, "--bind", s.cfg.HostWorkDir, fallbackTarget, "--chdir", fallbackTarget)
+				args = append(args, "--dir", fallbackTarget, "--bind", g.cfg.HostWorkDir, fallbackTarget, "--chdir", fallbackTarget)
 			}
 		} else {
-			args = append(args, "--dir", targetDir, "--bind", s.cfg.HostWorkDir, targetDir, "--chdir", targetDir)
+			args = append(args, "--dir", targetDir, "--bind", g.cfg.HostWorkDir, targetDir, "--chdir", targetDir)
 		}
 	}
 
-	for _, m := range s.cfg.Mounts {
+	for _, m := range g.cfg.Mounts {
 		switch m.Type {
 		case MountTypeRoBind:
 			args = append(args, "--ro-bind", m.Source, m.Destination)
@@ -157,15 +335,15 @@ func (s *Sandbox) BuildBwrapArgs(command []string) ([]string, []*os.File, error)
 		}
 	}
 
-	if s.cfg.ClearEnv {
+	if g.cfg.ClearEnv {
 		args = append(args, "--clearenv")
 	}
-	for k, v := range s.cfg.Env {
+	for k, v := range g.cfg.Env {
 		args = append(args, "--setenv", k, v)
 	}
 
-	if len(s.cfg.ApprovedProxyLoopbacks) > 0 {
-		proxy := s.cfg.ApprovedProxyLoopbacks[0]
+	if len(g.cfg.ApprovedProxyLoopbacks) > 0 {
+		proxy := g.cfg.ApprovedProxyLoopbacks[0]
 		if strings.HasPrefix(proxy, "/") {
 			args = append(args, "--ro-bind-try", proxy, proxy)
 		}
@@ -178,8 +356,8 @@ func (s *Sandbox) BuildBwrapArgs(command []string) ([]string, []*os.File, error)
 		)
 	}
 
-	if s.cfg.EnableSeccomp && runtime.GOARCH == "amd64" {
-		filterBytes, err := BuildSeccompFilter(s.cfg.DeniedSyscalls)
+	if g.cfg.EnableSeccomp && runtime.GOARCH == "amd64" {
+		filterBytes, err := BuildSeccompFilter(g.cfg.DeniedSyscalls)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build seccomp filter: %w", err)
 		}
@@ -258,6 +436,7 @@ func (s *Sandbox) Run(ctx context.Context, command ...string) (*RunResult, error
 
 	res := &RunResult{
 		InstanceID: s.cfg.InstanceID,
+		AgentID:    Agent51ID,
 		Command:    command,
 		ExitCode:   exitCode,
 		Stdout:     stdout.String(),
@@ -302,4 +481,24 @@ func (s *Sandbox) Teardown() (time.Duration, error) {
 func (s *Sandbox) Close() error {
 	_, err := s.Teardown()
 	return err
+}
+
+func (s *Sandbox) Config() Config {
+	return s.cfg
+}
+
+func (s *Sandbox) RunWithAudit(ctx context.Context, logger *AuditLogger, command ...string) (*RunResult, *AuditRecord, error) {
+	if logger == nil {
+		res, err := s.Run(ctx, command...)
+		return res, nil, err
+	}
+	return logger.AuditedRun(ctx, s, command...)
+}
+
+func (s *Sandbox) RunScriptWithAudit(ctx context.Context, logger *AuditLogger, script string) (*RunResult, *AuditRecord, error) {
+	if logger == nil {
+		res, err := s.RunScript(ctx, script)
+		return res, nil, err
+	}
+	return logger.AuditedRunScript(ctx, s, script)
 }

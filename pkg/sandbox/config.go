@@ -39,6 +39,8 @@ type Config struct {
 	HostWorkDir            string            `json:"host_work_dir"`
 	ContainerWorkDir       string            `json:"container_work_dir"`
 	EphemeralWorkDir       bool              `json:"ephemeral_work_dir"`
+	UnshareAll             bool              `json:"unshare_all"`
+	ShareNet               bool              `json:"share_net"`
 	UnshareUser            bool              `json:"unshare_user"`
 	UnsharePID             bool              `json:"unshare_pid"`
 	UnshareIPC             bool              `json:"unshare_ipc"`
@@ -79,6 +81,8 @@ func DefaultConfig() Config {
 		RootMode:         RootModeHostRO,
 		ContainerWorkDir: "",
 		EphemeralWorkDir: true,
+		UnshareAll:       true,
+		ShareNet:         false,
 		UnshareUser:      true,
 		UnsharePID:       true,
 		UnshareIPC:       true,

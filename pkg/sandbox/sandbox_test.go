@@ -245,3 +245,250 @@ func TestBenchmarkRun(t *testing.T) {
 		t.Fatalf("error rate SLA failed: %v > %v", report.ErrorRate, report.ErrorRateCeiling)
 	}
 }
+
+func containsArg(args []string, target string) bool {
+	for _, a := range args {
+		if a == target {
+			return true
+		}
+	}
+	return false
+}
+
+func TestAgent51_Constants(t *testing.T) {
+	if Agent51ID != 51 {
+		t.Fatalf("expected Agent51ID 51, got %d", Agent51ID)
+	}
+	expectedName := "Agent 51: Bubblewrap unprivileged user namespace runtime manager"
+	if Agent51Name != expectedName {
+		t.Fatalf("expected Agent51Name %q, got %q", expectedName, Agent51Name)
+	}
+
+	cfg := DefaultConfig()
+	sb, err := NewRuntimeManager(cfg)
+	if err != nil {
+		t.Fatalf("NewRuntimeManager failed: %v", err)
+	}
+	defer sb.Close()
+
+	if sb.AgentID() != 51 {
+		t.Fatalf("expected sb.AgentID() 51, got %d", sb.AgentID())
+	}
+	if sb.AgentName() != expectedName {
+		t.Fatalf("expected sb.AgentName() %q, got %q", expectedName, sb.AgentName())
+	}
+}
+
+func TestAgent51_BwrapArgGenerator_DefaultArgs(t *testing.T) {
+	cfg := DefaultConfig()
+	gen := NewBwrapArgGenerator(cfg)
+
+	args, files, err := gen.GenerateArgs([]string{"echo", "test"})
+	if err != nil {
+		t.Fatalf("GenerateArgs failed: %v", err)
+	}
+	defer func() {
+		for _, f := range files {
+			_ = f.Close()
+		}
+	}()
+
+	requiredFlags := []string{
+		"--unshare-all",
+		"--ro-bind",
+		"--tmpfs",
+		"--die-with-parent",
+		"--",
+		"echo",
+		"test",
+	}
+	for _, flag := range requiredFlags {
+		if !containsArg(args, flag) {
+			t.Fatalf("expected flag %q in args, got: %v", flag, args)
+		}
+	}
+}
+
+func TestAgent51_BwrapArgGenerator_FluentBuilder(t *testing.T) {
+	gen := NewBwrapArgGenerator(Config{}).
+		WithUnshareAll(true).
+		WithDieWithParent(true).
+		WithRoBind("/usr", "/usr").
+		WithTmpfs("/tmp")
+
+	args, files, err := gen.GenerateArgs([]string{"/bin/true"})
+	if err != nil {
+		t.Fatalf("GenerateArgs failed: %v", err)
+	}
+	defer func() {
+		for _, f := range files {
+			_ = f.Close()
+		}
+	}()
+
+	expected := []string{"--unshare-all", "--die-with-parent", "--ro-bind", "--tmpfs"}
+	for _, exp := range expected {
+		if !containsArg(args, exp) {
+			t.Fatalf("expected flag %q in args, got: %v", exp, args)
+		}
+	}
+}
+
+func TestAgent51_BwrapArgGenerator_UnshareAllDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.UnshareAll = false
+
+	gen := NewBwrapArgGenerator(cfg)
+	args, files, err := gen.GenerateArgs([]string{"/bin/true"})
+	if err != nil {
+		t.Fatalf("GenerateArgs failed: %v", err)
+	}
+	defer func() {
+		for _, f := range files {
+			_ = f.Close()
+		}
+	}()
+
+	if containsArg(args, "--unshare-all") {
+		t.Fatalf("expected --unshare-all to be absent when UnshareAll is false")
+	}
+	expected := []string{"--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-net", "--die-with-parent"}
+	for _, exp := range expected {
+		if !containsArg(args, exp) {
+			t.Fatalf("expected flag %q when UnshareAll is false, got: %v", exp, args)
+		}
+	}
+}
+
+func TestAgent51_BwrapArgGenerator_ShareNet(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.UnshareAll = true
+	cfg.ShareNet = true
+
+	args, files, err := NewBwrapArgGenerator(cfg).GenerateArgs([]string{"/bin/true"})
+	if err != nil {
+		t.Fatalf("GenerateArgs failed: %v", err)
+	}
+	defer func() {
+		for _, f := range files {
+			_ = f.Close()
+		}
+	}()
+
+	if !containsArg(args, "--unshare-all") {
+		t.Fatalf("expected --unshare-all in args")
+	}
+	if !containsArg(args, "--share-net") {
+		t.Fatalf("expected --share-net in args when ShareNet is true")
+	}
+}
+
+func TestAgent51_BwrapArgGenerator_EmptyCommand(t *testing.T) {
+	gen := NewBwrapArgGenerator(DefaultConfig())
+	if _, _, err := gen.GenerateArgs(nil); err == nil {
+		t.Fatalf("expected error for nil command")
+	}
+	if _, _, err := gen.GenerateArgs([]string{}); err == nil {
+		t.Fatalf("expected error for empty command slice")
+	}
+}
+
+func TestAgent51_RuntimeManagerRun(t *testing.T) {
+	sb, err := NewRuntimeManager(DefaultConfig())
+	if err != nil {
+		t.Fatalf("NewRuntimeManager failed: %v", err)
+	}
+	defer sb.Close()
+
+	res, err := sb.Run(context.Background(), "/bin/sh", "-c", "echo agent-51-runtime")
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if !res.Success {
+		t.Fatalf("expected success, got exit code %d: %s", res.ExitCode, res.Stderr)
+	}
+	if strings.TrimSpace(res.Stdout) != "agent-51-runtime" {
+		t.Fatalf("unexpected stdout: %q", res.Stdout)
+	}
+	if res.AgentID != 51 {
+		t.Fatalf("expected RunResult.AgentID 51, got %d", res.AgentID)
+	}
+}
+
+func TestAgent51_UnprivilegedUserNamespace(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.UID = 1001
+	cfg.GID = 1001
+
+	sb, err := NewRuntimeManager(cfg)
+	if err != nil {
+		t.Fatalf("NewRuntimeManager failed: %v", err)
+	}
+	defer sb.Close()
+
+	res, err := sb.Run(context.Background(), "id", "-u")
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if !res.Success {
+		t.Fatalf("expected success, got exit code %d: %s", res.ExitCode, res.Stderr)
+	}
+	if strings.TrimSpace(res.Stdout) != "1001" {
+		t.Fatalf("expected uid 1001 inside namespace, got: %q", res.Stdout)
+	}
+}
+
+func TestAgent51_DieWithParentAndTmpfs(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TmpfsPaths = []string{"/tmp", "/dev/shm"}
+
+	sb, err := NewRuntimeManager(cfg)
+	if err != nil {
+		t.Fatalf("NewRuntimeManager failed: %v", err)
+	}
+	defer sb.Close()
+
+	res, err := sb.RunScript(context.Background(), "echo test51 > /tmp/a51.txt && cat /tmp/a51.txt")
+	if err != nil {
+		t.Fatalf("RunScript failed: %v", err)
+	}
+	if !res.Success {
+		t.Fatalf("expected success, got exit code %d: %s", res.ExitCode, res.Stderr)
+	}
+	if strings.TrimSpace(res.Stdout) != "test51" {
+		t.Fatalf("expected test51, got: %q", res.Stdout)
+	}
+}
+
+func TestAgent51_ArgGeneratorAliases(t *testing.T) {
+	cfg := DefaultConfig()
+	gen1 := NewArgGenerator(cfg)
+	gen2 := NewArgumentGenerator(cfg)
+
+	args1, err := gen1.Args("echo", "1")
+	if err != nil {
+		t.Fatalf("Args failed: %v", err)
+	}
+	if !containsArg(args1, "--unshare-all") {
+		t.Fatalf("expected --unshare-all in args1")
+	}
+
+	args2, err := gen2.Args("echo", "2")
+	if err != nil {
+		t.Fatalf("Args failed: %v", err)
+	}
+	if !containsArg(args2, "--unshare-all") {
+		t.Fatalf("expected --unshare-all in args2")
+	}
+
+	argsStandAlone, files, err := GenerateBwrapArgs(cfg, []string{"echo", "3"})
+	if err != nil {
+		t.Fatalf("GenerateBwrapArgs failed: %v", err)
+	}
+	for _, f := range files {
+		_ = f.Close()
+	}
+	if !containsArg(argsStandAlone, "--unshare-all") {
+		t.Fatalf("expected --unshare-all in argsStandAlone")
+	}
+}
