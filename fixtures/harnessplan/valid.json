@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "plan_sha256": "sha256:8f1e2a12dc6cbb7aadb5eb9ed97046b0cd25d86047b1ae4926f481206f81823b",
+  "plan": {
+    "id": "native-hooks-canary",
+    "target_repository": "hairglasses-studio/codex-harness-staging-canary",
+    "generator_sha": "084f439a43bc2334d93c8f949eeebe09166ab77c",
+    "manifest_digest": "sha256:62cd46334179ff5d54d4383e8e21ab1e1bded26cec1b5a31d74e974d71c4205a",
+    "inventory_digest": "sha256:313466430b4f1d4493629385f6b6752b1c5b6a8d52dbbde0a856edd266704777",
+    "primary_source_binding": "codex-harness",
+    "expected_source_sha": "084f439a43bc2334d93c8f949eeebe09166ab77c",
+    "source_bindings": [
+      {
+        "id": "codex-harness",
+        "repository": "hairglasses-studio/codex-harness-staging",
+        "remote_url": "https://github.com/hairglasses-studio/codex-harness-staging.git",
+        "requested_ref": "refs/heads/main",
+        "requested_sha": "084f439a43bc2334d93c8f949eeebe09166ab77c",
+        "tested_ref": "refs/heads/main",
+        "tested_sha": "084f439a43bc2334d93c8f949eeebe09166ab77c",
+        "evidence_class": "remote-tree",
+        "checkout_dirty": false,
+        "observed_at": "2026-09-06T06:27:17Z",
+        "valid_until": "2026-09-13T06:27:17Z"
+      }
+    ],
+    "operations": [
+      {
+        "id": "create-native-hooks",
+        "object_id": "native-hooks",
+        "kind": "create",
+        "destination": ".codex/hooks/hooks.json",
+        "source_binding_ids": [
+          "codex-harness"
+        ],
+        "before": {
+          "type": "absent"
+        },
+        "after": {
+          "type": "regular-file",
+          "mode": "0644",
+          "hash": "sha256:9c11da0f01b80199f5ad754439f0b83c5040c194dfc746018982d0006670527b",
+          "marker": {
+            "owner": "codex-harness",
+            "object_id": "native-hooks",
+            "state_hash": "sha256:9c11da0f01b80199f5ad754439f0b83c5040c194dfc746018982d0006670527b"
+          }
+        },
+        "payload": {
+          "hash": "sha256:9c11da0f01b80199f5ad754439f0b83c5040c194dfc746018982d0006670527b",
+          "size": 982
+        }
+      },
+      {
+        "id": "create-native-tool-policy",
+        "object_id": "native-tool-policy",
+        "kind": "create",
+        "destination": ".codex/hooks/tool_policy_adapter.py",
+        "source_binding_ids": [
+          "codex-harness"
+        ],
+        "before": {
+          "type": "absent"
+        },
+        "after": {
+          "type": "regular-file",
+          "mode": "0644",
+          "hash": "sha256:936972de331493df62bf932dab6d4886f7b510199accbf5a791448dbee9b5fe7",
+          "marker": {
+            "owner": "codex-harness",
+            "object_id": "native-tool-policy",
+            "state_hash": "sha256:936972de331493df62bf932dab6d4886f7b510199accbf5a791448dbee9b5fe7"
+          }
+        },
+        "payload": {
+          "hash": "sha256:936972de331493df62bf932dab6d4886f7b510199accbf5a791448dbee9b5fe7",
+          "size": 4713
+        }
+      },
+      {
+        "id": "create-native-review-rules",
+        "object_id": "native-review-rules",
+        "kind": "create",
+        "destination": ".codex/rules/review.rules",
+        "source_binding_ids": [
+          "codex-harness"
+        ],
+        "before": {
+          "type": "absent"
+        },
+        "after": {
+          "type": "regular-file",
+          "mode": "0644",
+          "hash": "sha256:480618d7e6ebb1ff08945719f42e326d92dbcaf372a9dddc5dd80240fa98584f",
+          "marker": {
+            "owner": "codex-harness",
+            "object_id": "native-review-rules",
+            "state_hash": "sha256:480618d7e6ebb1ff08945719f42e326d92dbcaf372a9dddc5dd80240fa98584f"
+          }
+        },
+        "payload": {
+          "hash": "sha256:480618d7e6ebb1ff08945719f42e326d92dbcaf372a9dddc5dd80240fa98584f",
+          "size": 1119
+        }
+      }
+    ]
+  }
+}

@@ -479,13 +479,12 @@ func TestConvenienceFunctions(t *testing.T) {
 }
 
 func TestCloseLeaks(t *testing.T) {
-	r, w, err := os.Pipe()
-	if err != nil {
+	var p [2]int
+	if err := syscall.Pipe(p[:]); err != nil {
 		t.Fatalf("create pipe: %v", err)
 	}
-
-	rFD := int(r.Fd())
-	wFD := int(w.Fd())
+	rFD := p[0]
+	wFD := p[1]
 
 	rep := &LeakReport{
 		UnclosedFDs: []Descriptor{

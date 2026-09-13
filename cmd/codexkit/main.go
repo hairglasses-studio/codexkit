@@ -12,6 +12,7 @@ import (
 
 	"github.com/hairglasses-studio/codexkit"
 	"github.com/hairglasses-studio/codexkit/baselineguard"
+	"github.com/hairglasses-studio/codexkit/builtinmodules"
 	"github.com/hairglasses-studio/codexkit/configindex"
 	"github.com/hairglasses-studio/codexkit/fleetaudit"
 	"github.com/hairglasses-studio/codexkit/llmreduction"
@@ -31,22 +32,7 @@ var registry *codexkit.Registry
 
 func init() {
 	registry = codexkit.NewRegistry()
-	for _, m := range []codexkit.ToolModule{
-		baselineguard.Module(),
-		configindex.Module(),
-		skillsync.Module(),
-		mcpsync.Module(),
-		fleetaudit.Module(),
-		llmreduction.Module(),
-		perfaudit.Module(),
-		primitiveindex.Module(),
-		reporeadiness.Module(),
-		sourcecontract.Module(),
-		surfaceindex.Module(),
-		telemetry.Module(),
-		unificationaudit.Module(),
-		workspace.Module(),
-	} {
+	for _, m := range builtinmodules.All() {
 		if err := registry.Register(m); err != nil {
 			fmt.Fprintf(os.Stderr, "init error: %v\n", err)
 			os.Exit(1)
@@ -83,6 +69,12 @@ func main() {
 		runReduction(os.Args[2:])
 	case "telemetry":
 		runTelemetry(os.Args[2:])
+	case "research":
+		runResearch(os.Args[2:])
+	case "source-ref":
+		runSourceRef(os.Args[2:])
+	case "harness":
+		runHarness(os.Args[2:])
 	case "bridge":
 		runBridge(os.Args[2:])
 	case "tools":

@@ -1,0 +1,9 @@
+{
+  "expected_source_sha": "084f439a43bc2334d93c8f949eeebe09166ab77c",
+  "manifest_repository": "codex-harness-staging-canary",
+  "marker_owner": "codex-harness",
+  "plan_id": "native-hooks-canary",
+  "plan_sha256": "sha256:8f1e2a12dc6cbb7aadb5eb9ed97046b0cd25d86047b1ae4926f481206f81823b",
+  "schema_version": 1,
+  "target_repository": "hairglasses-studio/codex-harness-staging-canary"
+}

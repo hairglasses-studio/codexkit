@@ -1,0 +1,13 @@
+{
+  "expected": "allow",
+  "payload": {
+    "session_id": "fixture",
+    "cwd": "/tmp/repo",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "safe-1",
+    "tool_input": {
+      "command": "git --no-pager status --short"
+    }
+  }
+}

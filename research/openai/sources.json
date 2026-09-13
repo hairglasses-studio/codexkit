@@ -1,0 +1,1035 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "captured_at": "2026-09-06",
+    "scope": "Official OpenAI and ChatGPT documentation for Codex harness behavior.",
+    "allowed_domains": [
+      "learn.chatgpt.com",
+      "developers.openai.com",
+      "platform.openai.com"
+    ],
+    "policy": "Use these records as a cited source register. Do not copy manuals into this repository; refresh summaries from official pages."
+  },
+  "cadence": {
+    "critical": "weekly, plus before changing harness safety defaults",
+    "high": "biweekly, plus before CLI/app/SDK release adoption",
+    "medium": "monthly",
+    "low": "quarterly"
+  },
+  "sources": [
+    {
+      "id": "OAI-CX-000",
+      "title": "ChatGPT & Codex changelog",
+      "url": "https://learn.chatgpt.com/docs/changelog",
+      "domain": "learn.chatgpt.com",
+      "category": "00-source-index",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide",
+        "cloud",
+        "security-plugin"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Release notes are consolidated for ChatGPT and Codex surfaces.",
+        "Retrieved 2026-08-09: the 2026-08-07 Codex CLI 0.147.0 entry includes portable Agent Plugins and catalog search, the new --approve-for-me flag, imported Cursor skills plus Claude/Cursor conversation sync, opt-in MCP 2026-07-28 support, secret redaction, project-trust enforcement, plugin isolation hardening, and removal of the deprecated codex exec --full-auto flag."
+      ],
+      "watch_for": [
+        "new app or CLI releases",
+        "sandbox or approval behavior changes",
+        "security plugin version changes",
+        "import and conversation migration behavior"
+      ]
+    },
+    {
+      "id": "OAI-CX-001",
+      "title": "What's new",
+      "url": "https://learn.chatgpt.com/docs/whats-new",
+      "domain": "learn.chatgpt.com",
+      "category": "00-source-index",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide",
+        "cloud",
+        "plugins"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Feature announcements and availability notes are collected separately from the dated changelog."
+      ],
+      "watch_for": [
+        "new feature rollouts",
+        "availability changes",
+        "maturity label changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-002",
+      "title": "Feature Maturity",
+      "url": "https://learn.chatgpt.com/docs/feature-maturity",
+      "domain": "learn.chatgpt.com",
+      "category": "00-source-index",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide",
+        "cloud",
+        "plugins"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Some ChatGPT and Codex features carry maturity labels that affect support and change expectations."
+      ],
+      "watch_for": [
+        "experimental to stable transitions",
+        "deprecation notices"
+      ]
+    },
+    {
+      "id": "OAI-CX-003",
+      "title": "Open Source",
+      "url": "https://learn.chatgpt.com/docs/open-source",
+      "domain": "learn.chatgpt.com",
+      "category": "00-source-index",
+      "surfaces": [
+        "cli",
+        "app-server",
+        "security-cli",
+        "security-sdk"
+      ],
+      "volatility": "medium",
+      "refresh_cadence": "monthly",
+      "verified_facts": [
+        "OpenAI documents which Codex components are open source and where issue reporting belongs."
+      ],
+      "watch_for": [
+        "new open-source components",
+        "repository ownership changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-010",
+      "title": "Codex CLI",
+      "url": "https://learn.chatgpt.com/docs/codex/cli",
+      "domain": "learn.chatgpt.com",
+      "category": "01-entry-prompting",
+      "surfaces": [
+        "cli"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "The CLI is the terminal surface for inspecting, editing, running commands, and automation."
+      ],
+      "watch_for": [
+        "command-line flag changes",
+        "authentication or sandbox defaults"
+      ]
+    },
+    {
+      "id": "OAI-CX-011",
+      "title": "Quickstart",
+      "url": "https://learn.chatgpt.com/docs/quickstart",
+      "domain": "learn.chatgpt.com",
+      "category": "01-entry-prompting",
+      "surfaces": [
+        "desktop-app",
+        "web",
+        "cli",
+        "ide"
+      ],
+      "volatility": "medium",
+      "refresh_cadence": "monthly",
+      "verified_facts": [
+        "The official quickstart separates desktop/web usage from developer CLI and IDE usage."
+      ],
+      "watch_for": [
+        "surface naming changes",
+        "onboarding flow changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-012",
+      "title": "Prompt engineering",
+      "url": "https://developers.openai.com/api/docs/guides/prompt-engineering",
+      "domain": "developers.openai.com",
+      "category": "01-entry-prompting",
+      "surfaces": [
+        "api",
+        "sdk",
+        "codex-prompts"
+      ],
+      "volatility": "medium",
+      "refresh_cadence": "monthly",
+      "verified_facts": [
+        "OpenAI maintains API-level prompting guidance separately from Codex-specific entry docs."
+      ],
+      "watch_for": [
+        "model-specific prompting migrations",
+        "reasoning prompt changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-020",
+      "title": "Config basics",
+      "url": "https://learn.chatgpt.com/docs/config-file/config-basic",
+      "domain": "learn.chatgpt.com",
+      "category": "02-config-policy",
+      "surfaces": [
+        "cli",
+        "ide",
+        "desktop-app"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Codex reads user config and trusted project .codex/config.toml layers; CLI overrides have highest precedence."
+      ],
+      "watch_for": [
+        "precedence changes",
+        "new project-trust rules",
+        "new permission profile defaults"
+      ]
+    },
+    {
+      "id": "OAI-CX-021",
+      "title": "Advanced Configuration",
+      "url": "https://learn.chatgpt.com/docs/config-file/config-advanced",
+      "domain": "learn.chatgpt.com",
+      "category": "02-config-policy",
+      "surfaces": [
+        "cli",
+        "ide",
+        "desktop-app"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Project config walks from project root to current directory; trusted project layers may include hooks and rules."
+      ],
+      "watch_for": [
+        "ignored project-local keys",
+        "profile-file behavior",
+        "provider settings"
+      ]
+    },
+    {
+      "id": "OAI-CX-022",
+      "title": "Configuration Reference",
+      "url": "https://learn.chatgpt.com/docs/config-file/config-reference",
+      "domain": "learn.chatgpt.com",
+      "category": "02-config-policy",
+      "surfaces": [
+        "cli",
+        "ide",
+        "desktop-app"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "The reference is the searchable source for config.toml and requirements.toml keys.",
+        "Retrieved 2026-08-09: project-scoped config cannot override host-owned app request metadata, provider, notification, profile selection, or telemetry keys; the remote plugin catalog is controlled by features.remote_plugin and managed requirements can pin plugin availability.",
+        "Retrieved 2026-08-09: app and MCP default_tools_approval_mode plus per-tool approval_mode accept auto, prompt, writes, or approve; top-level command approval_policy is a separate setting whose values include never."
+      ],
+      "watch_for": [
+        "new keys",
+        "removed keys",
+        "requirements.toml constraints",
+        "plugin and MCP policy keys"
+      ]
+    },
+    {
+      "id": "OAI-CX-023",
+      "title": "Environment variables",
+      "url": "https://learn.chatgpt.com/docs/config-file/environment-variables",
+      "domain": "learn.chatgpt.com",
+      "category": "02-config-policy",
+      "surfaces": [
+        "cli",
+        "ide",
+        "desktop-app"
+      ],
+      "volatility": "medium",
+      "refresh_cadence": "monthly",
+      "verified_facts": [
+        "Environment-variable behavior is documented separately from config-file keys."
+      ],
+      "watch_for": [
+        "auth env var changes",
+        "runtime path variable changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-024",
+      "title": "Managed configuration",
+      "url": "https://learn.chatgpt.com/docs/enterprise/managed-configuration",
+      "domain": "learn.chatgpt.com",
+      "category": "02-config-policy",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide",
+        "enterprise"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Managed configuration constrains supported local runtime behavior but does not replace workspace access controls."
+      ],
+      "watch_for": [
+        "admin-enforced requirement changes",
+        "client coverage changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-030",
+      "title": "Custom instructions with AGENTS.md",
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+      "domain": "learn.chatgpt.com",
+      "category": "03-instructions-skills",
+      "surfaces": [
+        "cli",
+        "ide",
+        "desktop-app",
+        "cloud"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Codex builds an instruction chain from global and project AGENTS files; closer files override earlier guidance by appearing later.",
+        "Retrieved 2026-08-09: Codex uses at most one instruction file per directory in AGENTS.override.md, AGENTS.md, then configured fallback order; project_doc_max_bytes defaults to 32 KiB."
+      ],
+      "watch_for": [
+        "instruction search order changes",
+        "size-limit changes",
+        "fallback filename changes",
+        "override and fallback behavior"
+      ]
+    },
+    {
+      "id": "OAI-CX-031",
+      "title": "Subagents",
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/subagents",
+      "domain": "learn.chatgpt.com",
+      "category": "03-instructions-skills",
+      "surfaces": [
+        "chatgpt-work",
+        "codex",
+        "cli",
+        "desktop-app"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Subagent workflows can spawn specialized agents in parallel and aggregate their results."
+      ],
+      "watch_for": [
+        "surface availability",
+        "custom agent configuration keys"
+      ]
+    },
+    {
+      "id": "OAI-CX-032",
+      "title": "Build skills",
+      "url": "https://learn.chatgpt.com/docs/build-skills",
+      "domain": "learn.chatgpt.com",
+      "category": "03-instructions-skills",
+      "surfaces": [
+        "chatgpt",
+        "codex"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Skills package instructions, resources, and optional scripts for repeatable workflows.",
+        "Retrieved 2026-08-09: skills use progressive disclosure, local Codex starts from name, description, and file path before loading full SKILL.md, and agents/openai.yaml can disable implicit invocation while preserving explicit invocation."
+      ],
+      "watch_for": [
+        "skill package format changes",
+        "approval or installation flow changes",
+        "implicit invocation and dependency metadata"
+      ]
+    },
+    {
+      "id": "OAI-CX-033",
+      "title": "Rules",
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/rules",
+      "domain": "learn.chatgpt.com",
+      "category": "03-instructions-skills",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Rules are part of Codex agent configuration and should be tracked separately from prose instructions."
+      ],
+      "watch_for": [
+        "rule schema changes",
+        "trust behavior changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-040",
+      "title": "Authentication overview",
+      "url": "https://learn.chatgpt.com/docs/auth",
+      "domain": "learn.chatgpt.com",
+      "category": "04-safety-auth",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide",
+        "cloud"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Local desktop, CLI, and IDE surfaces support ChatGPT sign-in and API-key sign-in; Codex cloud requires ChatGPT sign-in."
+      ],
+      "watch_for": [
+        "credential storage changes",
+        "workspace access policy changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-041",
+      "title": "Agent approvals & security",
+      "url": "https://learn.chatgpt.com/docs/agent-approvals-security",
+      "domain": "learn.chatgpt.com",
+      "category": "04-safety-auth",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Approvals and sandboxing are distinct controls; approvals govern pauses before actions while sandboxing constrains command access."
+      ],
+      "watch_for": [
+        "approval policy semantics",
+        "protected path behavior",
+        "network defaults"
+      ]
+    },
+    {
+      "id": "OAI-CX-042",
+      "title": "Sandbox",
+      "url": "https://learn.chatgpt.com/docs/sandboxing",
+      "domain": "learn.chatgpt.com",
+      "category": "04-safety-auth",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Sandbox configuration controls filesystem and network access independently from approval prompts."
+      ],
+      "watch_for": [
+        "workspace-write behavior",
+        "network access defaults",
+        "writable root protections"
+      ]
+    },
+    {
+      "id": "OAI-CX-043",
+      "title": "Auto-review",
+      "url": "https://learn.chatgpt.com/docs/sandboxing/auto-review",
+      "domain": "learn.chatgpt.com",
+      "category": "04-safety-auth",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Auto-review routes eligible sandbox-boundary approval requests to a reviewer agent without expanding the sandbox."
+      ],
+      "watch_for": [
+        "reviewer lifecycle",
+        "failure behavior",
+        "managed policy knobs"
+      ]
+    },
+    {
+      "id": "OAI-CX-044",
+      "title": "Permissions",
+      "url": "https://learn.chatgpt.com/docs/permissions",
+      "domain": "learn.chatgpt.com",
+      "category": "04-safety-auth",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Permission profiles provide reusable filesystem and network policies.",
+        "Retrieved 2026-08-09: permission profiles govern local sandboxed command execution; connectors, MCP servers, browser/computer-use surfaces, Codex cloud settings, and approved escalations have separate controls."
+      ],
+      "watch_for": [
+        "built-in profile changes",
+        "custom profile schema changes",
+        "boundary between local command profiles and external-tool controls"
+      ]
+    },
+    {
+      "id": "OAI-CX-050",
+      "title": "Hooks",
+      "url": "https://learn.chatgpt.com/docs/hooks",
+      "domain": "learn.chatgpt.com",
+      "category": "05-extensions-integrations",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Hooks can run deterministic scripts at lifecycle events; matching command hooks for the same event are launched concurrently."
+      ],
+      "watch_for": [
+        "hook event schema",
+        "trust prompts",
+        "managed hook restrictions"
+      ]
+    },
+    {
+      "id": "OAI-CX-051",
+      "title": "Model Context Protocol",
+      "url": "https://learn.chatgpt.com/docs/extend/mcp",
+      "domain": "learn.chatgpt.com",
+      "category": "05-extensions-integrations",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide",
+        "plugins"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Local Codex clients share MCP configuration; plugin-provided MCP servers have different ownership from user-configured servers.",
+        "Retrieved 2026-08-09: Codex host MCP supports STDIO and Streamable HTTP servers, server instructions, OAuth and bearer-token authentication, and tool approval policy under user config; hosted plugin tools can differ. The 2026-08-07 Codex CLI 0.147.0 changelog added opt-in MCP 2026-07-28 support with paginated discovery, multi-round requests, and non-blocking server startup."
+      ],
+      "watch_for": [
+        "supported MCP features",
+        "tool approval policy",
+        "OAuth behavior",
+        "MCP protocol-version adoption"
+      ]
+    },
+    {
+      "id": "OAI-CX-052",
+      "title": "Build plugins",
+      "url": "https://learn.chatgpt.com/docs/build-plugins",
+      "domain": "learn.chatgpt.com",
+      "category": "05-extensions-integrations",
+      "surfaces": [
+        "plugins",
+        "mcp",
+        "skills"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Plugin guidance is separate from local MCP configuration and skill packaging.",
+        "Retrieved 2026-08-09: a plugin can include skills, an MCP server, or both; ChatGPT and Codex share one universal plugin directory, and local marketplaces support development testing."
+      ],
+      "watch_for": [
+        "manifest schema",
+        "submission requirements",
+        "local marketplace behavior"
+      ]
+    },
+    {
+      "id": "OAI-CX-053",
+      "title": "Plugins",
+      "url": "https://learn.chatgpt.com/docs/plugins",
+      "domain": "learn.chatgpt.com",
+      "category": "05-extensions-integrations",
+      "surfaces": [
+        "chatgpt-work",
+        "desktop-app",
+        "codex-cli",
+        "plugins",
+        "mcp",
+        "skills",
+        "connectors"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Retrieved 2026-08-09: plugins bundle reusable ChatGPT and Codex capabilities and can include skills, connectors, or both; Codex CLI has a plugin browser, and installed plugins can add skills, connectors, and MCP tools to new chats."
+      ],
+      "watch_for": [
+        "catalog tabs",
+        "surface availability",
+        "connector permission flow",
+        "CLI plugin browser behavior"
+      ]
+    },
+    {
+      "id": "OAI-CX-060",
+      "title": "Codex environments",
+      "url": "https://learn.chatgpt.com/docs/environments/modes",
+      "domain": "learn.chatgpt.com",
+      "category": "06-app-ide-cloud-worktree",
+      "surfaces": [
+        "desktop-app",
+        "local",
+        "worktree",
+        "cloud"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Desktop Codex can run in Local, Worktree, or Cloud modes."
+      ],
+      "watch_for": [
+        "environment-mode behavior",
+        "availability changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-061",
+      "title": "Codex cloud",
+      "url": "https://learn.chatgpt.com/docs/cloud",
+      "domain": "learn.chatgpt.com",
+      "category": "06-app-ide-cloud-worktree",
+      "surfaces": [
+        "cloud",
+        "github"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Cloud setup includes GitHub connection, repository access, and cloud environment configuration."
+      ],
+      "watch_for": [
+        "environment setup",
+        "secret handling",
+        "internet access policy"
+      ]
+    },
+    {
+      "id": "OAI-CX-062",
+      "title": "Codex IDE extension",
+      "url": "https://learn.chatgpt.com/docs/codex/ide",
+      "domain": "learn.chatgpt.com",
+      "category": "06-app-ide-cloud-worktree",
+      "surfaces": [
+        "ide"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "The IDE extension brings open files and selections into prompt context and lets users review edits in place."
+      ],
+      "watch_for": [
+        "supported editors",
+        "context ingestion behavior"
+      ]
+    },
+    {
+      "id": "OAI-CX-063",
+      "title": "Git worktrees",
+      "url": "https://learn.chatgpt.com/docs/environments/git-worktrees",
+      "domain": "learn.chatgpt.com",
+      "category": "06-app-ide-cloud-worktree",
+      "surfaces": [
+        "desktop-app",
+        "worktree"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Worktrees isolate independent chats in the same project; scheduled tasks can use dedicated background worktrees for Git repositories."
+      ],
+      "watch_for": [
+        "handoff behavior",
+        "background task isolation",
+        "non-git behavior"
+      ]
+    },
+    {
+      "id": "OAI-CX-064",
+      "title": "Local environments",
+      "url": "https://learn.chatgpt.com/docs/environments/local-environment",
+      "domain": "learn.chatgpt.com",
+      "category": "06-app-ide-cloud-worktree",
+      "surfaces": [
+        "desktop-app",
+        "worktree"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Local environments configure setup steps for worktrees and are available through Codex in the ChatGPT desktop app."
+      ],
+      "watch_for": [
+        "shareable generated file format",
+        "surface availability"
+      ]
+    },
+    {
+      "id": "OAI-CX-070",
+      "title": "Non-interactive mode",
+      "url": "https://learn.chatgpt.com/docs/non-interactive-mode",
+      "domain": "learn.chatgpt.com",
+      "category": "07-automation-ci",
+      "surfaces": [
+        "cli",
+        "ci"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "codex exec runs Codex from scripts and CI without opening the interactive TUI."
+      ],
+      "watch_for": [
+        "exec flags",
+        "exit-code semantics",
+        "authentication requirements"
+      ]
+    },
+    {
+      "id": "OAI-CX-071",
+      "title": "Codex GitHub Action",
+      "url": "https://learn.chatgpt.com/docs/github-action",
+      "domain": "learn.chatgpt.com",
+      "category": "07-automation-ci",
+      "surfaces": [
+        "github-action",
+        "ci"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Codex can be run from workflow files for repeatable tasks such as code review or release preparation."
+      ],
+      "watch_for": [
+        "action inputs",
+        "permissions requirements",
+        "runner assumptions"
+      ]
+    },
+    {
+      "id": "OAI-CX-072",
+      "title": "Codex Security CLI: run scans in CI",
+      "url": "https://learn.chatgpt.com/docs/security/cli/ci",
+      "domain": "learn.chatgpt.com",
+      "category": "07-automation-ci",
+      "surfaces": [
+        "security-cli",
+        "ci"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Codex Security CLI has CI-oriented scan guidance separate from the hosted plugin."
+      ],
+      "watch_for": [
+        "SARIF behavior",
+        "token requirements",
+        "beta access"
+      ]
+    },
+    {
+      "id": "OAI-CX-080",
+      "title": "Codex SDK",
+      "url": "https://learn.chatgpt.com/docs/codex-sdk",
+      "domain": "learn.chatgpt.com",
+      "category": "08-sdk-orchestration",
+      "surfaces": [
+        "sdk",
+        "cli",
+        "ide",
+        "cloud"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "The Codex SDK supports programmatic control for coding-focused Codex threads."
+      ],
+      "watch_for": [
+        "SDK API surface",
+        "event schema",
+        "authentication behavior"
+      ]
+    },
+    {
+      "id": "OAI-CX-081",
+      "title": "Codex App Server",
+      "url": "https://learn.chatgpt.com/docs/app-server",
+      "domain": "learn.chatgpt.com",
+      "category": "08-sdk-orchestration",
+      "surfaces": [
+        "app-server",
+        "ide",
+        "embedded-client"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "The app-server interface powers rich clients and exposes conversation, approval, and streamed event behavior."
+      ],
+      "watch_for": [
+        "protocol shape",
+        "client support",
+        "approval events"
+      ]
+    },
+    {
+      "id": "OAI-CX-082",
+      "title": "Use Codex with the Agents SDK",
+      "url": "https://learn.chatgpt.com/docs/mcp-server",
+      "domain": "learn.chatgpt.com",
+      "category": "08-sdk-orchestration",
+      "surfaces": [
+        "mcp-server",
+        "agents-sdk",
+        "orchestration"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Codex CLI can run as an MCP server exposing tools for starting and continuing Codex conversations."
+      ],
+      "watch_for": [
+        "MCP tool names",
+        "session persistence",
+        "Agents SDK integration guidance"
+      ]
+    },
+    {
+      "id": "OAI-API-083",
+      "title": "Agents SDK",
+      "url": "https://developers.openai.com/api/docs/guides/agents",
+      "domain": "developers.openai.com",
+      "category": "08-sdk-orchestration",
+      "surfaces": [
+        "api",
+        "agents-sdk"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "OpenAI's API Agents SDK guidance is a separate orchestration surface from Codex SDK."
+      ],
+      "watch_for": [
+        "SDK runtime APIs",
+        "handoff patterns",
+        "tool integration changes"
+      ]
+    },
+    {
+      "id": "OAI-API-090",
+      "title": "Models",
+      "url": "https://developers.openai.com/api/docs/models",
+      "domain": "developers.openai.com",
+      "category": "09-models-reasoning",
+      "surfaces": [
+        "api",
+        "codex-model-selection"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "The model catalog is the official current source for model families and availability."
+      ],
+      "watch_for": [
+        "new model aliases",
+        "deprecations",
+        "availability by plan or API key"
+      ]
+    },
+    {
+      "id": "OAI-API-091",
+      "title": "Reasoning models",
+      "url": "https://developers.openai.com/api/docs/guides/reasoning",
+      "domain": "developers.openai.com",
+      "category": "09-models-reasoning",
+      "surfaces": [
+        "api",
+        "codex-model-selection"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Reasoning behavior and reasoning controls are documented in API-level guidance."
+      ],
+      "watch_for": [
+        "reasoning effort semantics",
+        "model-specific constraints"
+      ]
+    },
+    {
+      "id": "OAI-CX-092",
+      "title": "Pricing",
+      "url": "https://learn.chatgpt.com/docs/pricing",
+      "domain": "learn.chatgpt.com",
+      "category": "09-models-reasoning",
+      "surfaces": [
+        "cli",
+        "sdk",
+        "ide",
+        "cloud"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "Codex authentication path affects available features and billing model."
+      ],
+      "watch_for": [
+        "credit behavior",
+        "plan limits",
+        "API-key feature coverage"
+      ]
+    },
+    {
+      "id": "OAI-API-100",
+      "title": "Working with evals",
+      "url": "https://developers.openai.com/api/docs/guides/evals",
+      "domain": "developers.openai.com",
+      "category": "10-observability-evals",
+      "surfaces": [
+        "api",
+        "evals"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "OpenAI keeps eval workflow guidance in API documentation."
+      ],
+      "watch_for": [
+        "grader APIs",
+        "prompt optimizer behavior",
+        "external model support"
+      ]
+    },
+    {
+      "id": "OAI-API-101",
+      "title": "Agents SDK: integrations and observability",
+      "url": "https://developers.openai.com/api/docs/guides/agents/integrations-observability",
+      "domain": "developers.openai.com",
+      "category": "10-observability-evals",
+      "surfaces": [
+        "api",
+        "agents-sdk",
+        "observability"
+      ],
+      "volatility": "high",
+      "refresh_cadence": "biweekly",
+      "verified_facts": [
+        "Agents SDK observability is an API orchestration concern rather than a Codex harness logging contract."
+      ],
+      "watch_for": [
+        "trace/export behavior",
+        "vendor integrations"
+      ]
+    },
+    {
+      "id": "OAI-CX-102",
+      "title": "Developer settings",
+      "url": "https://learn.chatgpt.com/docs/developer-settings",
+      "domain": "learn.chatgpt.com",
+      "category": "10-observability-evals",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide"
+      ],
+      "volatility": "medium",
+      "refresh_cadence": "monthly",
+      "verified_facts": [
+        "Developer settings are a separate client-facing surface from config-file reference."
+      ],
+      "watch_for": [
+        "logging toggles",
+        "telemetry controls",
+        "client-only settings"
+      ]
+    },
+    {
+      "id": "OAI-CX-110",
+      "title": "Glossary",
+      "url": "https://learn.chatgpt.com/docs/glossary",
+      "domain": "learn.chatgpt.com",
+      "category": "11-reference-support",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide",
+        "cloud",
+        "sdk"
+      ],
+      "volatility": "medium",
+      "refresh_cadence": "monthly",
+      "verified_facts": [
+        "The glossary defines Codex terms across app, CLI, IDE, cloud, SDK, and related integrations."
+      ],
+      "watch_for": [
+        "new surface names",
+        "term definition changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-111",
+      "title": "Troubleshooting",
+      "url": "https://learn.chatgpt.com/docs/reference/troubleshooting",
+      "domain": "learn.chatgpt.com",
+      "category": "11-reference-support",
+      "surfaces": [
+        "desktop-app",
+        "cli",
+        "ide",
+        "cloud"
+      ],
+      "volatility": "medium",
+      "refresh_cadence": "monthly",
+      "verified_facts": [
+        "Troubleshooting is a support reference, not a source for normative harness defaults."
+      ],
+      "watch_for": [
+        "known incident patterns",
+        "diagnostic command changes"
+      ]
+    },
+    {
+      "id": "OAI-CX-112",
+      "title": "Security plugin changelog",
+      "url": "https://learn.chatgpt.com/docs/security/plugin/changelog",
+      "domain": "learn.chatgpt.com",
+      "category": "11-reference-support",
+      "surfaces": [
+        "security-plugin"
+      ],
+      "volatility": "critical",
+      "refresh_cadence": "weekly",
+      "verified_facts": [
+        "As of the 2026-08-09 snapshot, the hosted Codex Security plugin catalog latest release is documented as 0.1.17."
+      ],
+      "watch_for": [
+        "catalog version",
+        "CLI marketplace version",
+        "feature availability"
+      ]
+    }
+  ]
+}

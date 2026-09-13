@@ -1,0 +1,11 @@
+{
+  "expected": "deny",
+  "payload": {
+    "session_id": "fixture",
+    "cwd": "/tmp/repo",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "apply_patch",
+    "tool_use_id": "deny-2",
+    "tool_input": "*** Begin Patch\n*** Update File: .codex/auth.json\n@@\n-{}\n+{\"token\":\"never\"}\n*** End Patch\n"
+  }
+}

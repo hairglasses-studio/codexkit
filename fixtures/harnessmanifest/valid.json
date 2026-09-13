@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "repo": "codex-harness-staging-canary",
+  "objects": [
+    {
+      "id": "native-hooks",
+      "repo": "codex-harness-staging-canary",
+      "source": "codex/hooks/hooks.json",
+      "inputs": [
+        {
+          "repository": "hairglasses-studio/codex-harness-staging",
+          "remote": "https://github.com/hairglasses-studio/codex-harness-staging.git",
+          "ref": "refs/heads/main",
+          "commit": "084f439a43bc2334d93c8f949eeebe09166ab77c",
+          "path": "codex/hooks/hooks.json",
+          "blob_hash": "sha256:9c11da0f01b80199f5ad754439f0b83c5040c194dfc746018982d0006670527b"
+        }
+      ],
+      "destination": ".codex/hooks/hooks.json",
+      "ownership_class": "codex-harness-specific",
+      "source_disposition": "central-canonical",
+      "projection_mode": "copy",
+      "mode": "0644",
+      "source_hash": "sha256:9c11da0f01b80199f5ad754439f0b83c5040c194dfc746018982d0006670527b",
+      "projected_hash": "sha256:9c11da0f01b80199f5ad754439f0b83c5040c194dfc746018982d0006670527b",
+      "verifier_ids": [
+        "native-surface-parse"
+      ],
+      "lifecycle": "planned",
+      "conflict_policy": "fail",
+      "removal_policy": "preserve"
+    },
+    {
+      "id": "native-review-rules",
+      "repo": "codex-harness-staging-canary",
+      "source": "codex/rules/review.rules",
+      "inputs": [
+        {
+          "repository": "hairglasses-studio/codex-harness-staging",
+          "remote": "https://github.com/hairglasses-studio/codex-harness-staging.git",
+          "ref": "refs/heads/main",
+          "commit": "084f439a43bc2334d93c8f949eeebe09166ab77c",
+          "path": "codex/rules/review.rules",
+          "blob_hash": "sha256:480618d7e6ebb1ff08945719f42e326d92dbcaf372a9dddc5dd80240fa98584f"
+        }
+      ],
+      "destination": ".codex/rules/review.rules",
+      "ownership_class": "codex-harness-specific",
+      "source_disposition": "central-canonical",
+      "projection_mode": "copy",
+      "mode": "0644",
+      "source_hash": "sha256:480618d7e6ebb1ff08945719f42e326d92dbcaf372a9dddc5dd80240fa98584f",
+      "projected_hash": "sha256:480618d7e6ebb1ff08945719f42e326d92dbcaf372a9dddc5dd80240fa98584f",
+      "verifier_ids": [
+        "native-surface-parse"
+      ],
+      "lifecycle": "planned",
+      "conflict_policy": "fail",
+      "removal_policy": "preserve"
+    },
+    {
+      "id": "native-tool-policy",
+      "repo": "codex-harness-staging-canary",
+      "source": "codex/hooks/tool_policy_adapter.py",
+      "inputs": [
+        {
+          "repository": "hairglasses-studio/codex-harness-staging",
+          "remote": "https://github.com/hairglasses-studio/codex-harness-staging.git",
+          "ref": "refs/heads/main",
+          "commit": "084f439a43bc2334d93c8f949eeebe09166ab77c",
+          "path": "codex/hooks/tool_policy_adapter.py",
+          "blob_hash": "sha256:936972de331493df62bf932dab6d4886f7b510199accbf5a791448dbee9b5fe7"
+        }
+      ],
+      "destination": ".codex/hooks/tool_policy_adapter.py",
+      "ownership_class": "codex-harness-specific",
+      "source_disposition": "central-canonical",
+      "projection_mode": "copy",
+      "mode": "0644",
+      "source_hash": "sha256:936972de331493df62bf932dab6d4886f7b510199accbf5a791448dbee9b5fe7",
+      "projected_hash": "sha256:936972de331493df62bf932dab6d4886f7b510199accbf5a791448dbee9b5fe7",
+      "verifier_ids": [
+        "native-surface-parse"
+      ],
+      "lifecycle": "planned",
+      "conflict_policy": "fail",
+      "removal_policy": "preserve"
+    }
+  ],
+  "omissions": [
+    {
+      "id": "runtime-state",
+      "path": ".codex/runtime/**",
+      "kind": "glob",
+      "ownership_class": "external-owner",
+      "reason": "Codex runtime state is host-owned and never projected by the harness",
+      "verifier_ids": [
+        "forbidden-runtime-artifacts"
+      ],
+      "lifecycle": "active"
+    }
+  ],
+  "coverage_inputs": [
+    {
+      "id": "native-hooks",
+      "path": ".codex/hooks/hooks.json"
+    },
+    {
+      "id": "native-tool-policy",
+      "path": ".codex/hooks/tool_policy_adapter.py"
+    },
+    {
+      "id": "native-review-rules",
+      "path": ".codex/rules/review.rules"
+    },
+    {
+      "id": "runtime-session",
+      "path": ".codex/runtime/session.json"
+    }
+  ]
+}

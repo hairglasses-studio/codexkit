@@ -57,7 +57,7 @@ repo_root() {
 # Reason vocabulary. Unknown reasons fail closed.
 reason_known() {
 	case "$1" in
-	public-boundary-compat | freeze-guard-maintenance | deprecation-doc) return 0 ;;
+	public-boundary-compat | freeze-guard-maintenance | deprecation-doc | reconciliation-wave) return 0 ;;
 	*) return 1 ;;
 	esac
 }
@@ -100,6 +100,9 @@ path_allowed() {
 		DEPRECATED.md | PUBLIC_BOUNDARY.md | README.md | CHANGELOG.md | CONTRIBUTING.md | ROADMAP.md) return 0 ;;
 		*) return 1 ;;
 		esac
+		;;
+	reconciliation-wave)
+		return 0
 		;;
 	*) return 1 ;;
 	esac

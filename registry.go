@@ -1,6 +1,7 @@
 package codexkit
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -57,7 +58,7 @@ func (r *Registry) Register(m ToolModule) error {
 			return fmt.Errorf("register module %s: tool name is empty", moduleName)
 		case strings.TrimSpace(td.Description) == "":
 			return fmt.Errorf("register tool %s: description is empty", name)
-		case td.Handler == nil:
+		case td.Handler == nil && td.ContextHandler == nil:
 			return fmt.Errorf("register tool %s: handler is nil", name)
 		case td.Schema == nil:
 			return fmt.Errorf("register tool %s: input schema is nil", name)
@@ -114,9 +115,24 @@ func (r *Registry) GetTool(name string) (ToolDef, bool) {
 
 // Call dispatches a tool call by name.
 func (r *Registry) Call(toolName string, params map[string]any) (any, error) {
+	return r.CallContext(context.Background(), toolName, params)
+}
+
+// CallContext dispatches a tool call and passes cancellation to modules that
+// implement ToolDef.ContextHandler.
+func (r *Registry) CallContext(ctx context.Context, toolName string, params map[string]any) (any, error) {
 	rt, ok := r.tools[toolName]
 	if !ok {
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if rt.def.ContextHandler != nil {
+		return rt.def.ContextHandler(ctx, params)
+	}
+	if rt.def.Handler == nil {
+		return nil, fmt.Errorf("tool %s has no handler", toolName)
 	}
 	return rt.def.Handler(params)
 }

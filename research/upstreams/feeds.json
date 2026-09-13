@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "feeds": [
+    {
+      "id": "mcp.go-sdk.latest-release",
+      "url": "https://api.github.com/repos/modelcontextprotocol/go-sdk/releases/latest",
+      "kind": "github_latest_release",
+      "cadence_hours": 24,
+      "content_types": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "mcp.go-sdk.protocol-docs",
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/go-sdk/main/docs/protocol.md",
+      "kind": "markdown",
+      "cadence_hours": 168,
+      "content_types": [
+        "text/plain"
+      ]
+    },
+    {
+      "id": "mcp.go-sdk.readme",
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/go-sdk/main/README.md",
+      "kind": "markdown",
+      "cadence_hours": 168,
+      "content_types": [
+        "text/plain"
+      ]
+    },
+    {
+      "id": "mcp.spec.latest-release",
+      "url": "https://api.github.com/repos/modelcontextprotocol/modelcontextprotocol/releases/latest",
+      "kind": "github_latest_release",
+      "cadence_hours": 24,
+      "content_types": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "mcp.spec.schema.2026-07-28",
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/2026-07-28/schema/2026-07-28/schema.json",
+      "kind": "text",
+      "cadence_hours": 168,
+      "content_types": [
+        "text/plain"
+      ]
+    },
+    {
+      "id": "openai.codex.app-server",
+      "url": "https://learn.chatgpt.com/docs/app-server.md",
+      "kind": "markdown",
+      "cadence_hours": 168,
+      "content_types": [
+        "text/markdown"
+      ]
+    },
+    {
+      "id": "openai.codex.changelog",
+      "url": "https://learn.chatgpt.com/docs/changelog",
+      "kind": "html",
+      "cadence_hours": 24,
+      "content_types": [
+        "text/html"
+      ]
+    },
+    {
+      "id": "openai.codex.config-reference",
+      "url": "https://learn.chatgpt.com/docs/config-file/config-reference.md",
+      "kind": "markdown",
+      "cadence_hours": 168,
+      "content_types": [
+        "text/markdown"
+      ]
+    },
+    {
+      "id": "openai.codex.feature-maturity",
+      "url": "https://learn.chatgpt.com/docs/feature-maturity.md",
+      "kind": "markdown",
+      "cadence_hours": 336,
+      "content_types": [
+        "text/markdown"
+      ]
+    },
+    {
+      "id": "openai.codex.hooks",
+      "url": "https://learn.chatgpt.com/docs/hooks.md",
+      "kind": "markdown",
+      "cadence_hours": 168,
+      "content_types": [
+        "text/markdown"
+      ]
+    },
+    {
+      "id": "openai.codex.latest-release",
+      "url": "https://api.github.com/repos/openai/codex/releases/latest",
+      "kind": "github_latest_release",
+      "cadence_hours": 24,
+      "content_types": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "openai.codex.manual",
+      "url": "https://developers.openai.com/codex/codex-manual.md",
+      "kind": "markdown",
+      "cadence_hours": 168,
+      "allowed_redirect_domains": [
+        "learn.chatgpt.com"
+      ],
+      "content_types": [
+        "application/octet-stream"
+      ],
+      "verify_x_content_sha256": true
+    },
+    {
+      "id": "openai.codex.models",
+      "url": "https://learn.chatgpt.com/docs/models.md",
+      "kind": "markdown",
+      "cadence_hours": 168,
+      "content_types": [
+        "text/markdown"
+      ]
+    },
+    {
+      "id": "openai.codex.sdk",
+      "url": "https://learn.chatgpt.com/docs/codex-sdk.md",
+      "kind": "markdown",
+      "cadence_hours": 168,
+      "content_types": [
+        "text/markdown"
+      ]
+    },
+    {
+      "id": "openai.codex.subagents",
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/subagents.md",
+      "kind": "markdown",
+      "cadence_hours": 168,
+      "content_types": [
+        "text/markdown"
+      ]
+    }
+  ]
+}

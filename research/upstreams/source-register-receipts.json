@@ -1,0 +1,373 @@
+{
+  "version": 1,
+  "receipts": [
+    {
+      "id": "OAI-CX-000",
+      "url": "https://learn.chatgpt.com/docs/changelog",
+      "resolved_url": "https://learn.chatgpt.com/docs/changelog",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 1628580,
+      "sha256": "7756648cc568a474807cf932bc415c00ba24ed74a6ba33059b8f2753d306545c"
+    },
+    {
+      "id": "OAI-CX-001",
+      "url": "https://learn.chatgpt.com/docs/whats-new",
+      "resolved_url": "https://learn.chatgpt.com/docs/whats-new",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 896771,
+      "sha256": "eaa5006fa9b8026d871df5388c476c6e3d7d890fa33aedf55981dc1a4da423bf"
+    },
+    {
+      "id": "OAI-CX-002",
+      "url": "https://learn.chatgpt.com/docs/feature-maturity",
+      "resolved_url": "https://learn.chatgpt.com/docs/feature-maturity",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 302152,
+      "sha256": "9b92dc3fdaa9be797918c079bf36ecd2be95838935c83400b4567866e5924f71"
+    },
+    {
+      "id": "OAI-CX-003",
+      "url": "https://learn.chatgpt.com/docs/open-source",
+      "resolved_url": "https://learn.chatgpt.com/docs/open-source",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 308407,
+      "sha256": "6c68cedee99c2ad667aa5a2c728d678af2321e93b6b76c88440beb2f173a2d0b"
+    },
+    {
+      "id": "OAI-CX-010",
+      "url": "https://learn.chatgpt.com/docs/codex/cli",
+      "resolved_url": "https://learn.chatgpt.com/docs/codex/cli",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 368252,
+      "sha256": "7ec73a39c311fc6d15f709ce47ad9233c084467dea46b5f125d48b39d334b0bb"
+    },
+    {
+      "id": "OAI-CX-011",
+      "url": "https://learn.chatgpt.com/docs/quickstart",
+      "resolved_url": "https://learn.chatgpt.com/docs/quickstart",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 371241,
+      "sha256": "ebc3f0e953176a480fda64f3f39f9df998a014279277caa73db6747f83068600"
+    },
+    {
+      "id": "OAI-CX-012",
+      "url": "https://developers.openai.com/api/docs/guides/prompt-engineering",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/prompt-engineering",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 666459,
+      "sha256": "bcc4c428f579a4d76764464a0106f06c5c29df9b4b3b541158da7143054d0ce0"
+    },
+    {
+      "id": "OAI-CX-020",
+      "url": "https://learn.chatgpt.com/docs/config-file/config-basic",
+      "resolved_url": "https://learn.chatgpt.com/docs/config-file/config-basic",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 373804,
+      "sha256": "2386981c3b80177f2969f9ae93604b06113895c66475015af42cb1478d099299"
+    },
+    {
+      "id": "OAI-CX-021",
+      "url": "https://learn.chatgpt.com/docs/config-file/config-advanced",
+      "resolved_url": "https://learn.chatgpt.com/docs/config-file/config-advanced",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 492140,
+      "sha256": "cfe3dcd6e17ddcfd029c40c01acd8c17c71f13127eaf77a9b2b7d149fe31688f"
+    },
+    {
+      "id": "OAI-CX-022",
+      "url": "https://learn.chatgpt.com/docs/config-file/config-reference",
+      "resolved_url": "https://learn.chatgpt.com/docs/config-file/config-reference",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 1376382,
+      "sha256": "3caa2e251354d332677e67bff43e4a4ca40674ff5754337586132e73ced45abc"
+    },
+    {
+      "id": "OAI-CX-023",
+      "url": "https://learn.chatgpt.com/docs/config-file/environment-variables",
+      "resolved_url": "https://learn.chatgpt.com/docs/config-file/environment-variables",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 320425,
+      "sha256": "3ead6ea25c954e53134580c4f1da3afab10fcfba5d180a68adf9f7ffccf8ed9d"
+    },
+    {
+      "id": "OAI-CX-024",
+      "url": "https://learn.chatgpt.com/docs/enterprise/managed-configuration",
+      "resolved_url": "https://learn.chatgpt.com/docs/enterprise/managed-configuration",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 451505,
+      "sha256": "d2a9dabde4730213c2e6b03dbafa23e5510df32b44cbde23806d0c178823f47a"
+    },
+    {
+      "id": "OAI-CX-030",
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+      "resolved_url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 358889,
+      "sha256": "435417d5cc1bc903c93c21ee9dde127bfd79a88b04fe359c1c8c3b41ac21c6e4"
+    },
+    {
+      "id": "OAI-CX-031",
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/subagents",
+      "resolved_url": "https://learn.chatgpt.com/docs/agent-configuration/subagents",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 552316,
+      "sha256": "8fbbc3ec1b29303b3bc2e31e3307abcd17836a0ae6c007f7684485d185e29a73"
+    },
+    {
+      "id": "OAI-CX-032",
+      "url": "https://learn.chatgpt.com/docs/build-skills",
+      "resolved_url": "https://learn.chatgpt.com/docs/build-skills",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 370085,
+      "sha256": "ce02be0f32d99b0bc382876e0fbb7f01adceaf8ed9677851abf3ac7f458371f1"
+    },
+    {
+      "id": "OAI-CX-033",
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/rules",
+      "resolved_url": "https://learn.chatgpt.com/docs/agent-configuration/rules",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 330948,
+      "sha256": "282b9555b7a7da4a933c3f57dd176110241c19eb31c2b72497444cc007b0f688"
+    },
+    {
+      "id": "OAI-CX-040",
+      "url": "https://learn.chatgpt.com/docs/auth",
+      "resolved_url": "https://learn.chatgpt.com/docs/auth",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 540398,
+      "sha256": "c2708ebf2ad97b6804babae8422ad6bccea1ea748a6f3cdfa423c11db37c46e7"
+    },
+    {
+      "id": "OAI-CX-041",
+      "url": "https://learn.chatgpt.com/docs/agent-approvals-security",
+      "resolved_url": "https://learn.chatgpt.com/docs/agent-approvals-security",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 425399,
+      "sha256": "19335e79bc4c21c334a664b6234cb09aa24ac5a57898802947b58cd64f342129"
+    },
+    {
+      "id": "OAI-CX-042",
+      "url": "https://learn.chatgpt.com/docs/sandboxing",
+      "resolved_url": "https://learn.chatgpt.com/docs/sandboxing",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 435627,
+      "sha256": "41ae4fe8b23bfc76ea25009e6530fd78dd1bb9d2c5f3f92a2d93b94da257cfce"
+    },
+    {
+      "id": "OAI-CX-043",
+      "url": "https://learn.chatgpt.com/docs/sandboxing/auto-review",
+      "resolved_url": "https://learn.chatgpt.com/docs/sandboxing/auto-review",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 349059,
+      "sha256": "b757f826889675f88755daf1c6d581df572e24221297c8bfa5887e690967e159"
+    },
+    {
+      "id": "OAI-CX-044",
+      "url": "https://learn.chatgpt.com/docs/permissions",
+      "resolved_url": "https://learn.chatgpt.com/docs/permissions",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 422866,
+      "sha256": "cbd6c5c50c34e93cd8f7cc131915b7368813be6ac3e5ee9ab9d0262096df003b"
+    },
+    {
+      "id": "OAI-CX-050",
+      "url": "https://learn.chatgpt.com/docs/hooks",
+      "resolved_url": "https://learn.chatgpt.com/docs/hooks",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 489204,
+      "sha256": "9e4888f811b3ca5cd5c615e599aaa956bd97ad74c86e8a7002e3c1cf49db0998"
+    },
+    {
+      "id": "OAI-CX-051",
+      "url": "https://learn.chatgpt.com/docs/extend/mcp",
+      "resolved_url": "https://learn.chatgpt.com/docs/extend/mcp",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 444591,
+      "sha256": "e80e95d75faa61a48800b3379616fcd1515a7f910a7530336b05571067ce4d7c"
+    },
+    {
+      "id": "OAI-CX-052",
+      "url": "https://learn.chatgpt.com/docs/build-plugins",
+      "resolved_url": "https://learn.chatgpt.com/docs/build-plugins",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 349842,
+      "sha256": "a2fbbcf2c02238ac9f62584cc4e6ab83b47c7eb569a4b1a10aaada254f36c468"
+    },
+    {
+      "id": "OAI-CX-053",
+      "url": "https://learn.chatgpt.com/docs/plugins",
+      "resolved_url": "https://learn.chatgpt.com/docs/plugins",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 516722,
+      "sha256": "8d86a2ccdcb63288310f9f99ec881ac36844447eaca01ad78d64a15d8c90a70b"
+    },
+    {
+      "id": "OAI-CX-060",
+      "url": "https://learn.chatgpt.com/docs/environments/modes",
+      "resolved_url": "https://learn.chatgpt.com/docs/environments/modes",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 311178,
+      "sha256": "1a275ddcf322678ed1f76bc64ba2d0663ad1e47642ceb1c23c64336e6050127d"
+    },
+    {
+      "id": "OAI-CX-061",
+      "url": "https://learn.chatgpt.com/docs/cloud",
+      "resolved_url": "https://learn.chatgpt.com/docs/cloud",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 361863,
+      "sha256": "2ea600c19f8c501e6c9ca5c10f97860f8cbedbb9dad4e28d60690240ed217b39"
+    },
+    {
+      "id": "OAI-CX-062",
+      "url": "https://learn.chatgpt.com/docs/codex/ide",
+      "resolved_url": "https://learn.chatgpt.com/docs/codex/ide",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 411030,
+      "sha256": "956a0db43ce959db8fc4174914cb524fd17f339d7fef5151879616c5d1ac734d"
+    },
+    {
+      "id": "OAI-CX-063",
+      "url": "https://learn.chatgpt.com/docs/environments/git-worktrees",
+      "resolved_url": "https://learn.chatgpt.com/docs/environments/git-worktrees",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 367763,
+      "sha256": "f6bd3fd6e3f49c2d4de871a95dd5df2c298a441a7bdd63877c7dd867adfaf876"
+    },
+    {
+      "id": "OAI-CX-064",
+      "url": "https://learn.chatgpt.com/docs/environments/local-environment",
+      "resolved_url": "https://learn.chatgpt.com/docs/environments/local-environment",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 334746,
+      "sha256": "00bb6dbaad45a5c166490941224074dfe363f9bd4bc390812d8fd0c1e4119ef7"
+    },
+    {
+      "id": "OAI-CX-070",
+      "url": "https://learn.chatgpt.com/docs/non-interactive-mode",
+      "resolved_url": "https://learn.chatgpt.com/docs/non-interactive-mode",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 402023,
+      "sha256": "2578bb6669a1fa204be5a5dd54d54e0ccbbd827aa6819fe30313f0f52eeccb40"
+    },
+    {
+      "id": "OAI-CX-071",
+      "url": "https://learn.chatgpt.com/docs/github-action",
+      "resolved_url": "https://learn.chatgpt.com/docs/github-action",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 336683,
+      "sha256": "ade860d9d930170033224b804f02e2602425501ca59a70fd7eb40764f99e3c12"
+    },
+    {
+      "id": "OAI-CX-072",
+      "url": "https://learn.chatgpt.com/docs/security/cli/ci",
+      "resolved_url": "https://learn.chatgpt.com/docs/security/cli/ci",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 370069,
+      "sha256": "53e1409c5dcafd121a80323dcd3f6f74888ec3012bf07a2c49c252dd5d038b71"
+    },
+    {
+      "id": "OAI-CX-080",
+      "url": "https://learn.chatgpt.com/docs/codex-sdk",
+      "resolved_url": "https://learn.chatgpt.com/docs/codex-sdk",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 334401,
+      "sha256": "97f3b54c7a20bb1448da6308910a389b9d88ba49653b97ba464941b7cb24d717"
+    },
+    {
+      "id": "OAI-CX-081",
+      "url": "https://learn.chatgpt.com/docs/app-server",
+      "resolved_url": "https://learn.chatgpt.com/docs/app-server",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 905097,
+      "sha256": "904bfe0ba7cbd30d6309531e15607820a8b6612b6271c947d7bfc2c77fa01f65"
+    },
+    {
+      "id": "OAI-CX-082",
+      "url": "https://learn.chatgpt.com/docs/mcp-server",
+      "resolved_url": "https://learn.chatgpt.com/docs/mcp-server",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 385304,
+      "sha256": "a39a917e9a20c7385d6158c99a6d54e3237048a7a3e55e644bf68cad1f86dd82"
+    },
+    {
+      "id": "OAI-API-083",
+      "url": "https://developers.openai.com/api/docs/guides/agents",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/agents",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 327969,
+      "sha256": "78be9bdc4eb9e91c78fb10232a949e0bb48dde761d67c7bf3d915f8a0158c138"
+    },
+    {
+      "id": "OAI-API-090",
+      "url": "https://developers.openai.com/api/docs/models",
+      "resolved_url": "https://developers.openai.com/api/docs/models",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 364123,
+      "sha256": "3ab42bed07db35274b48abcc1f0d59467febffca73c3f8a042cdf3c86d7af8e3"
+    },
+    {
+      "id": "OAI-API-091",
+      "url": "https://developers.openai.com/api/docs/guides/reasoning",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/reasoning",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 1048071,
+      "sha256": "ffbec7a5a4517908a864fd839f3003346eaf798215455170cfb0a26beab4d8a4"
+    },
+    {
+      "id": "OAI-CX-092",
+      "url": "https://learn.chatgpt.com/docs/pricing",
+      "resolved_url": "https://learn.chatgpt.com/docs/pricing",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 657807,
+      "sha256": "538a2ead42143225946aa453b0ddcdb51056ab763988f2e756f22093f81c9f8a"
+    },
+    {
+      "id": "OAI-API-100",
+      "url": "https://developers.openai.com/api/docs/guides/evals",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/evals",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 708201,
+      "sha256": "da96764a78effc485df5e151335cb2d802740d733166ad0aed66d35dea3fbbb6"
+    },
+    {
+      "id": "OAI-API-101",
+      "url": "https://developers.openai.com/api/docs/guides/agents/integrations-observability",
+      "resolved_url": "https://developers.openai.com/api/docs/guides/agents/integrations-observability",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 381287,
+      "sha256": "b0be131c658a585aead8282886987a1dac4fc3e140c45b6870b45a9b9091ae84"
+    },
+    {
+      "id": "OAI-CX-102",
+      "url": "https://learn.chatgpt.com/docs/developer-settings",
+      "resolved_url": "https://learn.chatgpt.com/docs/developer-settings",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 382404,
+      "sha256": "9b2d7eac366700ababb09d6faf8e144ce4f12d6385889abbe7dedd95a1515391"
+    },
+    {
+      "id": "OAI-CX-110",
+      "url": "https://learn.chatgpt.com/docs/glossary",
+      "resolved_url": "https://learn.chatgpt.com/docs/glossary",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 511033,
+      "sha256": "be61ce91ba1a9bacb679b3609cdc57b8ada0af7cb84651a1ed58ce2a755954be"
+    },
+    {
+      "id": "OAI-CX-111",
+      "url": "https://learn.chatgpt.com/docs/reference/troubleshooting",
+      "resolved_url": "https://learn.chatgpt.com/docs/reference/troubleshooting",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 341627,
+      "sha256": "295a4e7c262812563f94a9929e7abadea6c37e607d92bf0bcc5e03d25fc1b0b7"
+    },
+    {
+      "id": "OAI-CX-112",
+      "url": "https://learn.chatgpt.com/docs/security/plugin/changelog",
+      "resolved_url": "https://learn.chatgpt.com/docs/security/plugin/changelog",
+      "checked_at": "2026-09-06T06:31:51.174831+00:00",
+      "bytes": 453872,
+      "sha256": "172652a3946240fe7cad5457d21df6f1cbe4f6205e4224713f6a78035efa6f54"
+    }
+  ]
+}

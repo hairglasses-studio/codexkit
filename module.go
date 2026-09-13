@@ -3,6 +3,7 @@
 package codexkit
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 )
@@ -41,6 +42,22 @@ type ToolDef struct {
 	// Handler executes the tool with the given parameters and returns
 	// a result or error.
 	Handler func(params map[string]any) (any, error) `json:"-"`
+
+	// ContextHandler is preferred for operations that can block. The official
+	// SDK adapter passes request cancellation through this seam. Handler remains
+	// the compatibility fallback for existing modules.
+	ContextHandler func(context.Context, map[string]any) (any, error) `json:"-"`
+}
+
+// TypedContextHandler adapts a typed, context-aware request handler.
+func TypedContextHandler[T any](fn func(context.Context, T) (any, error)) func(context.Context, map[string]any) (any, error) {
+	return func(ctx context.Context, params map[string]any) (any, error) {
+		typed, err := DecodeParams[T](params)
+		if err != nil {
+			return nil, err
+		}
+		return fn(ctx, typed)
+	}
 }
 
 // DecodeParams decodes a loose MCP argument map into a typed request struct.

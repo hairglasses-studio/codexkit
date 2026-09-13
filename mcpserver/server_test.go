@@ -462,38 +462,43 @@ func TestCompatibilityPayloadPinsCodex0147Contract(t *testing.T) {
 	}
 }
 
-func TestMetaDiscoveryGroupsFiltersAndBoundsTools(t *testing.T) {
+func TestMetaModuleCountsSDKNativeExtensions(t *testing.T) {
 	reg := codexkit.NewRegistry()
 	if err := reg.Register(&testModule{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := reg.Register(Module(reg, ServerInfo{Name: "test", Version: "0.1.0"})); err != nil {
+	counts := SurfaceCounts{
+		Tools: 1, Resources: 1, ResourceTemplates: 1, Prompts: 1,
+		ToolDefinitions: []codexkit.ToolDef{{
+			Name: "native_research", Description: "Native research tool", Annotations: codexkit.ToolAnnotations(true, false, true, false),
+			Schema: map[string]any{"type": "object", "properties": map[string]any{}},
+		}},
+	}
+	if err := reg.Register(Module(reg, ServerInfo{Name: "test", Version: "0.1.0"}, counts)); err != nil {
 		t.Fatal(err)
 	}
-
-	result, err := reg.Call("tool_search", map[string]any{
-		"query":         "echo",
-		"namespaces":    []string{"test"},
-		"allowed_tools": []string{"test_echo"},
-	})
+	result, err := reg.Call("server_health", map[string]any{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	payload := result.(map[string]any)
-	tools := payload["tools"].([]map[string]any)
-	if len(tools) != 1 || tools[0]["namespace"] != "test" || tools[0]["name"] != "test_echo" {
-		t.Fatalf("unexpected discovery payload %+v", payload)
+	if payload["resource_count"] != 4 || payload["resource_template_count"] != 1 || payload["prompt_count"] != 5 {
+		t.Fatalf("unexpected extension counts %+v", payload)
 	}
-	if tools[0]["schema_available"] != true || tools[0]["approval_hint"] != "on-request" {
-		t.Fatalf("unexpected discovery metadata %+v", tools[0])
+	if payload["tool_count"] != len(reg.ListTools())+counts.Tools {
+		t.Fatalf("unexpected tool count %+v", payload)
 	}
-
-	tooMany := make([]string, maxAllowedTools+1)
-	for i := range tooMany {
-		tooMany[i] = fmt.Sprintf("tool_%d", i)
+	search, err := reg.Call("tool_search", map[string]any{"query": "native_research"})
+	if err != nil || !strings.Contains(fmt.Sprint(search), "native_research") {
+		t.Fatalf("native tool missing from compatibility search: %v, %v", search, err)
 	}
-	if _, err := reg.Call("tool_catalog", map[string]any{"allowed_tools": tooMany}); err == nil || !strings.Contains(err.Error(), "at most 64") {
-		t.Fatalf("expected bounded allowed_tools error, got %v", err)
+	schema, err := reg.Call("tool_schema", map[string]any{"name": "native_research"})
+	if err != nil || !strings.Contains(fmt.Sprint(schema), "Native research tool") {
+		t.Fatalf("native tool missing from compatibility schema: %v, %v", schema, err)
+	}
+	overview, err := New(reg, ServerInfo{Name: "test", Version: "0.1.0"}, counts).resourcePayload("codexkit://catalog/overview")
+	if err != nil || overview["tool_count"] != len(reg.ListTools())+counts.Tools || !strings.Contains(fmt.Sprint(overview["native_tools"]), "native_research") {
+		t.Fatalf("native tool missing from overview: %v, %v", overview, err)
 	}
 }
 

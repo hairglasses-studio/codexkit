@@ -29,6 +29,7 @@ import (
 type Server struct {
 	registry *codexkit.Registry
 	info     ServerInfo
+	extra    SurfaceCounts
 	mu       sync.Mutex
 }
 
@@ -95,13 +96,19 @@ type MCPPromptArgInfo struct {
 }
 
 const codexkitPromptCount = 4
+
+// baseResourceCount is the number of resources served by this package itself:
+// catalog/overview, catalog/modules, and catalog/compatibility. Extensions
+// (researchmcp) add to it via SurfaceCounts.
+const baseResourceCount = 3
 const toolsListPageSize = 50
 
 // New creates an MCP server backed by the given registry.
-func New(registry *codexkit.Registry, info ServerInfo) *Server {
+func New(registry *codexkit.Registry, info ServerInfo, extensions ...SurfaceCounts) *Server {
 	return &Server{
 		registry: registry,
 		info:     info,
+		extra:    mergeSurfaceCounts(extensions...),
 	}
 }
 
@@ -414,8 +421,9 @@ func (s *Server) resourcePayload(uri string) (map[string]any, error) {
 		return map[string]any{
 			"server":       s.info,
 			"module_count": len(s.registry.ListModules()),
-			"tool_count":   len(s.registry.ListTools()),
+			"tool_count":   len(s.registry.ListTools()) + s.extra.Tools,
 			"modules":      s.registry.ListModules(),
+			"native_tools": surfaceToolNames(s.extra.ToolDefinitions),
 		}, nil
 	case "codexkit://catalog/modules":
 		moduleNames := s.registry.ListModules()
@@ -436,6 +444,15 @@ func (s *Server) resourcePayload(uri string) (map[string]any, error) {
 	default:
 		return nil, fmt.Errorf("unknown resource: %s", uri)
 	}
+}
+
+func surfaceToolNames(definitions []codexkit.ToolDef) []string {
+	names := make([]string, 0, len(definitions))
+	for _, definition := range definitions {
+		names = append(names, definition.Name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (s *Server) promptCatalog() []MCPPromptInfo {

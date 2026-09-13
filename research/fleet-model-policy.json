@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "claude-opus-4-1",
+      "aliases": [
+        "claude-opus-4-1-20250805"
+      ],
+      "provider": "claude",
+      "status": "unverified",
+      "retires": null,
+      "replacement": "claude-opus-5",
+      "policy_disallowed": true,
+      "policy_checked_at": "2026-09-06T06:30:14Z",
+      "policy_reason": "Fleet legacy-model migration policy; upstream retirement not inferred from this policy."
+    },
+    {
+      "id": "gpt-5.4",
+      "aliases": [],
+      "provider": "openai",
+      "status": "unverified",
+      "retires": null,
+      "replacement": "gpt-5.6-sol",
+      "policy_disallowed": true,
+      "policy_checked_at": "2026-09-06T06:30:14Z",
+      "policy_reason": "Fleet legacy-model migration policy; upstream retirement not inferred from this policy.",
+      "source_url": "https://developers.openai.com/api/docs/deprecations"
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "aliases": [],
+      "provider": "openai",
+      "status": "unverified",
+      "retires": null,
+      "replacement": "gpt-5.6-sol",
+      "policy_disallowed": true,
+      "policy_checked_at": "2026-09-06T06:30:14Z",
+      "policy_reason": "Fleet legacy-model migration policy; upstream retirement not inferred from this policy.",
+      "source_url": "https://developers.openai.com/api/docs/deprecations"
+    },
+    {
+      "id": "gpt-5.5",
+      "aliases": [],
+      "provider": "openai",
+      "status": "unverified",
+      "retires": null,
+      "replacement": "gpt-5.6-sol",
+      "policy_disallowed": true,
+      "policy_checked_at": "2026-09-06T06:30:14Z",
+      "policy_reason": "Fleet legacy-model migration policy; upstream retirement not inferred from this policy.",
+      "source_url": "https://developers.openai.com/api/docs/deprecations"
+    },
+    {
+      "id": "gpt-5.3-codex",
+      "aliases": [],
+      "provider": "openai",
+      "status": "unverified",
+      "retires": null,
+      "replacement": "gpt-5.6-sol",
+      "policy_disallowed": true,
+      "policy_checked_at": "2026-09-06T06:30:14Z",
+      "policy_reason": "Fleet legacy-model migration policy; upstream retirement not inferred from this policy.",
+      "source_url": "https://developers.openai.com/api/docs/deprecations"
+    },
+    {
+      "id": "gpt-5.2",
+      "aliases": [],
+      "provider": "openai",
+      "status": "unverified",
+      "retires": null,
+      "replacement": "gpt-5.6-sol",
+      "policy_disallowed": true,
+      "policy_checked_at": "2026-09-06T06:30:14Z",
+      "policy_reason": "Fleet legacy-model migration policy; upstream retirement not inferred from this policy.",
+      "source_url": "https://developers.openai.com/api/docs/deprecations"
+    },
+    {
+      "id": "gemini-2.0-flash",
+      "aliases": [],
+      "provider": "gemini",
+      "status": "unverified",
+      "retires": null,
+      "replacement": "gemini-3.6-flash",
+      "policy_disallowed": true,
+      "policy_checked_at": "2026-09-06T06:30:14Z",
+      "policy_reason": "Fleet legacy-model migration policy; upstream retirement not inferred from this policy."
+    },
+    {
+      "id": "gemini-2.0-flash-lite",
+      "aliases": [],
+      "provider": "gemini",
+      "status": "unverified",
+      "retires": null,
+      "replacement": "gemini-3.5-flash-lite",
+      "policy_disallowed": true,
+      "policy_checked_at": "2026-09-06T06:30:14Z",
+      "policy_reason": "Fleet legacy-model migration policy; upstream retirement not inferred from this policy."
+    }
+  ]
+}

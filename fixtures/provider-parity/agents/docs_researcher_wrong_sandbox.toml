@@ -1,0 +1,10 @@
+name = "docs_researcher"
+description = "Negative control for the docs researcher sandbox policy and role-specific model contract."
+model = "gpt-5.6-luna"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+This is a hermetic negative-control fixture. It is deliberately long enough to
+pass the routing and instruction-shape checks so only its invalid role policy
+causes validation to fail. It must never be installed as a custom agent.
+"""
