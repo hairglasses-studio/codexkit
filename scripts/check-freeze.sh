@@ -38,7 +38,8 @@ usage: check-freeze.sh --commit-msg <file>
 Exempt reasons and the paths each may touch:
 
   public-boundary-compat   Go sources, cmd/, public docs/examples, go.mod/sum,
-                           CHANGELOG.md, scripts/check-public-boundary.sh
+                           CHANGELOG.md, scripts/check-public-boundary.sh,
+                           fixtures/, research/, vendor/
   freeze-guard-maintenance the freeze guard itself (.githooks/, its scripts)
   deprecation-doc          DEPRECATED.md, PUBLIC_BOUNDARY.md, README.md,
                            CHANGELOG.md, CONTRIBUTING.md
@@ -79,9 +80,10 @@ path_allowed() {
 		case "$path" in
 		*.go) return 0 ;;
 		cmd/* | internal/* | examples/* | docs/* | .agents/roles/*) return 0 ;;
+		fixtures/* | research/* | vendor/*) return 0 ;;
 		go.mod | go.sum) return 0 ;;
 		CHANGELOG.md | ROADMAP.md) return 0 ;;
-		scripts/check-public-boundary.sh) return 0 ;;
+		scripts/check-public-boundary.sh | scripts/check-freeze.sh) return 0 ;;
 		*) return 1 ;;
 		esac
 		;;

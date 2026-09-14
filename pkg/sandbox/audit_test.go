@@ -151,7 +151,7 @@ func TestAuditLogger_DetectViolations(t *testing.T) {
 	t.Run("UnsafeMounts", func(t *testing.T) {
 		cfg := DefaultConfig()
 		cfg.Mounts = []Mount{
-			{Type: MountTypeBind, Source: "/home/user/app", Destination: "/"},
+			{Type: MountTypeBind, Source: "/var/app", Destination: "/"},
 			{Type: MountTypeRoBind, Source: "/var/log/../../etc/shadow", Destination: "/tmp/shadow"},
 			{Type: MountTypeBind, Source: "/root/.ssh", Destination: "/root/.ssh"},
 		}

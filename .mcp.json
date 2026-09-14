@@ -2,7 +2,11 @@
   "mcpServers": {
     "codexkit": {
       "command": "/usr/bin/env",
-      "args": ["bash", "-lc", "exec \"$PWD/scripts/run-codexkit-mcp.sh\""]
+      "args": [
+        "bash",
+        "-lc",
+        "for root in \"$CLAUDE_PROJECT_DIR\" \"$GEMINI_PROJECT_ROOT\" \"$CODEX_PROJECT_DIR\" \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$PWD\"; do [ -n \"$root\" ] && [ -x \"$root/scripts/run-codexkit-mcp.sh\" ] && exec \"$root/scripts/run-codexkit-mcp.sh\"; done; echo \"run-codexkit-mcp.sh: could not locate scripts/run-codexkit-mcp.sh under any candidate root (CLAUDE_PROJECT_DIR=$CLAUDE_PROJECT_DIR GEMINI_PROJECT_ROOT=$GEMINI_PROJECT_ROOT CODEX_PROJECT_DIR=$CODEX_PROJECT_DIR PWD=$PWD)\" >&2; exit 1"
+      ]
     }
   }
 }

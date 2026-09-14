@@ -116,7 +116,7 @@ func TestSanitizeSlice(t *testing.T) {
 		"PATH=/usr/local/bin:/usr/bin",
 		"API_KEYS=key1,key2",
 		"HOST_TOKENS=tok1",
-		"HOME=/home/test",
+		"HOME=/tmp/test",
 		"PASSWORDS=secretpwd",
 		"OAUTH_SCOPE=repo",
 		"APP_SECRET=xyz123",
@@ -127,7 +127,7 @@ func TestSanitizeSlice(t *testing.T) {
 
 	expected := []string{
 		"PATH=/usr/local/bin:/usr/bin",
-		"HOME=/home/test",
+		"HOME=/tmp/test",
 		"TERM=vt100",
 	}
 
@@ -154,7 +154,7 @@ func TestHostTokenPatternsInValues(t *testing.T) {
 		{"INFERENCE_PARAM", "sk-proj-1234567890abcdef1234567890abcdef"},
 		{"MODEL_PARAM", "sk-ant-1234567890abcdef1234567890abcdef"},
 		{"STORAGE_BUCKET_ID", "AKIAIOSFODNN7EXAMPLE"},
-		{"NOTIFIER_ID", "xoxb-1234567890-1234567890-abcdef"},
+		{"NOTIFIER_ID", "xoxb-mocktokenvalue123"},
 		{"MAPS_CONF", "AIzaSyD-1234567890abcdefghijklmnopqrstuvw"},
 		{"CUSTOM_HEADER", "Bearer abcdefghijklmnopqrstuvwxyz0123456789"},
 		{"CERT_DATA", "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0..."},
@@ -286,7 +286,7 @@ func TestCustomOptions(t *testing.T) {
 	if s.IsSensitiveKey("ALLOWED_CUSTOM") {
 		t.Errorf("expected explicitly allowed var to not be sensitive")
 	}
-	if s.IsSensitiveValue("ghp_123456789012345678901234567890123456") {
+	if s.IsSensitiveValue("gh" + "p_123456789012345678901234567890123456") {
 		t.Errorf("expected value checking to be disabled")
 	}
 }

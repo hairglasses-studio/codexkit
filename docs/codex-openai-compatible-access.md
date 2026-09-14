@@ -22,7 +22,7 @@ Codex configuration follows a layered resolution hierarchy:
 | Scope | Location | Description |
 |-------|----------|-------------|
 | **Global User Config** | `~/.codex/config.toml` | User-wide profiles, default model, and provider endpoints |
-| **Workspace Root** | `/home/hg/hairglasses-studio/.codex/config.toml` | Org-wide policy, MCP server declarations, and permissions |
+| **Workspace Root** | `<workspace-root>/.codex/config.toml` | Org-wide policy, MCP server declarations, and permissions |
 | **Project / Repo** | `<repo>/.codex/config.toml` | Repo-scoped overrides and repo-specific MCP servers |
 | **Credentials Store** | `~/.codex/auth.json` | Local credential store (`auth_mode`, API keys, session tokens) |
 | **Fleet Management** | `codexkit/` | Go toolkit (`baselineguard`, `configindex`) validating configuration state |
@@ -191,7 +191,7 @@ Non-interactive execution under API key mode was verified using an end-to-end mo
 To ensure configuration files remain valid across the fleet:
 
 ```bash
-cd /home/hg/hairglasses-studio/codexkit
+cd codexkit
 GOWORK=off go run ./cmd/codexkit baseline check .
 ```
 
