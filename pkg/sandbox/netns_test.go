@@ -397,6 +397,8 @@ func TestNewNetNSVerifierWithConfig(t *testing.T) {
 }
 
 func TestLiveNetNSIsolation_Default(t *testing.T) {
+	requireBwrap(t)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -451,6 +453,8 @@ func TestLiveNetNSIsolation_DisabledNetUnshare(t *testing.T) {
 }
 
 func TestVerifyNetNS_Helper(t *testing.T) {
+	requireBwrap(t)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 

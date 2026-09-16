@@ -188,6 +188,8 @@ func TestOverlay_ReadOnlyMountCommand(t *testing.T) {
 }
 
 func TestOverlay_TeardownCleanupSLA(t *testing.T) {
+	requireBwrap(t)
+
 	for i := 0; i < 5; i++ {
 		lowerDir := t.TempDir()
 		cfg := DefaultOverlayConfig(lowerDir)

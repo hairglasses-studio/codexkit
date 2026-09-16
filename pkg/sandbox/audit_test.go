@@ -593,6 +593,8 @@ func TestAuditLogger_Concurrency(t *testing.T) {
 }
 
 func TestAuditLogger_LiveSandboxExecution(t *testing.T) {
+	requireBwrap(t)
+
 	cfg := DefaultConfig()
 	sb, err := New(cfg)
 	if err != nil {
