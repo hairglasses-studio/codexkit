@@ -26,6 +26,7 @@ func TestRunnerAgentConstants(t *testing.T) {
 }
 
 func TestRunner_StdoutStderrIsolation(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultRunnerConfig()
 	r, err := NewRunner(cfg)
 	if err != nil {
@@ -65,6 +66,7 @@ func TestRunner_StdoutStderrIsolation(t *testing.T) {
 }
 
 func TestRunner_StreamingCallbacks(t *testing.T) {
+	requireBwrap(t)
 	var mu sync.Mutex
 	var stdoutChunks []string
 	var stderrChunks []string
@@ -180,6 +182,7 @@ echo "delta" >&2
 }
 
 func TestRunner_OutputTruncationSafety(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultRunnerConfig()
 	cfg.MaxOutputBytes = 128
 
@@ -226,6 +229,7 @@ python3 -c "import sys; sys.stdout.write('X' * 50000); sys.stderr.write('Y' * 50
 }
 
 func TestRunner_EphemeralWorkspaceLifecycle(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultRunnerConfig()
 	cfg.EphemeralDir = true
 
@@ -277,6 +281,7 @@ func TestRunner_EphemeralWorkspaceLifecycle(t *testing.T) {
 }
 
 func TestRunner_PrepareFileAndFilesConfig(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultRunnerConfig()
 	cfg.Files = map[string][]byte{
 		"config/params.json": []byte(`{"env":"test"}`),
@@ -309,6 +314,7 @@ func TestRunner_PrepareFileAndFilesConfig(t *testing.T) {
 }
 
 func TestRunner_ExitCodeAndFailure(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultRunnerConfig()
 	r, err := NewRunner(cfg)
 	if err != nil {
@@ -335,6 +341,7 @@ func TestRunner_ExitCodeAndFailure(t *testing.T) {
 }
 
 func TestRunner_Timeout(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultRunnerConfig()
 	cfg.Timeout = 500 * time.Millisecond
 
@@ -375,6 +382,7 @@ func TestRunner_CombinedOutput(t *testing.T) {
 }
 
 func TestRunEphemeralHelper(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultRunnerConfig()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

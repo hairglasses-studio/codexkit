@@ -13,6 +13,7 @@ import (
 )
 
 func TestBubblewrapInstalled(t *testing.T) {
+	requireBwrap(t)
 	out, err := exec.Command("bwrap", "--version").CombinedOutput()
 	if err != nil {
 		t.Fatalf("bwrap --version failed: %v", err)
@@ -24,6 +25,7 @@ func TestBubblewrapInstalled(t *testing.T) {
 }
 
 func TestInvariant1_ReadOnlyRoot(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultConfig()
 	sb, err := New(cfg)
 	if err != nil {
@@ -52,6 +54,7 @@ func TestInvariant1_ReadOnlyRoot(t *testing.T) {
 }
 
 func TestInvariant2_NetworkIsolation(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultConfig()
 	cfg.UnshareNet = true
 	sb, err := New(cfg)
@@ -81,6 +84,7 @@ func TestInvariant2_NetworkIsolation(t *testing.T) {
 }
 
 func TestInvariant3_TeardownCleanupSLA(t *testing.T) {
+	requireBwrap(t)
 	for i := 0; i < 5; i++ {
 		cfg := DefaultConfig()
 		cfg.EphemeralWorkDir = true
@@ -121,6 +125,7 @@ func TestInvariant3_TeardownCleanupSLA(t *testing.T) {
 }
 
 func TestEphemeralWorkspace(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultConfig()
 	sb, err := New(cfg)
 	if err != nil {
@@ -149,6 +154,7 @@ cat sub/message.txt
 }
 
 func TestSeccompDeniedSyscall(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultConfig()
 	cfg.EnableSeccomp = true
 	cfg.DeniedSyscalls = []uint32{sysPtrace}
@@ -183,6 +189,7 @@ print(f"res={res} errno={err}")
 }
 
 func TestModuleTools(t *testing.T) {
+	requireBwrap(t)
 	reg := codexkit.NewRegistry()
 	mod := Module()
 	if mod.Name() != "sandbox" {
@@ -234,6 +241,7 @@ func TestModuleTools(t *testing.T) {
 }
 
 func TestBenchmarkRun(t *testing.T) {
+	requireBwrap(t)
 	report, err := RunBenchmark(5)
 	if err != nil {
 		t.Fatalf("RunBenchmark failed: %v", err)
@@ -394,6 +402,7 @@ func TestAgent51_BwrapArgGenerator_EmptyCommand(t *testing.T) {
 }
 
 func TestAgent51_RuntimeManagerRun(t *testing.T) {
+	requireBwrap(t)
 	sb, err := NewRuntimeManager(DefaultConfig())
 	if err != nil {
 		t.Fatalf("NewRuntimeManager failed: %v", err)
@@ -416,6 +425,7 @@ func TestAgent51_RuntimeManagerRun(t *testing.T) {
 }
 
 func TestAgent51_UnprivilegedUserNamespace(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultConfig()
 	cfg.UID = 1001
 	cfg.GID = 1001
@@ -439,6 +449,7 @@ func TestAgent51_UnprivilegedUserNamespace(t *testing.T) {
 }
 
 func TestAgent51_DieWithParentAndTmpfs(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultConfig()
 	cfg.TmpfsPaths = []string{"/tmp", "/dev/shm"}
 

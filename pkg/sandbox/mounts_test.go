@@ -262,6 +262,7 @@ func TestValidateMountinfoFile_Error(t *testing.T) {
 }
 
 func TestValidateSelf(t *testing.T) {
+	requireBwrap(t)
 	report, err := ValidateSelf()
 	if err != nil {
 		t.Fatalf("ValidateSelf failed: %v", err)
@@ -275,6 +276,7 @@ func TestValidateSelf(t *testing.T) {
 }
 
 func TestSandbox_ValidateMounts_Integration(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultConfig()
 	sb, err := New(cfg)
 	if err != nil {
@@ -304,6 +306,7 @@ func TestSandbox_ValidateMounts_Integration(t *testing.T) {
 }
 
 func TestSandbox_ValidateMounts_ViolationDetected(t *testing.T) {
+	requireBwrap(t)
 	tmpDir := t.TempDir()
 	cfg := DefaultConfig()
 	cfg.Mounts = []Mount{

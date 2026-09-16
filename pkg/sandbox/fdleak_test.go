@@ -24,6 +24,7 @@ func TestAgent56Constants(t *testing.T) {
 }
 
 func TestEnumerateProcSelfFD(t *testing.T) {
+	requireBwrap(t)
 	descs, err := EnumerateOpenDescriptors()
 	if err != nil {
 		t.Fatalf("EnumerateOpenDescriptors failed: %v", err)
@@ -244,6 +245,7 @@ func TestSnapshotDiffAndDetect(t *testing.T) {
 }
 
 func TestRealPipeLeakDetection(t *testing.T) {
+	requireBwrap(t)
 	d := NewDetector()
 	snap, err := d.Snapshot()
 	if err != nil {
@@ -304,6 +306,7 @@ func TestRealPipeLeakDetection(t *testing.T) {
 }
 
 func TestRealBindMountLeakDetection(t *testing.T) {
+	requireBwrap(t)
 	mountDir := t.TempDir()
 	testFile := filepath.Join(mountDir, "leak_target.txt")
 	if err := os.WriteFile(testFile, []byte("leak_content"), 0644); err != nil {
@@ -357,6 +360,7 @@ func TestRealBindMountLeakDetection(t *testing.T) {
 }
 
 func TestSandboxDetectFDLeaks(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultConfig()
 	sb, err := New(cfg)
 	if err != nil {
@@ -374,6 +378,7 @@ func TestSandboxDetectFDLeaks(t *testing.T) {
 }
 
 func TestSandboxAuditFDLeaks(t *testing.T) {
+	requireBwrap(t)
 	cfg := DefaultConfig()
 	sb, err := New(cfg)
 	if err != nil {
@@ -448,6 +453,7 @@ func TestClassifyDescriptor(t *testing.T) {
 }
 
 func TestConvenienceFunctions(t *testing.T) {
+	requireBwrap(t)
 	_, err := DetectUnclosedDescriptors()
 	if err != nil {
 		t.Fatalf("DetectUnclosedDescriptors failed: %v", err)
