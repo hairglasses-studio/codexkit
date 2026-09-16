@@ -4,6 +4,7 @@ package telemetry
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // EventType constants for standard Codex fleet events.
@@ -71,6 +74,13 @@ func Record(storePath string, ev Event) (Event, error) {
 	if storePath == "" {
 		storePath = DefaultStorePath()
 	}
+	if isSQLitePath(storePath) {
+		s, err := getOrCreateSQLiteStore(storePath)
+		if err != nil {
+			return ev, err
+		}
+		return s.Record(context.Background(), ev)
+	}
 	if ev.ID == "" {
 		ev.ID = generateEventID()
 	}
@@ -97,6 +107,11 @@ func Record(storePath string, ev Event) (Event, error) {
 	}
 	defer f.Close()
 
+	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX); err != nil {
+		return ev, fmt.Errorf("lock telemetry store: %w", err)
+	}
+	defer unix.Flock(int(f.Fd()), unix.LOCK_UN)
+
 	if _, err := f.Write(append(data, '\n')); err != nil {
 		return ev, fmt.Errorf("write telemetry event: %w", err)
 	}
@@ -108,6 +123,13 @@ func Record(storePath string, ev Event) (Event, error) {
 func Query(storePath string, filter Filter) ([]Event, error) {
 	if storePath == "" {
 		storePath = DefaultStorePath()
+	}
+	if isSQLitePath(storePath) {
+		s, err := getOrCreateSQLiteStore(storePath)
+		if err != nil {
+			return nil, err
+		}
+		return s.Query(context.Background(), filter)
 	}
 
 	storeMu.Lock()
@@ -121,6 +143,11 @@ func Query(storePath string, filter Filter) ([]Event, error) {
 		return nil, fmt.Errorf("open telemetry store: %w", err)
 	}
 	defer f.Close()
+
+	if err := unix.Flock(int(f.Fd()), unix.LOCK_SH); err != nil {
+		return nil, fmt.Errorf("lock telemetry store: %w", err)
+	}
+	defer unix.Flock(int(f.Fd()), unix.LOCK_UN)
 
 	var all []Event
 	scanner := bufio.NewScanner(f)
@@ -161,6 +188,13 @@ func Search(storePath string, query string, limit int) ([]Event, error) {
 	if storePath == "" {
 		storePath = DefaultStorePath()
 	}
+	if isSQLitePath(storePath) {
+		s, err := getOrCreateSQLiteStore(storePath)
+		if err != nil {
+			return nil, err
+		}
+		return s.Search(context.Background(), query, limit)
+	}
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
 		return Query(storePath, Filter{Limit: limit})
@@ -177,6 +211,11 @@ func Search(storePath string, query string, limit int) ([]Event, error) {
 		return nil, fmt.Errorf("open telemetry store: %w", err)
 	}
 	defer f.Close()
+
+	if err := unix.Flock(int(f.Fd()), unix.LOCK_SH); err != nil {
+		return nil, fmt.Errorf("lock telemetry store: %w", err)
+	}
+	defer unix.Flock(int(f.Fd()), unix.LOCK_UN)
 
 	var all []Event
 	scanner := bufio.NewScanner(f)

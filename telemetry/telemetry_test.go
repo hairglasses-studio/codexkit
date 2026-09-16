@@ -232,3 +232,163 @@ func TestModuleTools(t *testing.T) {
 		t.Fatalf("expected 1 event in search response, got %+v", sResp)
 	}
 }
+
+func TestSQLiteStoreRecordAndQuery(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "telemetry.sqlite")
+
+	ev1 := Event{
+		EventType: EventTypeRouting,
+		Repo:      "hairglasses-studio/codexkit",
+		Provider:  "codex",
+		Model:     "gpt-5.6-sol",
+		Profile:   "danger-full-access",
+		Role:      "lead",
+		Decision:  "selected gpt-5.6-sol for high-reasoning orchestration",
+	}
+
+	rec1, err := Record(dbPath, ev1)
+	if err != nil {
+		t.Fatalf("Record failed: %v", err)
+	}
+	if rec1.ID == "" {
+		t.Fatal("expected generated event ID")
+	}
+	if rec1.Timestamp == "" {
+		t.Fatal("expected generated timestamp")
+	}
+
+	ev2 := Event{
+		EventType:  EventTypeVerification,
+		Repo:       "hairglasses-studio/codexkit",
+		Provider:   "codex",
+		CheckType:  "baseline",
+		Status:     "pass",
+		DurationMS: 124.5,
+		Findings:   0,
+	}
+
+	_, err = Record(dbPath, ev2)
+	if err != nil {
+		t.Fatalf("Record ev2 failed: %v", err)
+	}
+
+	all, err := Query(dbPath, Filter{})
+	if err != nil {
+		t.Fatalf("Query all failed: %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(all))
+	}
+
+	if all[0].EventType != EventTypeVerification {
+		t.Errorf("expected first event in result to be verification, got %s", all[0].EventType)
+	}
+
+	routingEvents, err := Query(dbPath, Filter{EventType: EventTypeRouting})
+	if err != nil {
+		t.Fatalf("Query routing failed: %v", err)
+	}
+	if len(routingEvents) != 1 {
+		t.Fatalf("expected 1 routing event, got %d", len(routingEvents))
+	}
+	if routingEvents[0].Model != "gpt-5.6-sol" {
+		t.Errorf("expected model gpt-5.6-sol, got %s", routingEvents[0].Model)
+	}
+
+	passEvents, err := Query(dbPath, Filter{Status: "pass"})
+	if err != nil {
+		t.Fatalf("Query pass failed: %v", err)
+	}
+	if len(passEvents) != 1 {
+		t.Fatalf("expected 1 pass event, got %d", len(passEvents))
+	}
+}
+
+func TestSQLiteStoreSearch(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "telemetry.sqlite")
+
+	events := []Event{
+		{
+			EventType: EventTypeRouting,
+			Repo:      "ralphglasses",
+			Model:     "claude-3-7-sonnet",
+			Decision:  "fall back to claude for interactive session",
+		},
+		{
+			EventType: EventTypeModelSelection,
+			Repo:      "jobb",
+			Model:     "gemini-3.1-pro",
+			Decision:  "chose gemini pro for high-volume background extraction",
+		},
+		{
+			EventType: EventTypeVerification,
+			Repo:      "secretstudios-mcp",
+			CheckType: "opnsense_router_gate",
+			Status:    "fail",
+			Error:     "gateway timeout on 192.168.1.1",
+		},
+	}
+
+	for _, ev := range events {
+		if _, err := Record(dbPath, ev); err != nil {
+			t.Fatalf("Record failed: %v", err)
+		}
+	}
+
+	res, err := Search(dbPath, "fall back", 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(res) != 1 || res[0].Repo != "ralphglasses" {
+		t.Fatalf("expected 1 match in ralphglasses, got %+v", res)
+	}
+
+	res, err = Search(dbPath, "gateway timeout", 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(res) != 1 || res[0].Repo != "secretstudios-mcp" {
+		t.Fatalf("expected 1 match in secretstudios-mcp, got %+v", res)
+	}
+}
+
+func TestSQLiteStoreConcurrentWrites(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "telemetry_concurrent.sqlite")
+
+	var wg sync.WaitGroup
+	workers := 8
+	iterations := 25
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				_, err := Record(dbPath, Event{
+					EventType: EventTypeRouting,
+					Repo:      "codexkit",
+					Model:     "gpt-5.6-sol",
+					Role:      "worker",
+					Metadata:  map[string]any{"worker": workerID, "iter": j},
+				})
+				if err != nil {
+					t.Errorf("worker %d failed to record: %v", workerID, err)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	all, err := Query(dbPath, Filter{})
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	expected := workers * iterations
+	if len(all) != expected {
+		t.Fatalf("expected %d events, got %d", expected, len(all))
+	}
+}
