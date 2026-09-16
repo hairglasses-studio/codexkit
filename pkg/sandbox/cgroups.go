@@ -486,12 +486,7 @@ func (cs *CgroupSubtree) AttachCmd(cmd *exec.Cmd) error {
 		}
 		cs.dirFile = f
 	}
-	if cmd.SysProcAttr == nil {
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-	}
-	cmd.SysProcAttr.UseCgroupFD = true
-	cmd.SysProcAttr.CgroupFD = int(cs.dirFile.Fd())
-	return nil
+	return attachCgroupFD(cmd, cs.dirFile)
 }
 
 func (cs *CgroupSubtree) Kill() error {
