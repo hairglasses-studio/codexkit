@@ -3,6 +3,7 @@ package sandbox
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"testing"
 )
@@ -24,6 +25,11 @@ func TestAgent56Constants(t *testing.T) {
 }
 
 func TestEnumerateProcSelfFD(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("sandbox requires linux")
+	}
+	requireBwrap(t)
+
 	descs, err := EnumerateOpenDescriptors()
 	if err != nil {
 		t.Fatalf("EnumerateOpenDescriptors failed: %v", err)
@@ -244,6 +250,11 @@ func TestSnapshotDiffAndDetect(t *testing.T) {
 }
 
 func TestRealPipeLeakDetection(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("sandbox requires linux")
+	}
+	requireBwrap(t)
+
 	d := NewDetector()
 	snap, err := d.Snapshot()
 	if err != nil {
@@ -304,6 +315,11 @@ func TestRealPipeLeakDetection(t *testing.T) {
 }
 
 func TestRealBindMountLeakDetection(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("sandbox requires linux")
+	}
+	requireBwrap(t)
+
 	mountDir := t.TempDir()
 	testFile := filepath.Join(mountDir, "leak_target.txt")
 	if err := os.WriteFile(testFile, []byte("leak_content"), 0644); err != nil {

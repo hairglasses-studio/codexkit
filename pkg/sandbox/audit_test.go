@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -593,6 +594,9 @@ func TestAuditLogger_Concurrency(t *testing.T) {
 }
 
 func TestAuditLogger_LiveSandboxExecution(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("sandbox requires linux")
+	}
 	requireBwrap(t)
 
 	cfg := DefaultConfig()
