@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,13 +10,33 @@ import (
 	"testing"
 )
 
+var codexkitBin string
+
+func TestMain(m *testing.M) {
+	tmpDir, err := os.MkdirTemp("", "codexkit-build-*")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create temp dir: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	codexkitBin = filepath.Join(tmpDir, "codexkit")
+	buildCmd := exec.Command("go", "build", "-o", codexkitBin, ".")
+	if err := buildCmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to build codexkit: %v\n", err)
+		os.Exit(1)
+	}
+
+	os.Exit(m.Run())
+}
+
 func TestBaselineCheckJSONIsMachineReadable(t *testing.T) {
 	dir := t.TempDir()
 	mkdirAll(t, filepath.Join(dir, ".git"))
 	writeText(t, filepath.Join(dir, "AGENTS.md"), "# Demo\n")
 	writeText(t, filepath.Join(dir, "CLAUDE.md"), "# Demo\n")
 
-	cmd := exec.Command("go", "run", ".", "baseline", "check", dir, "--json")
+	cmd := exec.Command(codexkitBin, "baseline", "check", dir, "--json")
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	out, err := cmd.Output()
 	if err == nil {
@@ -70,3 +91,4 @@ func writeText(t *testing.T, path string, content string) {
 		t.Fatal(err)
 	}
 }
+
