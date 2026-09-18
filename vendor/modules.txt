@@ -79,7 +79,7 @@ golang.org/x/time/rate
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# modernc.org/libc v1.75.7
+# modernc.org/libc v1.76.0
 ## explicit; go 1.25.0
 modernc.org/libc
 modernc.org/libc/errno
