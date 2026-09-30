@@ -54,6 +54,9 @@ func Audit(scanPath string) FleetReport {
 		if !entry.IsDir() {
 			continue
 		}
+		if strings.HasPrefix(entry.Name(), ".wt-") || strings.HasPrefix(entry.Name(), "wt-") || entry.Name() == ".worktrees" || entry.Name() == ".archive" {
+			continue
+		}
 		repoPath := filepath.Join(scanPath, entry.Name())
 		if _, err := os.Stat(filepath.Join(repoPath, ".git")); err != nil {
 			continue

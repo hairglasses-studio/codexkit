@@ -79,6 +79,33 @@ func TestAudit_SkipsNonGitDirs(t *testing.T) {
 	}
 }
 
+func TestAudit_SkipsWorktreeAndArchiveDirs(t *testing.T) {
+	dir := t.TempDir()
+	ignoredDirs := []string{
+		".wt-control",
+		"wt-temp",
+		".worktrees",
+		".archive",
+	}
+	for _, name := range ignoredDirs {
+		if err := os.MkdirAll(filepath.Join(dir, name, ".git"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Add one valid repo
+	if err := os.MkdirAll(filepath.Join(dir, "valid-repo", ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	report := Audit(dir)
+	if report.TotalRepos != 1 {
+		t.Fatalf("TotalRepos = %d, want 1 (ignored dirs should be skipped)", report.TotalRepos)
+	}
+	if report.Repos[0].RepoName != "valid-repo" {
+		t.Errorf("RepoName = %q, want %q", report.Repos[0].RepoName, "valid-repo")
+	}
+}
+
 func TestAudit_SkipsFiles(t *testing.T) {
 	dir := t.TempDir()
 	// Create a regular file in scan dir
