@@ -373,6 +373,9 @@ func TestRealBindMountLeakDetection(t *testing.T) {
 }
 
 func TestSandboxDetectFDLeaks(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("live /proc probe requires Linux; parser fixtures run on every platform")
+	}
 	cfg := DefaultConfig()
 	sb, err := New(cfg)
 	if err != nil {
@@ -390,6 +393,9 @@ func TestSandboxDetectFDLeaks(t *testing.T) {
 }
 
 func TestSandboxAuditFDLeaks(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("live /proc probe requires Linux; parser fixtures run on every platform")
+	}
 	cfg := DefaultConfig()
 	sb, err := New(cfg)
 	if err != nil {
@@ -464,6 +470,9 @@ func TestClassifyDescriptor(t *testing.T) {
 }
 
 func TestConvenienceFunctions(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("live /proc probe requires Linux; parser fixtures run on every platform")
+	}
 	_, err := DetectUnclosedDescriptors()
 	if err != nil {
 		t.Fatalf("DetectUnclosedDescriptors failed: %v", err)

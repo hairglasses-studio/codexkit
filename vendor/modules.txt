@@ -1,5 +1,5 @@
-# github.com/dustin/go-humanize v1.0.1
-## explicit; go 1.16
+# github.com/dustin/go-humanize v1.1.0
+## explicit; go 1.21
 github.com/dustin/go-humanize
 # github.com/google/jsonschema-go v0.4.3
 ## explicit; go 1.23.0
@@ -24,8 +24,8 @@ github.com/modelcontextprotocol/go-sdk/internal/xcontext
 github.com/modelcontextprotocol/go-sdk/jsonrpc
 github.com/modelcontextprotocol/go-sdk/mcp
 github.com/modelcontextprotocol/go-sdk/oauthex
-# github.com/ncruces/go-strftime v1.0.0
-## explicit; go 1.17
+# github.com/ncruces/go-strftime v1.1.0
+## explicit; go 1.24
 github.com/ncruces/go-strftime
 # github.com/pelletier/go-toml/v2 v2.4.3
 ## explicit; go 1.21.0
@@ -72,15 +72,13 @@ golang.org/x/sys/windows
 # golang.org/x/time v0.16.0
 ## explicit; go 1.26.0
 golang.org/x/time/rate
-# golang.org/x/tools v0.50.0
-## explicit; go 1.26.0
 # gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 ## explicit; go 1.11
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# modernc.org/libc v1.76.0
-## explicit; go 1.25.0
+# modernc.org/libc v1.77.1
+## explicit; go 1.26.0
 modernc.org/libc
 modernc.org/libc/errno
 modernc.org/libc/fcntl
@@ -113,8 +111,8 @@ modernc.org/mathutil
 # modernc.org/memory v1.12.1
 ## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.59.0
-## explicit; go 1.25.0
+# modernc.org/sqlite v1.60.1
+## explicit; go 1.26.0
 modernc.org/sqlite
 modernc.org/sqlite/lib
 modernc.org/sqlite/vtab

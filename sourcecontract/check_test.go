@@ -11,7 +11,7 @@ import (
 )
 
 func TestCheck_PassesWithSyncedSources(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSourceContractManifest(t, root, "app")
 	writeSourceContractSkill(t, root, "app")
 	writeSourceContractMCP(t, root, "app")
@@ -44,7 +44,7 @@ func TestCheck_PassesWithSyncedSources(t *testing.T) {
 }
 
 func TestCheck_FailsOnSkillDrift(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSourceContractManifest(t, root, "app")
 	writeSourceContractSkill(t, root, "app")
 
@@ -64,7 +64,7 @@ func TestCheck_FailsOnSkillDrift(t *testing.T) {
 }
 
 func TestCheck_FailsOnMCPDrift(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSourceContractManifest(t, root, "app")
 	writeSourceContractMCP(t, root, "app")
 
@@ -84,7 +84,7 @@ func TestCheck_FailsOnMCPDrift(t *testing.T) {
 }
 
 func TestCheck_UsesRepoLocalSkillCheckWhenPresent(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSourceContractManifest(t, root, "app")
 	writeSourceContractSkill(t, root, "app")
 	writeSourceContractFile(t, root, "app/Makefile", "skill-surface-check:\n\t@echo local skill check\n")
@@ -105,7 +105,7 @@ func TestCheck_UsesRepoLocalSkillCheckWhenPresent(t *testing.T) {
 }
 
 func TestCheck_FailsWhenRepoLocalSkillCheckFails(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSourceContractManifest(t, root, "app")
 	writeSourceContractSkill(t, root, "app")
 	writeSourceContractFile(t, root, "app/Makefile", "skill-surface-check:\n\t@echo local drift\n\t@exit 2\n")
@@ -126,7 +126,7 @@ func TestCheck_FailsWhenRepoLocalSkillCheckFails(t *testing.T) {
 }
 
 func TestCheck_UsesRepoLocalMCPCheckWhenPresent(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSourceContractManifest(t, root, "sample-app")
 	writeSourceContractMCP(t, root, "sample-app")
 	writeSourceContractFile(t, root, "sample-app/cmd/sample-sync-surfaces/main.go", "package main\n")
@@ -155,7 +155,7 @@ func TestCheck_UsesRepoLocalMCPCheckWhenPresent(t *testing.T) {
 }
 
 func TestRepoLocalMCPCheckSkipsAmbiguousSyncSurfaceCommands(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSourceContractFile(t, root, "scripts/dev/go.sh", "#!/usr/bin/env bash\nexit 99\n")
 	writeSourceContractFile(t, root, "cmd/alpha-sync-surfaces/main.go", "package main\n")
 	writeSourceContractFile(t, root, "cmd/beta-sync-surfaces/main.go", "package main\n")
@@ -169,7 +169,7 @@ func TestRepoLocalMCPCheckSkipsAmbiguousSyncSurfaceCommands(t *testing.T) {
 }
 
 func TestCheck_FailsOnWorkspaceManifestDrift(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSourceContractManifest(t, root, "missing-app")
 
 	report, err := Check(root, CheckOptions{SkipRuntimeInventory: true})
@@ -185,7 +185,7 @@ func TestCheck_FailsOnWorkspaceManifestDrift(t *testing.T) {
 }
 
 func TestArtifactRoundTripAndDrift(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSourceContractManifest(t, root, "app")
 	writeSourceContractSkill(t, root, "app")
 	if report := skillsync.Sync(filepath.Join(root, "app"), false); len(report.Errors) > 0 {

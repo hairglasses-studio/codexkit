@@ -44,7 +44,7 @@ func setupBaselineCompliantRepo(t *testing.T, dir string) {
 }
 
 func TestAudit_EmptyDir(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	report := Audit(dir)
 
 	if report.ScanPath != dir {
@@ -67,7 +67,7 @@ func TestAudit_NonexistentDir(t *testing.T) {
 }
 
 func TestAudit_SkipsNonGitDirs(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	// Create a subdirectory without .git
 	if err := os.MkdirAll(filepath.Join(dir, "not-a-repo"), 0755); err != nil {
 		t.Fatal(err)
@@ -80,7 +80,7 @@ func TestAudit_SkipsNonGitDirs(t *testing.T) {
 }
 
 func TestAudit_SkipsWorktreeAndArchiveDirs(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	ignoredDirs := []string{
 		".wt-control",
 		"wt-temp",
@@ -107,7 +107,7 @@ func TestAudit_SkipsWorktreeAndArchiveDirs(t *testing.T) {
 }
 
 func TestAudit_SkipsFiles(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	// Create a regular file in scan dir
 	if err := os.WriteFile(filepath.Join(dir, "somefile.txt"), []byte("hi"), 0644); err != nil {
 		t.Fatal(err)
@@ -120,7 +120,7 @@ func TestAudit_SkipsFiles(t *testing.T) {
 }
 
 func TestAudit_DetectsGitRepo(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	repoDir := filepath.Join(dir, "test-repo")
 	if err := os.MkdirAll(filepath.Join(repoDir, ".git"), 0755); err != nil {
 		t.Fatal(err)
@@ -139,7 +139,7 @@ func TestAudit_DetectsGitRepo(t *testing.T) {
 }
 
 func TestAudit_PassedCountsMatchRepos(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	// Create two mock repos
 	for _, name := range []string{"repo-a", "repo-b"} {
 		if err := os.MkdirAll(filepath.Join(dir, name, ".git"), 0755); err != nil {
@@ -163,7 +163,7 @@ func TestAudit_PassedCountsMatchRepos(t *testing.T) {
 // must not fold mcpsync.Diff's "reading .mcp.json: ... no such file" error
 // into audit.Passed = false.
 func TestAudit_AbsentMCPConfigDoesNotFailRepo(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	repoDir := filepath.Join(dir, "no-mcp-repo")
 	if err := os.MkdirAll(filepath.Join(repoDir, ".git"), 0755); err != nil {
 		t.Fatal(err)
@@ -227,7 +227,7 @@ func TestModule_ToolCount(t *testing.T) {
 }
 
 func TestModule_FleetAuditHandler(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	m := Module()
 	tools := m.Tools()
 
@@ -256,7 +256,7 @@ func TestModule_FleetAuditHandler(t *testing.T) {
 }
 
 func TestModule_FleetReportHandler(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	m := Module()
 	tools := m.Tools()
 

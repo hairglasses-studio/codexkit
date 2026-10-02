@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -262,6 +263,9 @@ func TestValidateMountinfoFile_Error(t *testing.T) {
 }
 
 func TestValidateSelf(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("live /proc probe requires Linux; parser fixtures run on every platform")
+	}
 	report, err := ValidateSelf()
 	if err != nil {
 		t.Fatalf("ValidateSelf failed: %v", err)

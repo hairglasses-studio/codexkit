@@ -12,7 +12,7 @@ import (
 )
 
 func TestBuildIndexesBaselineRepoSurfaces(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSurfaceIndexManifest(t, root)
 	writeSurfaceIndexConsolidation(t, root)
 	writeSurfaceIndexSkill(t, root)
@@ -60,7 +60,7 @@ func TestBuildIndexesBaselineRepoSurfaces(t *testing.T) {
 }
 
 func TestCheckPassesWithWrittenArtifacts(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSurfaceIndexManifest(t, root)
 	writeSurfaceIndexSkill(t, root)
 	if report := skillsync.Sync(filepath.Join(root, "app"), false); len(report.Errors) > 0 {
@@ -95,7 +95,7 @@ func TestCheckPassesWithWrittenArtifacts(t *testing.T) {
 }
 
 func TestBuildClassifiesRuntimeProjectionOnlyRepo(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeSurfaceIndexFile(t, root, "workspace/manifest.json", `{
   "version": 1,
   "repos": [

@@ -68,7 +68,7 @@ func TestExecuteHarnessPlanRebindsTrustedInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "plan.json")
+	path := filepath.Join(canonicalTempDir(t), "plan.json")
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestExecuteHarnessPlanRebindsTrustedInputs(t *testing.T) {
 
 func writeHarnessCLITestFiles(t *testing.T) (string, string) {
 	t.Helper()
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	registryPath := filepath.Join(root, "verifiers.tsv")
 	registry := "id\tcommand\tscope\texecutable_in_manifest_lane\tnotes\nprojection-check\tcheck\ttest\ttrue\ttest verifier\n"
 	if err := os.WriteFile(registryPath, []byte(registry), 0o600); err != nil {

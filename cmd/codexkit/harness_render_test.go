@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -36,7 +37,7 @@ type harnessRenderFixture struct {
 
 func newHarnessRenderFixture(t *testing.T, mode harnessmanifest.ProjectionMode) harnessRenderFixture {
 	t.Helper()
-	work := t.TempDir()
+	work := canonicalTempDir(t)
 	sourceRoot := filepath.Join(work, "source")
 	if err := os.Mkdir(sourceRoot, 0o700); err != nil {
 		t.Fatal(err)
@@ -229,6 +230,9 @@ func (fixture *harnessRenderFixture) rewriteTrustFiles(t *testing.T) {
 }
 
 func TestExecuteHarnessRenderCopyCanaryIsReadOnly(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("descriptor-pinned harness filesystem requires Linux")
+	}
 	fixture := newHarnessRenderFixture(t, harnessmanifest.ProjectionCopy)
 	before := snapshotTree(t, fixture.sourceRoot)
 	summary, jsonOutput, err := executeHarnessRender(fixture.args)
@@ -259,6 +263,9 @@ func TestExecuteHarnessRenderRejectsUnknownFlag(t *testing.T) {
 }
 
 func TestExecuteHarnessRenderRejectsTraversalAndSymlinkSource(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("descriptor-pinned harness filesystem requires Linux")
+	}
 	t.Run("manifest source traversal", func(t *testing.T) {
 		fixture := newHarnessRenderFixture(t, harnessmanifest.ProjectionCopy)
 		data, err := os.ReadFile(fixture.manifestPath)
@@ -384,7 +391,7 @@ func TestExecuteHarnessRenderSanitizesMissingAbsolutePaths(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := newHarnessRenderFixture(t, harnessmanifest.ProjectionCopy)
-			missing := filepath.Join(t.TempDir(), "absolute-local-secret", "missing.json")
+			missing := filepath.Join(canonicalTempDir(t), "absolute-local-secret", "missing.json")
 			args := test.mutate(fixture.args, missing)
 			_, _, err := executeHarnessRender(args)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
@@ -446,6 +453,9 @@ func TestValidateHarnessRenderSingleSourceRootRejectsSecondaryRepository(t *test
 }
 
 func TestExecuteHarnessRenderRenderedMappingValidation(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("descriptor-pinned harness filesystem requires Linux")
+	}
 	t.Run("valid", func(t *testing.T) {
 		fixture := newHarnessRenderFixture(t, harnessmanifest.ProjectionRender)
 		summary, _, err := executeHarnessRender(fixture.args)
@@ -553,6 +563,9 @@ func removeFlagValues(args []string, flag string) []string {
 }
 
 func TestHarnessRenderSummaryContainsNoArtifactBytesOrPaths(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("descriptor-pinned harness filesystem requires Linux")
+	}
 	fixture := newHarnessRenderFixture(t, harnessmanifest.ProjectionCopy)
 	summary, _, err := executeHarnessRender(fixture.args)
 	if err != nil {

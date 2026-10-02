@@ -22,7 +22,7 @@ func writeFile(t *testing.T, base, name, content string) {
 
 func setupSyncRepo(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 
 	surface, _ := json.Marshal(map[string]any{
 		"version":     1,
@@ -39,7 +39,7 @@ func setupSyncRepo(t *testing.T) string {
 }
 
 func TestParseSurfaceAcceptsVersion2(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	writeFile(t, dir, ".agents/skills/surface.yaml", `{
   "version": 2,
   "plugin_root": "demo",
@@ -96,7 +96,7 @@ metadata:
 }
 
 func TestSync_PreservesPortableProjectionFrontmatter(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	surface, _ := json.Marshal(map[string]any{
 		"version":              2,
 		"plugin_root":          "demo",
@@ -241,7 +241,7 @@ func TestSync_RemovesStaleManagedMirrors(t *testing.T) {
 }
 
 func TestSync_RejectsNonPortableFrontmatter(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	surface, _ := json.Marshal(map[string]any{
 		"version": 1,
 		"skills": []map[string]any{{
@@ -261,7 +261,7 @@ func TestSync_RejectsNonPortableFrontmatter(t *testing.T) {
 }
 
 func TestSync_AllowsSourceOnlyFrontmatterAndBlockDescription(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	surface, _ := json.Marshal(map[string]any{
 		"version": 1,
 		"skills": []map[string]any{{
@@ -304,7 +304,7 @@ see_also:
 }
 
 func TestSync_Version2EmitsSourceFrontmatter(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	surface, _ := json.Marshal(map[string]any{
 		"version": 2,
 		"skills": []map[string]any{{
@@ -348,8 +348,8 @@ triggers:
 
 func TestSync_UsesAgentskillsValidatorFallback(t *testing.T) {
 	dir := setupSyncRepo(t)
-	binDir := t.TempDir()
-	logPath := filepath.Join(t.TempDir(), "validator.log")
+	binDir := canonicalTempDir(t)
+	logPath := filepath.Join(canonicalTempDir(t), "validator.log")
 	validator := filepath.Join(binDir, "agentskills")
 	if err := os.WriteFile(validator, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SKILLS_VALIDATOR_LOG\"\n"), 0o755); err != nil {
 		t.Fatal(err)
@@ -378,7 +378,7 @@ func TestSync_UsesAgentskillsValidatorFallback(t *testing.T) {
 
 func TestCheckWithOptions_HostValidatorFailsWhenMissing(t *testing.T) {
 	dir := setupSyncRepo(t)
-	t.Setenv("PATH", t.TempDir())
+	t.Setenv("PATH", canonicalTempDir(t))
 
 	report := CheckWithOptions(dir, Options{ValidatorMode: ValidatorHost})
 	if len(report.Errors) == 0 {
@@ -391,7 +391,7 @@ func TestCheckWithOptions_HostValidatorFailsWhenMissing(t *testing.T) {
 
 func TestCheckWithOptions_OffValidatorSuppressesWarning(t *testing.T) {
 	dir := setupSyncRepo(t)
-	t.Setenv("PATH", t.TempDir())
+	t.Setenv("PATH", canonicalTempDir(t))
 
 	report := CheckWithOptions(dir, Options{ValidatorMode: ValidatorOff})
 	if len(report.Errors) > 0 {
@@ -407,8 +407,8 @@ func TestCheckWithOptions_OffValidatorSuppressesWarning(t *testing.T) {
 
 func TestCheckWithOptions_PinnedValidatorUsesUVX(t *testing.T) {
 	dir := setupSyncRepo(t)
-	binDir := t.TempDir()
-	logPath := filepath.Join(t.TempDir(), "validator.log")
+	binDir := canonicalTempDir(t)
+	logPath := filepath.Join(canonicalTempDir(t), "validator.log")
 	validator := filepath.Join(binDir, "uvx")
 	if err := os.WriteFile(validator, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SKILLS_VALIDATOR_LOG\"\n"), 0o755); err != nil {
 		t.Fatal(err)
@@ -434,8 +434,8 @@ func TestCheckWithOptions_PinnedValidatorUsesUVX(t *testing.T) {
 
 func TestCheckWithOptions_PinnedValidatorIgnoresHostValidator(t *testing.T) {
 	dir := setupSyncRepo(t)
-	binDir := t.TempDir()
-	logPath := filepath.Join(t.TempDir(), "validator.log")
+	binDir := canonicalTempDir(t)
+	logPath := filepath.Join(canonicalTempDir(t), "validator.log")
 	hostValidator := filepath.Join(binDir, "skills-ref")
 	if err := os.WriteFile(hostValidator, []byte("#!/bin/sh\necho host validator should not run >&2\nexit 42\n"), 0o755); err != nil {
 		t.Fatal(err)
@@ -509,7 +509,7 @@ func TestFilterValidatorFrontmatterUsesStrictAgentSkillsSubset(t *testing.T) {
 }
 
 func TestParseSurface_YAML(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	writeFile(t, dir, ".agents/skills/surface.yaml", "version: 1\nskills:\n  - name: alpha\n  - name: beta\n")
 
 	surface, err := ParseSurface(dir)
@@ -522,7 +522,7 @@ func TestParseSurface_YAML(t *testing.T) {
 }
 
 func TestParseSurface_Version2DefaultsExportAllToPlugin(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	writeFile(t, dir, ".agents/skills/surface.yaml", `{
   "version": 2,
   "plugin_root": "demo",
@@ -553,7 +553,7 @@ func TestParseSurface_Version2DefaultsExportAllToPlugin(t *testing.T) {
 }
 
 func TestSync_AddsHyphenAliasForUnderscoreSkills(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	surface, _ := json.Marshal(map[string]any{
 		"version": 1,
 		"skills": []map[string]any{{
@@ -588,7 +588,7 @@ func TestSync_AddsHyphenAliasForUnderscoreSkills(t *testing.T) {
 }
 
 func TestSync_DoesNotDuplicateExplicitNormalizedAlias(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	surface, _ := json.Marshal(map[string]any{
 		"version": 1,
 		"skills": []map[string]any{{

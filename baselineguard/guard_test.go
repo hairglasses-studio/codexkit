@@ -13,7 +13,7 @@ import (
 
 func setupCompliantRepo(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 
 	writeFile(t, dir, "AGENTS.md", "# Test\n\n> Canonical instructions: AGENTS.md\n")
 	writeFile(t, dir, "CLAUDE.md", "# Test\n\nThis repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file.\n")
@@ -64,7 +64,7 @@ func TestCheck_CompliantRepo(t *testing.T) {
 }
 
 func TestDiscoverWorkspaceTargetsUsesManifestAndSkipsNonGitRepos(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeFile(t, root, "workspace/manifest.json", `{
   "version": 2,
   "repos": [
@@ -107,7 +107,7 @@ func TestDiscoverWorkspaceTargetsUsesManifestAndSkipsNonGitRepos(t *testing.T) {
 // entries for open-mcpkit and anthropic-ica-practice, both scoped
 // active_first_party but deliberately marked baseline_target:false.
 func TestDiscoverWorkspaceTargetsBaselineTargetFalseExcludesRegardlessOfScope(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	writeFile(t, root, "workspace/manifest.json", `{
   "version": 2,
   "repos": [
@@ -635,7 +635,7 @@ func withNow(t *testing.T, ts string) {
 // workspace/model-lifecycle.json registry with the given raw JSON body.
 func setupLifecycleRepo(t *testing.T, registryJSON string) string {
 	t.Helper()
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	repoDir := filepath.Join(root, "repo")
 	if err := os.MkdirAll(repoDir, 0755); err != nil {
 		t.Fatal(err)
@@ -828,7 +828,7 @@ func TestModelPinFreshness_OverlapGuardDoesNotDoubleReport(t *testing.T) {
 
 func setupSpecTargetRepo(t *testing.T, protocolVersion, registryJSON string) string {
 	t.Helper()
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	repoDir := filepath.Join(root, "repo")
 	if err := os.MkdirAll(repoDir, 0755); err != nil {
 		t.Fatal(err)
@@ -918,7 +918,7 @@ func TestMCPSpecTarget_PastDeadlineFails(t *testing.T) {
 
 func setupConfigExpectationRepo(t *testing.T, registryJSON string) string {
 	t.Helper()
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	repoDir := filepath.Join(root, "repo")
 	if err := os.MkdirAll(repoDir, 0755); err != nil {
 		t.Fatal(err)

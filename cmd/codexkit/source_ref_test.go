@@ -24,7 +24,7 @@ func TestExecuteSourceRefValidatesAndSummarizesOfflineInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "source-refs.json")
+	path := filepath.Join(canonicalTempDir(t), "source-refs.json")
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestExecuteSourceRefValidatesAndSummarizesOfflineInventory(t *testing.T) {
 
 func TestExecuteSourceRefRejectsStaleAndOversizedInputs(t *testing.T) {
 	now := time.Date(2026, 8, 11, 21, 0, 0, 0, time.UTC)
-	path := filepath.Join(t.TempDir(), "source-refs.json")
+	path := filepath.Join(canonicalTempDir(t), "source-refs.json")
 	if err := os.WriteFile(path, []byte(`{"schema_version":1,"repositories":[]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}

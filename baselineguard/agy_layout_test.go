@@ -8,7 +8,7 @@ import (
 func TestAGYDocumentedLayouts(t *testing.T) {
 	for _, path := range []string{"flat.md", "nested/agent.md"} {
 		t.Run(path, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := canonicalTempDir(t)
 			writeFile(t, dir, ".agents/agents/"+path, "---\nname: auditor\ndescription: Audit surfaces.\n---\nInstructions\n")
 			r := &Report{}
 			r.addAGYAgentLayout(dir)
@@ -20,7 +20,7 @@ func TestAGYDocumentedLayouts(t *testing.T) {
 }
 
 func TestAGYDuplicateIdentity(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	for _, path := range []string{"flat.md", "nested/agent.md"} {
 		writeFile(t, dir, ".agents/agents/"+path, "---\nname: auditor\ndescription: Audit surfaces.\n---\n")
 	}

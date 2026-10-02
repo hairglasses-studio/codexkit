@@ -11,8 +11,8 @@ import (
 func TestMetadataPathLabelPrefersRepoRelativePathForCodexkitSelfAudit(t *testing.T) {
 	t.Parallel()
 
-	repoRoot := filepath.Join(t.TempDir(), "codexkit")
-	toolRoot := filepath.Join(t.TempDir(), "codexkit-tool")
+	repoRoot := filepath.Join(canonicalTempDir(t), "codexkit")
+	toolRoot := filepath.Join(canonicalTempDir(t), "codexkit-tool")
 
 	for _, path := range []string{
 		filepath.Join(repoRoot, "templates"),
@@ -62,8 +62,8 @@ hg_parity_metadata_path_label "__REPO_ROOT__" "__TOOL_TEMPLATE__"
 func TestMetadataPathLabelKeepsCodexkitPrefixForExternalRepos(t *testing.T) {
 	t.Parallel()
 
-	repoRoot := filepath.Join(t.TempDir(), "external-repo")
-	toolRoot := filepath.Join(t.TempDir(), "codexkit-tool")
+	repoRoot := filepath.Join(canonicalTempDir(t), "external-repo")
+	toolRoot := filepath.Join(canonicalTempDir(t), "codexkit-tool")
 
 	for _, path := range []string{
 		filepath.Join(repoRoot, "templates"),

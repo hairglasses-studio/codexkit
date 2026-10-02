@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestBaselineCheckJSONIsMachineReadable(t *testing.T) {
-	dir := t.TempDir()
+	dir := canonicalTempDir(t)
 	mkdirAll(t, filepath.Join(dir, ".git"))
 	writeText(t, filepath.Join(dir, "AGENTS.md"), "# Demo\n")
 	writeText(t, filepath.Join(dir, "CLAUDE.md"), "# Demo\n")
@@ -91,4 +91,3 @@ func writeText(t *testing.T, path string, content string) {
 		t.Fatal(err)
 	}
 }
-

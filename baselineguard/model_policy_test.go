@@ -16,10 +16,10 @@ func TestFleetModelPolicyIsNotUpstreamRetirement(t *testing.T) {
 }
 
 func TestModelPolicyResolvesWorkspaceForIsolatedCheckout(t *testing.T) {
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	t.Setenv("CODEXKIT_WORKSPACE_ROOT", root)
 	writeFile(t, root, "workspace/model-lifecycle.json", `{"version":1,"models":[{"id":"legacy","policy_disallowed":true,"replacement":"current"}]}`)
-	repo := filepath.Join(t.TempDir(), "isolated")
+	repo := filepath.Join(canonicalTempDir(t), "isolated")
 	writeFile(t, repo, ".codex/config.toml", "model = \"legacy\"\n")
 	r := &Report{}
 	r.addModelPinFreshness(repo)

@@ -56,7 +56,7 @@ func TestFindCodexkitRootFallsBackToSourceTree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Getwd() error = %v", err)
 	}
-	temp := t.TempDir()
+	temp := canonicalTempDir(t)
 	if err := os.Chdir(temp); err != nil {
 		t.Fatalf("Chdir(%q) error = %v", temp, err)
 	}

@@ -311,7 +311,7 @@ func TestResearchReadOnlyToolsAreRegistered(t *testing.T) {
 
 func newResearchHarness(t *testing.T, feeds []researchrefresh.Feed) string {
 	t.Helper()
-	root := t.TempDir()
+	root := canonicalTempDir(t)
 	if err := os.MkdirAll(filepath.Join(root, "codexkit"), 0o755); err != nil {
 		t.Fatal(err)
 	}
