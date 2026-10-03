@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/hairglasses-studio/codexkit/sourcecontract"
+	"github.com/hairglasses-studio/codexkit/surfaceparity"
 )
 
 type AuditReport struct {
@@ -37,11 +38,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 	var outputJSON string
 	var outputMD string
 	var checkMode bool
+	var parityMode bool
+	var syncMode bool
 
 	flagSet.StringVar(&workspaceRoot, "workspace", ".", "Workspace root to audit")
 	flagSet.StringVar(&outputJSON, "json", "surface-audit.json", "JSON output file")
 	flagSet.StringVar(&outputMD, "md", "surface-audit.md", "Markdown output file")
 	flagSet.BoolVar(&checkMode, "check", false, "Run continuous unification compliance checks")
+	flagSet.BoolVar(&parityMode, "parity", false, "Run multi-repo surface parity audit across 74+ workspaces")
+	flagSet.BoolVar(&syncMode, "sync", false, "Automatically synchronize and repair surface files across workspaces")
 
 	if err := flagSet.Parse(args); err != nil {
 		return 2
@@ -50,6 +55,36 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if flagSet.NArg() > 0 {
 		fmt.Fprintf(stderr, "error: unexpected arguments\n")
 		return 2
+	}
+
+	if parityMode || syncMode {
+		report, err := surfaceparity.RunSweep(surfaceparity.SweepOptions{
+			WorkspaceRoot: workspaceRoot,
+			Sync:          syncMode,
+		})
+		if err != nil {
+			fmt.Fprintf(stderr, "error running surface parity sweep: %v\n", err)
+			return 1
+		}
+		jsonBytes, err := json.MarshalIndent(report, "", "  ")
+		if err != nil {
+			fmt.Fprintf(stderr, "error encoding JSON parity report: %v\n", err)
+			return 1
+		}
+		if err := writeReportFile(outputJSON, jsonBytes); err != nil {
+			fmt.Fprintf(stderr, "error writing JSON parity report: %v\n", err)
+			return 1
+		}
+		if err := writeReportFile(outputMD, []byte(report.Markdown())); err != nil {
+			fmt.Fprintf(stderr, "error writing Markdown parity report: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Surface parity sweep completed (%d repos, %d compliant, %d drifted). Wrote to %s and %s\n",
+			report.TotalRepos, report.CompliantRepos, report.DriftedRepos, outputJSON, outputMD)
+		if !syncMode && report.DriftedRepos > 0 {
+			return 1
+		}
+		return 0
 	}
 
 	if checkMode {
@@ -310,6 +345,13 @@ func runComplianceChecks(workspaceRoot string) bool {
 		fmt.Println("[PASS] Skill symlinks integrity check passed")
 	}
 
+	fmt.Println("--> Running Multi-Repo Surface Parity Sweep across 74+ Workspaces...")
+	if !checkSurfaceParity(workspaceRoot, false) {
+		passed = false
+	} else {
+		fmt.Println("[PASS] Multi-repo surface parity check passed")
+	}
+
 	fmt.Println("--> Running Gofmt Compliance Check...")
 	if !checkGofmtCompliance(workspaceRoot) {
 		passed = false
@@ -324,6 +366,41 @@ func runComplianceChecks(workspaceRoot string) bool {
 	}
 
 	return passed
+}
+
+func checkSurfaceParity(workspaceRoot string, syncMode bool, out ...io.Writer) bool {
+	var w io.Writer = os.Stdout
+	if len(out) > 0 && out[0] != nil {
+		w = out[0]
+	}
+
+	report, err := surfaceparity.RunSweep(surfaceparity.SweepOptions{
+		WorkspaceRoot: workspaceRoot,
+		Sync:          syncMode,
+	})
+	if err != nil {
+		fmt.Fprintf(w, "[FAIL] Surface parity sweep error: %v\n", err)
+		return false
+	}
+
+	fmt.Fprintf(w, "    Audited %d repositories: %d compliant, %d drifted\n",
+		report.TotalRepos, report.CompliantRepos, report.DriftedRepos)
+
+	if report.DriftedRepos > 0 {
+		for _, st := range report.Repos {
+			if !st.InSync {
+				var issues []string
+				issues = append(issues, st.AgentsMDIssues...)
+				issues = append(issues, st.ClaudeMDIssues...)
+				issues = append(issues, st.MCPErrors...)
+				fmt.Fprintf(w, "    [DRIFT] %s: %s\n", st.RepoName, strings.Join(issues, "; "))
+			}
+		}
+		if !syncMode {
+			return false
+		}
+	}
+	return true
 }
 
 func checkSkillSymlinks(workspaceRoot string) bool {
@@ -394,6 +471,27 @@ func checkGofmtCompliance(workspaceRoot string, out ...io.Writer) bool {
 		w = out[0]
 	}
 
+	manifestPath := filepath.Join(workspaceRoot, "workspace", "manifest.json")
+	var allowedDirs map[string]bool
+	if data, err := os.ReadFile(manifestPath); err == nil {
+		var m struct {
+			Repos []struct {
+				Name string `json:"name"`
+				Path string `json:"path"`
+			} `json:"repos"`
+		}
+		if err := json.Unmarshal(data, &m); err == nil && len(m.Repos) > 0 {
+			allowedDirs = make(map[string]bool)
+			for _, r := range m.Repos {
+				dirName := r.Path
+				if dirName == "" {
+					dirName = r.Name
+				}
+				allowedDirs[dirName] = true
+			}
+		}
+	}
+
 	excludedDirs := map[string]bool{
 		".git":                 true,
 		"vault":                true,
@@ -416,6 +514,7 @@ func checkGofmtCompliance(workspaceRoot string, out ...io.Writer) bool {
 		"__pycache__":          true,
 		"dist":                 true,
 		"build":                true,
+		"artifacts":            true,
 	}
 
 	passed := true
@@ -433,6 +532,15 @@ func checkGofmtCompliance(workspaceRoot string, out ...io.Writer) bool {
 			}
 			if strings.HasPrefix(name, ".") && name != ".agents" && path != workspaceRoot {
 				return filepath.SkipDir
+			}
+			if allowedDirs != nil && path != workspaceRoot {
+				rel, rerr := filepath.Rel(workspaceRoot, path)
+				if rerr == nil {
+					parts := strings.Split(filepath.ToSlash(rel), "/")
+					if len(parts) == 1 && !allowedDirs[parts[0]] {
+						return filepath.SkipDir
+					}
+				}
 			}
 			return nil
 		}
@@ -462,7 +570,6 @@ func checkGofmtCompliance(workspaceRoot string, out ...io.Writer) bool {
 
 		return nil
 	})
-
 	if err != nil {
 		fmt.Fprintf(w, "[FAIL] Gofmt walk error: %v\n", err)
 		return false

@@ -91,4 +91,3 @@ func writeText(t *testing.T, path string, content string) {
 		t.Fatal(err)
 	}
 }
-

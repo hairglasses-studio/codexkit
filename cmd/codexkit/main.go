@@ -23,6 +23,7 @@ import (
 	"github.com/hairglasses-studio/codexkit/skillsync"
 	"github.com/hairglasses-studio/codexkit/sourcecontract"
 	"github.com/hairglasses-studio/codexkit/surfaceindex"
+	"github.com/hairglasses-studio/codexkit/surfaceparity"
 	"github.com/hairglasses-studio/codexkit/telemetry"
 	"github.com/hairglasses-studio/codexkit/unificationaudit"
 	"github.com/hairglasses-studio/codexkit/workspace"
@@ -65,6 +66,8 @@ func main() {
 		runRepoReadiness(os.Args[2:])
 	case "unification":
 		runUnification(os.Args[2:])
+	case "parity":
+		runParity(os.Args[2:])
 	case "reduction":
 		runReduction(os.Args[2:])
 	case "telemetry":
@@ -152,6 +155,12 @@ Commands:
                                  Generate a repeatable unification cycle note; defaults to the latest prior note for carry-forward checks
   unification shell-file <repo> <path> [--json]
                                  Inventory functions, entrypoints, and obvious callers for one shell file
+  parity audit [root] [--json] [--scope <scope>]
+                                 Run multi-repo surface parity audit across 74+ workspaces
+  parity sync [root] [--json] [--scope <scope>]
+                                 Automatically synchronize and repair surface files across workspaces
+  parity report [root] [--scope <scope>]
+                                 Print the surface parity audit as Markdown
   reduction <audit|dedup|plan|apply|verify> [root] [--json] [--all-scopes] [--max-repos <n>] [--limit <n>] [--execute]
                                  Run LLM-surface reduction ranking and tranche planning helpers
   telemetry record [--event-type <type>] [--repo <repo>] [--provider <p>] [--model <m>] [--status <s>] [--decision <d>]
@@ -986,6 +995,54 @@ func runUnificationShellFile(args []string) {
 		return
 	}
 	fmt.Print(inventory.Markdown())
+}
+
+func runParity(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: codexkit parity <audit|sync|report> [root] [--json] [--scope <scope>]")
+		os.Exit(1)
+	}
+	cmd := args[0]
+	root := workspace.DefaultRoot()
+	jsonOut := false
+	scope := ""
+	rootSet := false
+
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "--json":
+			jsonOut = true
+		case "--scope":
+			i++
+			if i < len(args) {
+				scope = args[i]
+			}
+		default:
+			if !strings.HasPrefix(arg, "-") && !rootSet {
+				root = arg
+				rootSet = true
+			}
+		}
+	}
+
+	syncMode := (cmd == "sync")
+	report, err := surfaceparity.RunSweep(surfaceparity.SweepOptions{
+		WorkspaceRoot: root,
+		Sync:          syncMode,
+		ScopeFilter:   scope,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error running surface parity sweep: %v\n", err)
+		os.Exit(1)
+	}
+
+	if jsonOut {
+		printJSON(report)
+		return
+	}
+
+	fmt.Print(report.Markdown())
 }
 
 func runReduction(args []string) {

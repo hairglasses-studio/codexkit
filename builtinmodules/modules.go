@@ -16,6 +16,7 @@ import (
 	"github.com/hairglasses-studio/codexkit/skillsync"
 	"github.com/hairglasses-studio/codexkit/sourcecontract"
 	"github.com/hairglasses-studio/codexkit/surfaceindex"
+	"github.com/hairglasses-studio/codexkit/surfaceparity"
 	"github.com/hairglasses-studio/codexkit/telemetry"
 	"github.com/hairglasses-studio/codexkit/unificationaudit"
 	"github.com/hairglasses-studio/codexkit/workspace"
@@ -36,6 +37,7 @@ func All() []codexkit.ToolModule {
 		researchrefresh.Module(),
 		sourcecontract.Module(),
 		surfaceindex.Module(),
+		surfaceparity.Module(),
 		telemetry.Module(),
 		unificationaudit.Module(),
 		workspace.Module(),
@@ -57,6 +59,7 @@ func ForMCP() []codexkit.ToolModule {
 		reporeadiness.Module(),
 		sourcecontract.Module(),
 		surfaceindex.Module(),
+		surfaceparity.Module(),
 		telemetry.Module(),
 		unificationaudit.Module(),
 		workspace.Module(),
