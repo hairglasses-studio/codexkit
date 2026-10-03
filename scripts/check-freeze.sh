@@ -42,7 +42,7 @@ Exempt reasons and the paths each may touch:
                            fixtures/, research/, vendor/
   freeze-guard-maintenance the freeze guard itself (.githooks/, its scripts)
   deprecation-doc          DEPRECATED.md, PUBLIC_BOUNDARY.md, README.md,
-                           CHANGELOG.md, CONTRIBUTING.md
+                           CHANGELOG.md, CONTRIBUTING.md, CLAUDE.md, AGENTS.md
 EOF
 }
 
@@ -100,6 +100,7 @@ path_allowed() {
 	deprecation-doc)
 		case "$path" in
 		DEPRECATED.md | PUBLIC_BOUNDARY.md | README.md | CHANGELOG.md | CONTRIBUTING.md | ROADMAP.md) return 0 ;;
+		CLAUDE.md | AGENTS.md) return 0 ;; # agent entrypoints (DRW29 D03)
 		*) return 1 ;;
 		esac
 		;;

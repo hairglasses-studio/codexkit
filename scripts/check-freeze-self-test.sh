@@ -171,6 +171,11 @@ else
 	bad "allowed commit is missing the parsed trailer"
 fi
 
+printf '# entrypoint touch\n' >>"${clone}/CLAUDE.md"
+git -C "$clone" add CLAUDE.md
+expect_commit allow "deprecation-doc touching the CLAUDE.md agent entrypoint" \
+	"$(printf 'docs: fix entrypoint import\n\nFreeze-Exempt: deprecation-doc')"
+
 printf '# maintenance touch\n' >>"${clone}/scripts/check-freeze.sh"
 git -C "$clone" add scripts/check-freeze.sh
 expect_commit allow "freeze-guard-maintenance touching the guard itself" \
