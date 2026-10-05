@@ -1,0 +1,15 @@
+# claude-autofix — Claude fixes a red `ci` run on a same-repo PR branch (tier A/B repos).
+# Canonical source: hairglasses-studio/.github callers/claude-autofix.yml
+name: claude-autofix
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+jobs:
+  autofix:
+    uses: hairglasses-studio/.github/.github/workflows/reusable-claude-autofix.yml@v1
+    secrets: inherit

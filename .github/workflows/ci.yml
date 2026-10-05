@@ -1,14 +1,19 @@
-name: "Deprecated: Go CI"
-
+# ci — calls the shared hairglasses-studio CI. Required status check: `ci / gate`.
+# Canonical source: hairglasses-studio/.github callers/ci.yml (do not hand-edit per repo).
+name: ci
 on:
+  pull_request:
+  push:
+    branches: [main, master]
   workflow_dispatch:
-
 permissions:
   contents: read
-
+  pull-requests: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
 jobs:
-  diagnostic:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Local CI is authoritative
-        run: echo "Deprecated diagnostic only. Run 'make ci' in a local checkout."
+  ci:
+    name: ci
+    uses: hairglasses-studio/.github/.github/workflows/reusable-ci.yml@v1
+    secrets: inherit
