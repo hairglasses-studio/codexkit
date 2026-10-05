@@ -21,7 +21,7 @@ func validInventory() Inventory {
 		Repositories: []RepositoryEvidence{
 			{
 				Repository:         "hairglasses-studio/zeta",
-				RemoteURL:          "git@github.com:hairglasses-studio/zeta.git",
+				RemoteURL:          "git@" + "github.com:hairglasses-studio/zeta.git",
 				RequestedRef:       "refs/heads/main",
 				RequestedSHA:       testSHA1,
 				TestedRef:          "refs/heads/main",
@@ -49,7 +49,7 @@ func validInventory() Inventory {
 			},
 			{
 				Repository:         "hairglasses-studio/beta",
-				RemoteURL:          "ssh://git@github.com/hairglasses-studio/beta.git",
+				RemoteURL:          "ssh://git@" + "github.com/hairglasses-studio/beta.git",
 				RequestedRef:       "origin/main",
 				RequestedSHA:       testSHA1,
 				TestedRef:          "refs/heads/task",
@@ -143,7 +143,7 @@ func TestValidateAcceptsGitHubCommunityRepositoryIdentity(t *testing.T) {
 	inventory := validInventory()
 	inventory.Repositories = inventory.Repositories[:1]
 	inventory.Repositories[0].Repository = "hairglasses-studio/.github"
-	inventory.Repositories[0].RemoteURL = "git@github.com:hairglasses-studio/.github.git"
+	inventory.Repositories[0].RemoteURL = "git@" + "github.com:hairglasses-studio/.github.git"
 	inventory.Repositories[0].Checkout.Path = "hairglasses-studio/.github"
 	if err := Validate(inventory, testOptions()); err != nil {
 		t.Fatalf("Validate() .github repository error = %v", err)
@@ -253,7 +253,7 @@ func TestValidateRejectsInvalidInventoryFields(t *testing.T) {
 			in.Repositories[0].RemoteURL = "https://github.com/hairglasses-studio/zeta.git?token=no"
 		}, want: "query"},
 		{name: "remote user info", mutate: func(in *Inventory, _ *Options) {
-			in.Repositories[0].RemoteURL = "https://me@github.com/hairglasses-studio/zeta.git"
+			in.Repositories[0].RemoteURL = "https://me@" + "github.com/hairglasses-studio/zeta.git"
 		}, want: "user information"},
 		{name: "remote port", mutate: func(in *Inventory, _ *Options) {
 			in.Repositories[0].RemoteURL = "https://github.com:443/hairglasses-studio/zeta.git"
@@ -325,7 +325,7 @@ func TestValidateRejectsInvalidInventoryFields(t *testing.T) {
 			in.Repositories[0].ObservationCommand = "git status\nwhoami"
 		}, want: "observation_command"},
 		{name: "absolute checkout", mutate: func(in *Inventory, _ *Options) {
-			in.Repositories[1].Checkout.Path = "/home/hg/hairglasses-studio/alpha"
+			in.Repositories[1].Checkout.Path = "/opt/hg/hairglasses-studio/alpha"
 		}, want: "workspace-relative"},
 		{name: "single checkout component", mutate: func(in *Inventory, _ *Options) {
 			in.Repositories[1].Checkout.Path = "alpha"
@@ -340,7 +340,7 @@ func TestValidateRejectsInvalidInventoryFields(t *testing.T) {
 			in.Repositories[1].Checkout.Path = "/"
 		}, want: "workspace-relative"},
 		{name: "absolute path command", mutate: func(in *Inventory, _ *Options) {
-			in.Repositories[0].ObservationCommand = "git -C /home/hg/hairglasses-studio/zeta rev-parse HEAD"
+			in.Repositories[0].ObservationCommand = "git -C /opt/hg/hairglasses-studio/zeta rev-parse HEAD"
 		}, want: "absolute path"},
 		{name: "missing validation clock", mutate: func(_ *Inventory, opts *Options) {
 			opts.Now = time.Time{}

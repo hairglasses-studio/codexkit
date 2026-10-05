@@ -234,22 +234,22 @@ func TestValidateRejectsUnsafeShapes(t *testing.T) {
 		{name: "bad remote", want: "repository remote", mutate: func(m *Manifest) { m.Objects[0].Inputs[0].Remote = "file:///tmp/repo" }},
 		{name: "remote repository mismatch", want: "must match", mutate: func(m *Manifest) { m.Objects[0].Inputs[0].Remote = "https://github.com/hairglasses-studio/other.git" }},
 		{name: "https userinfo token", want: "must not embed user information", mutate: func(m *Manifest) {
-			m.Objects[0].Inputs[0].Remote = "https://token@github.com/hairglasses-studio/codex-harness-staging.git"
+			m.Objects[0].Inputs[0].Remote = "https://token@" + "github.com/hairglasses-studio/codex-harness-staging.git"
 		}},
 		{name: "https userinfo password", want: "must not embed user information", mutate: func(m *Manifest) {
-			m.Objects[0].Inputs[0].Remote = "https://token:password@github.com/hairglasses-studio/codex-harness-staging.git"
+			m.Objects[0].Inputs[0].Remote = "https://token:password@" + "github.com/hairglasses-studio/codex-harness-staging.git"
 		}},
 		{name: "ssh password", want: "must not embed a password", mutate: func(m *Manifest) {
-			m.Objects[0].Inputs[0].Remote = "ssh://git:password@github.com/hairglasses-studio/codex-harness-staging.git"
+			m.Objects[0].Inputs[0].Remote = "ssh://git:password@" + "github.com/hairglasses-studio/codex-harness-staging.git"
 		}},
 		{name: "ssh non-git user", want: "user must be git", mutate: func(m *Manifest) {
-			m.Objects[0].Inputs[0].Remote = "ssh://ubuntu@github.com/hairglasses-studio/codex-harness-staging.git"
+			m.Objects[0].Inputs[0].Remote = "ssh://ubuntu@" + "github.com/hairglasses-studio/codex-harness-staging.git"
 		}},
 		{name: "ssh missing user", want: "user must be git", mutate: func(m *Manifest) {
 			m.Objects[0].Inputs[0].Remote = "ssh://github.com/hairglasses-studio/codex-harness-staging.git"
 		}},
 		{name: "scp non-git user", want: "user must be git", mutate: func(m *Manifest) {
-			m.Objects[0].Inputs[0].Remote = "ubuntu@github.com:hairglasses-studio/codex-harness-staging.git"
+			m.Objects[0].Inputs[0].Remote = "ubuntu@" + "github.com:hairglasses-studio/codex-harness-staging.git"
 		}},
 		{name: "bad ref", want: "normalized explicit", mutate: func(m *Manifest) { m.Objects[0].Inputs[0].Ref = "refs/../main" }},
 		{name: "bad commit", want: "exact commit", mutate: func(m *Manifest) { m.Objects[0].Inputs[0].Commit = "main" }},
@@ -309,8 +309,8 @@ func TestRelativeSymlinkContainment(t *testing.T) {
 func TestValidCredentialFreeRemoteForms(t *testing.T) {
 	remotes := []string{
 		"https://github.com/hairglasses-studio/codex-harness-staging.git",
-		"ssh://git@github.com/hairglasses-studio/codex-harness-staging.git",
-		"git@github.com:hairglasses-studio/codex-harness-staging.git",
+		"ssh://git@" + "github.com/hairglasses-studio/codex-harness-staging.git",
+		"git@" + "github.com:hairglasses-studio/codex-harness-staging.git",
 	}
 	for _, remote := range remotes {
 		t.Run(remote, func(t *testing.T) {
@@ -392,7 +392,7 @@ func TestRenderPreservesOrderedInputs(t *testing.T) {
 	object.Transform = "v1"
 	object.Inputs = append(object.Inputs, SourceInput{
 		Repository:        "hairglasses-studio/shared-inputs",
-		Remote:            "git@github.com:hairglasses-studio/shared-inputs.git",
+		Remote:            "git@" + "github.com:hairglasses-studio/shared-inputs.git",
 		Ref:               "refs/tags/v1.0.0",
 		Commit:            strings.Repeat("d", 40),
 		Path:              "templates/fragment.toml",

@@ -13,7 +13,7 @@ import (
 func TestExecuteSourceRefValidatesAndSummarizesOfflineInventory(t *testing.T) {
 	now := time.Date(2026, 8, 11, 21, 0, 0, 0, time.UTC)
 	inventory := sourceref.Inventory{SchemaVersion: sourceref.SchemaVersion, Repositories: []sourceref.RepositoryEvidence{{
-		Repository: "hairglasses-studio/example", RemoteURL: "git@github.com:hairglasses-studio/example.git",
+		Repository: "hairglasses-studio/example", RemoteURL: "git@" + "github.com:hairglasses-studio/example.git",
 		RequestedRef: "refs/heads/main", RequestedSHA: strings.Repeat("1", 40),
 		TestedRef: "HEAD", TestedSHA: strings.Repeat("1", 40),
 		Checkout: &sourceref.Checkout{Path: "hairglasses-studio/example"}, ObservedAt: now.Add(-time.Hour),

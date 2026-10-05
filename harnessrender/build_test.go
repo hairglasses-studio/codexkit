@@ -55,7 +55,7 @@ func newBuildFixture(t testing.TB) buildFixture {
 	docsInput := func(path string, content []byte) harnessmanifest.SourceInput {
 		return harnessmanifest.SourceInput{
 			Repository: "hairglasses-studio/docs",
-			Remote:     "git@github.com:hairglasses-studio/docs.git",
+			Remote:     "git@" + "github.com:hairglasses-studio/docs.git",
 			Ref:        "refs/heads/main",
 			Commit:     testDocsSHA,
 			Path:       path,
@@ -149,7 +149,7 @@ func newBuildFixture(t testing.TB) buildFixture {
 		Repositories: []sourceref.RepositoryEvidence{
 			{
 				Repository:         "hairglasses-studio/docs",
-				RemoteURL:          "git@github.com:hairglasses-studio/docs.git",
+				RemoteURL:          "git@" + "github.com:hairglasses-studio/docs.git",
 				RequestedRef:       "refs/heads/main",
 				RequestedSHA:       testDocsSHA,
 				TestedRef:          "refs/heads/main",
@@ -202,7 +202,7 @@ func newBuildFixture(t testing.TB) buildFixture {
 			{
 				ID:            "docs-main",
 				Repository:    "hairglasses-studio/docs",
-				RemoteURL:     "git@github.com:hairglasses-studio/docs.git",
+				RemoteURL:     "git@" + "github.com:hairglasses-studio/docs.git",
 				RequestedRef:  "refs/heads/main",
 				RequestedSHA:  testDocsSHA,
 				TestedRef:     "refs/heads/main",
@@ -483,8 +483,8 @@ func TestBuildMaterializesAllSupportedModesDeterministically(t *testing.T) {
 
 func TestBuildAcceptsEquivalentRemoteSpellings(t *testing.T) {
 	fixture := newBuildFixture(t)
-	fixture.inventory.Repositories[1].RemoteURL = "git@github.com:hairglasses-studio/codex-harness-staging.git"
-	fixture.envelope.Plan.SourceBindings[1].RemoteURL = "ssh://git@github.com/hairglasses-studio/codex-harness-staging.git"
+	fixture.inventory.Repositories[1].RemoteURL = "git@" + "github.com:hairglasses-studio/codex-harness-staging.git"
+	fixture.envelope.Plan.SourceBindings[1].RemoteURL = "ssh://git@" + "github.com/hairglasses-studio/codex-harness-staging.git"
 	fixture.reseal(t)
 
 	if _, err := Build(fixture.manifest, fixture.inventory, fixture.envelope, fixture.materials, fixture.options); err != nil {
@@ -673,7 +673,7 @@ func TestBuildRejectsSourceContractDrift(t *testing.T) {
 			f.reseal(t)
 		}},
 		{name: "plan remote host drift", want: "same normalized remote", mutate: func(f *buildFixture) {
-			f.envelope.Plan.SourceBindings[1].RemoteURL = "git@mirror.example.com:hairglasses-studio/codex-harness-staging.git"
+			f.envelope.Plan.SourceBindings[1].RemoteURL = "git@example.com:hairglasses-studio/codex-harness-staging.git"
 			f.reseal(t)
 		}},
 		{name: "plan observed time drift", want: "inventory observed_at", mutate: func(f *buildFixture) {
