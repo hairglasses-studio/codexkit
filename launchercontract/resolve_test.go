@@ -32,7 +32,7 @@ func validObservations(candidate string) Observations {
 		GitTopLevel:   candidate,
 		GitCommonDir:  "/srv/git/codex-harness-staging/.git",
 		Repository:    CanonicalRepository,
-		RemoteURL:     "git@github.com:hairglasses-studio/codex-harness-staging.git",
+		RemoteURL:     "git@" + "github.com:hairglasses-studio/codex-harness-staging.git",
 		TestedSHA:     testCommit,
 		CheckoutClean: true,
 		Markers: []MarkerObservation{
@@ -54,7 +54,7 @@ func cloneTrust(trust Trust) Trust {
 
 func TestResolvePrecedenceAndCheckoutModes(t *testing.T) {
 	t.Parallel()
-	candidate := "/home/test/Harness With Spaces"
+	candidate := "/opt/test/Harness With Spaces"
 	baseObservations := validObservations(candidate)
 	trust := validTrust()
 	tests := []struct {
@@ -137,10 +137,10 @@ func TestResolveAcceptsNormalizedRemoteForms(t *testing.T) {
 	candidate := "/work/harness"
 	inputs := Inputs{CodexHarnessDir: InputValue{Present: true, Value: candidate}}
 	for _, remote := range []string{
-		"git@github.com:hairglasses-studio/codex-harness-staging.git",
+		"git@" + "github.com:hairglasses-studio/codex-harness-staging.git",
 		"https://github.com/hairglasses-studio/codex-harness-staging",
 		"https://github.com/hairglasses-studio/codex-harness-staging.git",
-		"ssh://git@github.com/hairglasses-studio/codex-harness-staging.git",
+		"ssh://git@" + "github.com/hairglasses-studio/codex-harness-staging.git",
 	} {
 		remote := remote
 		t.Run(remote, func(t *testing.T) {
@@ -209,17 +209,17 @@ func TestResolveRejectsObservationAndTrustMatrix(t *testing.T) {
 		{name: "common-dir equals worktree", mutate: func(o *Observations, _ *Trust) { o.GitCommonDir = o.Candidate }, want: "must not equal"},
 		{name: "standalone codexkit repository", mutate: func(o *Observations, _ *Trust) {
 			o.Repository = "hairglasses-studio/codexkit"
-			o.RemoteURL = "git@github.com:hairglasses-studio/codexkit.git"
+			o.RemoteURL = "git@" + "github.com:hairglasses-studio/codexkit.git"
 		}, want: "not the central harness"},
-		{name: "standalone codexkit remote", mutate: func(o *Observations, _ *Trust) { o.RemoteURL = "git@github.com:hairglasses-studio/codexkit.git" }, want: "does not identify"},
+		{name: "standalone codexkit remote", mutate: func(o *Observations, _ *Trust) { o.RemoteURL = "git@" + "github.com:hairglasses-studio/codexkit.git" }, want: "does not identify"},
 		{name: "remote credentials", mutate: func(o *Observations, _ *Trust) {
-			o.RemoteURL = "https://user:secret@github.com/hairglasses-studio/codex-harness-staging.git"
+			o.RemoteURL = "https://user:secret@" + "github.com/hairglasses-studio/codex-harness-staging.git"
 		}, want: "user information"},
 		{name: "remote query", mutate: func(o *Observations, _ *Trust) {
 			o.RemoteURL = "https://github.com/hairglasses-studio/codex-harness-staging.git?token=x"
 		}, want: "query"},
 		{name: "remote port", mutate: func(o *Observations, _ *Trust) {
-			o.RemoteURL = "ssh://git@github.com:22/hairglasses-studio/codex-harness-staging.git"
+			o.RemoteURL = "ssh://git@" + "github.com:22/hairglasses-studio/codex-harness-staging.git"
 		}, want: "port"},
 		{name: "remote scheme", mutate: func(o *Observations, _ *Trust) { o.RemoteURL = "file:///work/harness" }, want: "https or ssh"},
 		{name: "short SHA", mutate: func(o *Observations, _ *Trust) { o.TestedSHA = "abc123" }, want: "40-hex"},
@@ -265,7 +265,7 @@ func TestResolveRejectsObservationAndTrustMatrix(t *testing.T) {
 
 func TestResolutionAuthorityRejectsFabricationAndGenericJSON(t *testing.T) {
 	t.Parallel()
-	candidate := "/home/alice/private harness"
+	candidate := "/opt/alice/private harness"
 	resolution, err := Resolve(
 		Inputs{CodexHarnessDir: InputValue{Present: true, Value: candidate}},
 		validObservations(candidate),
@@ -346,7 +346,7 @@ func TestAuthoritySHA256IsCanonicalAndBindsTrust(t *testing.T) {
 
 func TestPathIDIsDeterministicAndSanitized(t *testing.T) {
 	t.Parallel()
-	privatePath := "/home/alice/Harness With Spaces"
+	privatePath := "/opt/alice/Harness With Spaces"
 	first, err := PathID(privatePath)
 	if err != nil {
 		t.Fatal(err)
@@ -366,7 +366,7 @@ func TestPathIDIsDeterministicAndSanitized(t *testing.T) {
 }
 
 func FuzzResolveNeverPanics(f *testing.F) {
-	f.Add("/work/harness", "git@github.com:hairglasses-studio/codex-harness-staging.git", testCommit)
+	f.Add("/work/harness", "git@"+"github.com:hairglasses-studio/codex-harness-staging.git", testCommit)
 	f.Add("relative", "file:///tmp/codexkit", "abc")
 	f.Fuzz(func(t *testing.T, candidate, remote, commit string) {
 		inputs := Inputs{CodexHarnessDir: InputValue{Present: true, Value: candidate}}

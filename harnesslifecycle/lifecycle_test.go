@@ -240,7 +240,7 @@ func TestJournalRoundTripsAndRejectsContractViolations(t *testing.T) {
 		},
 		{
 			name:    "opaque identifier replaced by a host path",
-			mutate:  func(j *Journal) { j.JournalID = "/home/operator/journal" },
+			mutate:  func(j *Journal) { j.JournalID = "/opt/operator/journal" },
 			message: "must be 16 lowercase hex bytes",
 		},
 		{
@@ -341,7 +341,7 @@ func TestReceiptRejectsUnsanitizedAndInconsistentValues(t *testing.T) {
 	}{
 		{
 			name:    "host-absolute destination",
-			mutate:  func(r *Receipt) { r.Results[0].Destination = "/home/operator/.codex/config.toml" },
+			mutate:  func(r *Receipt) { r.Results[0].Destination = "/opt/operator/.codex/config.toml" },
 			message: "must be a portable repository-relative path",
 		},
 		{

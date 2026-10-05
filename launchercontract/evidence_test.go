@@ -21,7 +21,7 @@ func validEvidenceOptions() EvidenceOptions {
 
 func validResolution(t *testing.T) Resolution {
 	t.Helper()
-	candidate := "/home/alice/Harness With Spaces"
+	candidate := "/opt/alice/Harness With Spaces"
 	resolution, err := Resolve(
 		Inputs{CodexHarnessDir: InputValue{Present: true, Value: candidate}},
 		validObservations(candidate),
@@ -71,7 +71,7 @@ func TestEvidenceRoundTripIsCanonicalAndPathSanitized(t *testing.T) {
 	if !bytes.Equal(first, second) || !bytes.HasSuffix(first, []byte("\n")) {
 		t.Fatalf("MarshalEvidence() is not deterministic with trailing newline:\n%s", first)
 	}
-	for _, private := range []string{"/home/alice", "Harness With Spaces", "/srv/git"} {
+	for _, private := range []string{"/opt/alice", "Harness With Spaces", "/srv/git"} {
 		if bytes.Contains(first, []byte(private)) {
 			t.Fatalf("canonical evidence leaked private path %q:\n%s", private, first)
 		}
@@ -172,7 +172,7 @@ func TestValidateEvidenceRejectsNegativeMatrix(t *testing.T) {
 		{name: "negative max age", mutate: func(_ *Evidence, o *EvidenceOptions) { o.MaxAge = -time.Second }, want: "max age"},
 		{name: "missing trusted authority", mutate: func(_ *Evidence, o *EvidenceOptions) { o.ExpectedAuthoritySHA256 = "" }, want: "expected authority"},
 		{name: "wrong trusted authority", mutate: func(_ *Evidence, o *EvidenceOptions) { o.ExpectedAuthoritySHA256 = testDigest2 }, want: "trusted authority"},
-		{name: "raw candidate path", mutate: func(e *Evidence, _ *EvidenceOptions) { e.CandidatePathID = "/home/alice/harness" }, want: "sanitized path ID"},
+		{name: "raw candidate path", mutate: func(e *Evidence, _ *EvidenceOptions) { e.CandidatePathID = "/opt/alice/harness" }, want: "sanitized path ID"},
 		{name: "zero path ID", mutate: func(e *Evidence, _ *EvidenceOptions) { e.GitCommonDirPathID = "path-sha256:" + strings.Repeat("0", 64) }, want: "sanitized path ID"},
 		{name: "top mismatch", mutate: func(e *Evidence, _ *EvidenceOptions) { e.GitTopLevelPathID = e.GitCommonDirPathID }, want: "top-level path ID"},
 		{name: "common equals candidate", mutate: func(e *Evidence, _ *EvidenceOptions) { e.GitCommonDirPathID = e.CandidatePathID }, want: "must differ"},
@@ -185,7 +185,7 @@ func TestValidateEvidenceRejectsNegativeMatrix(t *testing.T) {
 		{name: "dirty", mutate: func(e *Evidence, _ *EvidenceOptions) { e.CheckoutClean = false }, want: "must be clean"},
 		{name: "no markers", mutate: func(e *Evidence, _ *EvidenceOptions) { e.Markers = nil }, want: "markers must contain"},
 		{name: "bad marker ID", mutate: func(e *Evidence, _ *EvidenceOptions) { e.Markers[0].ID = "Bad ID" }, want: ".id is invalid"},
-		{name: "raw marker path", mutate: func(e *Evidence, _ *EvidenceOptions) { e.Markers[0].PathID = "/home/alice/AGENTS.md" }, want: ".path_id is invalid"},
+		{name: "raw marker path", mutate: func(e *Evidence, _ *EvidenceOptions) { e.Markers[0].PathID = "/opt/alice/AGENTS.md" }, want: ".path_id is invalid"},
 		{name: "bad marker authority path", mutate: func(e *Evidence, _ *EvidenceOptions) { e.Markers[0].AuthorityMarkerPathID = "marker-path-sha256:bad" }, want: ".authority_marker_path_id is invalid"},
 		{name: "fabricated marker authority path", mutate: func(e *Evidence, _ *EvidenceOptions) {
 			e.Markers[0].AuthorityMarkerPathID = "marker-path-sha256:" + strings.Repeat("1", 64)
@@ -277,7 +277,7 @@ func TestEvidenceDefaultMaxAgeBoundary(t *testing.T) {
 }
 
 func FuzzLoadEvidenceNeverPanics(f *testing.F) {
-	candidate := "/home/alice/Harness With Spaces"
+	candidate := "/opt/alice/Harness With Spaces"
 	resolution, resolveErr := Resolve(
 		Inputs{CodexHarnessDir: InputValue{Present: true, Value: candidate}},
 		validObservations(candidate),

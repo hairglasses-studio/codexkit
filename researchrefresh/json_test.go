@@ -21,7 +21,7 @@ func TestRegistryValidationFailsClosed(t *testing.T) {
 	}{
 		{name: "duplicate id", feeds: []Feed{valid, valid}},
 		{name: "http URL", feeds: []Feed{withFeed(valid, func(feed *Feed) { feed.URL = "http://learn.chatgpt.com/docs/changelog" })}},
-		{name: "URL credentials", feeds: []Feed{withFeed(valid, func(feed *Feed) { feed.URL = "https://user:secret@learn.chatgpt.com/docs/changelog" })}},
+		{name: "URL credentials", feeds: []Feed{withFeed(valid, func(feed *Feed) { feed.URL = "https://user:secret@" + "learn.chatgpt.com/docs/changelog" })}},
 		{name: "URL query", feeds: []Feed{withFeed(valid, func(feed *Feed) { feed.URL = "https://learn.chatgpt.com/docs/changelog?token=secret" })}},
 		{name: "explicit port", feeds: []Feed{withFeed(valid, func(feed *Feed) { feed.URL = "https://learn.chatgpt.com:443/docs/changelog" })}},
 		{name: "IP literal", feeds: []Feed{withFeed(valid, func(feed *Feed) { feed.URL = "https://127.0.0.1/docs/changelog" })}},

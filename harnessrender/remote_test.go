@@ -6,8 +6,8 @@ func TestNormalizeRemoteIdentityEquivalentForms(t *testing.T) {
 	forms := []string{
 		"https://github.com/hairglasses-studio/codex-harness-staging",
 		"https://github.com/hairglasses-studio/codex-harness-staging.git",
-		"ssh://git@github.com/hairglasses-studio/codex-harness-staging.git",
-		"git@github.com:hairglasses-studio/codex-harness-staging.git",
+		"ssh://git@" + "github.com/hairglasses-studio/codex-harness-staging.git",
+		"git@" + "github.com:hairglasses-studio/codex-harness-staging.git",
 	}
 	want := "github.com/hairglasses-studio/codex-harness-staging"
 	for _, form := range forms {

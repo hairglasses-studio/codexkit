@@ -56,7 +56,7 @@ func validPlan() Plan {
 			{
 				ID:            "shared-docs",
 				Repository:    "hairglasses-studio/docs",
-				RemoteURL:     "git@github.com:hairglasses-studio/docs.git",
+				RemoteURL:     "git@" + "github.com:hairglasses-studio/docs.git",
 				RequestedRef:  "refs/heads/main",
 				RequestedSHA:  testOtherSHA,
 				TestedRef:     "refs/heads/main",

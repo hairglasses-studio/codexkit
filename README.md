@@ -223,11 +223,11 @@ All packages implement the `ToolModule` interface for uniform registration and a
 
 ## Local CI
 
-Local CI is authoritative. Tracked GitHub workflows are deprecated,
-manual-only diagnostics and do not validate or mutate pull requests.
+CI runs on GitHub Actions through the shared hairglasses-studio workflow
+(required check `ci / gate`); `make ci` runs the same gate locally.
 
 ```bash
-make ci       # JSON/TOML, workflow policy, format, tidy, vet, build, race tests, public boundary, baseline
+make ci       # JSON/TOML, format, tidy, vet, build, race tests, public boundary, baseline
 make baseline # repo baseline; permits only the recognized unstaged managed-launcher approval overlay
 make baseline-strict # repo baseline with no local overlay exception
 make test     # race-enabled Go tests only
