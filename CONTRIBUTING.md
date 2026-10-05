@@ -8,8 +8,8 @@ Thank you for your interest in contributing.
 make ci
 ```
 
-Local CI is authoritative. The tracked GitHub workflow files are deprecated,
-manual-only diagnostics and do not replace `make ci`.
+CI runs on GitHub Actions (required check `ci / gate`); `make ci` runs the same
+gate locally.
 `make baseline-strict` is available when no managed launcher overlay is present.
 
 ## Pull Requests

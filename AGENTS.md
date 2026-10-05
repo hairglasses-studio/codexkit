@@ -6,11 +6,11 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 
 ## Build & Test
 
-- `make ci` — authoritative local gate (parsing, workflow policy, format, tidy, vet, build, race tests, public boundary, baseline)
+- `make ci` — the CI gate (GitHub Actions runs it as `ci / gate`; also runnable locally) (parsing, format, tidy, vet, build, race tests, public boundary, baseline)
 - `make test` — run race-enabled Go tests
 - `make baseline` — validate this repo, permitting only the exact unstaged managed-launcher approval overlay
 - `make baseline-strict` — validate with no local overlay exception
-- Tracked GitHub workflows are deprecated manual-only diagnostics, not CI gates.
+- CI: GitHub Actions `ci / gate` (shared hairglasses-studio workflow); land with `hg-land`.
 
 ## Architecture
 
