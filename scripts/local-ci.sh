@@ -34,7 +34,8 @@ print(f"parsed {len(paths)} tracked JSON/TOML files")
 PY
 
 echo "==> gofmt"
-unformatted=$(gofmt -l -- $(git ls-files '*.go'))
+# vendor/ is third-party code, formatted by its own upstream gofmt version.
+unformatted=$(gofmt -l -- $(git ls-files '*.go' | grep -v '^vendor/'))
 if [[ -n "$unformatted" ]]; then
   printf 'gofmt required:\n%s\n' "$unformatted" >&2
   exit 1
