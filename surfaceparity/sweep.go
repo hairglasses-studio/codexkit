@@ -164,6 +164,19 @@ func auditAgentsMD(repoPath string, state *RepoSurfaceState, autoSync bool) {
 
 func auditClaudeMD(repoPath string, state *RepoSurfaceState, autoSync bool) {
 	claudePath := filepath.Join(repoPath, "CLAUDE.md")
+	// A symlinked CLAUDE.md is never written: os.WriteFile follows the link, so
+	// a sync would rewrite its target (AGENTS.md, in the common mirror shape).
+	if info, lerr := os.Lstat(claudePath); lerr == nil && info.Mode()&os.ModeSymlink != 0 {
+		state.HasClaudeMD = true
+		target, rerr := os.Readlink(claudePath)
+		if rerr == nil && filepath.Clean(target) == "AGENTS.md" {
+			state.ClaudeMDValid = true
+			return
+		}
+		state.ClaudeMDValid = false
+		state.ClaudeMDIssues = append(state.ClaudeMDIssues, fmt.Sprintf("CLAUDE.md is a symlink to %q, not AGENTS.md; not auto-synced", target))
+		return
+	}
 	data, err := os.ReadFile(claudePath)
 	if os.IsNotExist(err) {
 		state.HasClaudeMD = false

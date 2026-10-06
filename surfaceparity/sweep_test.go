@@ -90,3 +90,25 @@ func writeTestFile(t *testing.T, path, content string) {
 		t.Fatal(err)
 	}
 }
+
+func TestSyncNeverWritesThroughClaudeMDSymlink(t *testing.T) {
+	tempRoot := t.TempDir()
+	writeTestFile(t, filepath.Join(tempRoot, "workspace", "manifest.json"),
+		`{"version": 1, "repos": [{"name": "repo-l", "category": "hub", "scope": "active_first_party", "language": "Go"}]}`)
+	repo := filepath.Join(tempRoot, "repo-l")
+	agents := "# repo-l guidelines\n\nNo self-reference here.\n"
+	writeTestFile(t, filepath.Join(repo, "AGENTS.md"), agents)
+	if err := os.Symlink("AGENTS.md", filepath.Join(repo, "CLAUDE.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunSweep(SweepOptions{WorkspaceRoot: tempRoot, Sync: true}); err != nil {
+		t.Fatalf("RunSweep failed: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(repo, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != agents {
+		t.Fatalf("sync wrote through the CLAUDE.md symlink; AGENTS.md is now:\n%s", got)
+	}
+}
