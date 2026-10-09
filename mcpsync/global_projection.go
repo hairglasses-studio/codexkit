@@ -231,18 +231,18 @@ func WriteGlobalProjection(projection GlobalProjection, jsonPath, markdownPath s
 		if err != nil {
 			return err
 		}
-		if err := os.MkdirAll(filepath.Dir(jsonPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(jsonPath, append(data, '\n'), 0644); err != nil {
+		if err := os.WriteFile(jsonPath, append(data, '\n'), 0o644); err != nil {
 			return err
 		}
 	}
 	if markdownPath != "" {
-		if err := os.MkdirAll(filepath.Dir(markdownPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(markdownPath), 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(markdownPath, []byte(RenderGlobalProjectionMarkdown(projection)), 0644); err != nil {
+		if err := os.WriteFile(markdownPath, []byte(RenderGlobalProjectionMarkdown(projection)), 0o644); err != nil {
 			return err
 		}
 	}
@@ -349,7 +349,7 @@ type providerProjectionBuilder struct {
 	root     string
 	home     string
 	entries  map[string][]ProviderProjectionEntry
-	seen     map[string]map[string]struct{}
+	seen     map[string]map[string]ProviderProjectionEntry
 	warnings []string
 }
 
@@ -359,7 +359,7 @@ func newProviderProjectionBuilder(root string) *providerProjectionBuilder {
 		root:    root,
 		home:    home,
 		entries: map[string][]ProviderProjectionEntry{"codex": {}, "claude": {}, "gemini": {}},
-		seen: map[string]map[string]struct{}{
+		seen: map[string]map[string]ProviderProjectionEntry{
 			"codex":  {},
 			"claude": {},
 			"gemini": {},
@@ -558,11 +558,15 @@ func (b *providerProjectionBuilder) addEntry(provider string, entry ProviderProj
 		b.warnings = append(b.warnings, fmt.Sprintf("%s entry from %s:%s resolved to empty name", provider, entry.SourceRepo, entry.SourceServer))
 		return
 	}
-	if _, ok := b.seen[provider][entry.Name]; ok {
+	if existing, ok := b.seen[provider][entry.Name]; ok {
+		// If identical remote URL endpoint, deduplicate gracefully without warning
+		if existing.Server.URL != "" && existing.Server.URL == entry.Server.URL {
+			return
+		}
 		b.warnings = append(b.warnings, fmt.Sprintf("duplicate %s provider entry: %s", provider, entry.Name))
 		return
 	}
-	b.seen[provider][entry.Name] = struct{}{}
+	b.seen[provider][entry.Name] = entry
 	b.entries[provider] = append(b.entries[provider], entry)
 }
 
