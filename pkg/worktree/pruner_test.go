@@ -213,10 +213,10 @@ func TestFindPID(t *testing.T) {
 	pruner := NewPruner(DefaultConfig(tmpDir))
 
 	wt1 := filepath.Join(tmpDir, "wt1")
-	if err := os.MkdirAll(wt1, 0755); err != nil {
+	if err := os.MkdirAll(wt1, 0o755); err != nil {
 		t.Fatalf("mkdir wt1: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(wt1, ".pid"), []byte("12345\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(wt1, ".pid"), []byte("12345\n"), 0o644); err != nil {
 		t.Fatalf("write .pid: %v", err)
 	}
 
@@ -226,10 +226,10 @@ func TestFindPID(t *testing.T) {
 	}
 
 	wt2 := filepath.Join(tmpDir, "wt2")
-	if err := os.MkdirAll(wt2, 0755); err != nil {
+	if err := os.MkdirAll(wt2, 0o755); err != nil {
 		t.Fatalf("mkdir wt2: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(wt2, ".agent.pid"), []byte("54321\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(wt2, ".agent.pid"), []byte("54321\n"), 0o644); err != nil {
 		t.Fatalf("write .agent.pid: %v", err)
 	}
 
@@ -254,7 +254,7 @@ func TestFindLastActivity(t *testing.T) {
 	pruner := NewPruner(DefaultConfig(tmpDir))
 
 	wtDir := filepath.Join(tmpDir, "wt")
-	if err := os.MkdirAll(wtDir, 0755); err != nil {
+	if err := os.MkdirAll(wtDir, 0o755); err != nil {
 		t.Fatalf("mkdir wt: %v", err)
 	}
 
@@ -262,13 +262,13 @@ func TestFindLastActivity(t *testing.T) {
 	tRecent := time.Now().Add(-5 * time.Minute).Truncate(time.Second)
 
 	f1 := filepath.Join(wtDir, "old.txt")
-	if err := os.WriteFile(f1, []byte("old"), 0644); err != nil {
+	if err := os.WriteFile(f1, []byte("old"), 0o644); err != nil {
 		t.Fatalf("write old: %v", err)
 	}
 	_ = os.Chtimes(f1, tPast, tPast)
 
 	f2 := filepath.Join(wtDir, "new.txt")
-	if err := os.WriteFile(f2, []byte("new"), 0644); err != nil {
+	if err := os.WriteFile(f2, []byte("new"), 0o644); err != nil {
 		t.Fatalf("write new: %v", err)
 	}
 	_ = os.Chtimes(f2, tRecent, tRecent)
@@ -337,12 +337,17 @@ func setupTestGitRepo(t *testing.T) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()
 	repoDir := filepath.Join(root, "repo")
-	if err := os.MkdirAll(repoDir, 0755); err != nil {
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
 		t.Fatalf("mkdir repo: %v", err)
 	}
 
+	gitBin := "git"
+	if _, err := os.Stat("/usr/bin/git"); err == nil {
+		gitBin = "/usr/bin/git"
+	}
+
 	run := func(dir string, args ...string) {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(gitBin, args...)
 		cmd.Dir = dir
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -355,7 +360,7 @@ func setupTestGitRepo(t *testing.T) (string, string, string) {
 	run(repoDir, "config", "user.name", "Tester")
 
 	readme := filepath.Join(repoDir, "README.md")
-	if err := os.WriteFile(readme, []byte("test\n"), 0644); err != nil {
+	if err := os.WriteFile(readme, []byte("test\n"), 0o644); err != nil {
 		t.Fatalf("write readme: %v", err)
 	}
 	run(repoDir, "add", "README.md")
@@ -376,10 +381,10 @@ func TestLiveGitIntegration(t *testing.T) {
 	deadPid := 99999999
 	alivePid := os.Getpid()
 
-	if err := os.WriteFile(filepath.Join(wtDeadDir, ".pid"), []byte(strconv.Itoa(deadPid)+"\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(wtDeadDir, ".pid"), []byte(strconv.Itoa(deadPid)+"\n"), 0o644); err != nil {
 		t.Fatalf("write dead pid: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(wtAliveDir, ".pid"), []byte(strconv.Itoa(alivePid)+"\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(wtAliveDir, ".pid"), []byte(strconv.Itoa(alivePid)+"\n"), 0o644); err != nil {
 		t.Fatalf("write alive pid: %v", err)
 	}
 

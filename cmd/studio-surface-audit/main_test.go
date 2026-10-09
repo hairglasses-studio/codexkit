@@ -127,7 +127,11 @@ func runGit(t *testing.T, dir string, args ...string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("git", args...)
+	gitBin := "git"
+	if _, err := os.Stat("/usr/bin/git"); err == nil {
+		gitBin = "/usr/bin/git"
+	}
+	cmd := exec.Command(gitBin, args...)
 	cmd.Dir = dir
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, output)

@@ -80,7 +80,11 @@ func runReadinessGit(t *testing.T, path string, args ...string) {
 	// t.TempDir() if the operator's global git config demands signing —
 	// GIT_CONFIG_GLOBAL=/dev/null keeps commit from blocking on a GPG
 	// prompt regardless of the host's global config.
-	cmd := exec.Command("git", append([]string{"-C", path}, args...)...)
+	gitBin := "git"
+	if _, err := os.Stat("/usr/bin/git"); err == nil {
+		gitBin = "/usr/bin/git"
+	}
+	cmd := exec.Command(gitBin, append([]string{"-C", path}, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
