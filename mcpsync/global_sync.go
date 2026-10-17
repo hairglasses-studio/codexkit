@@ -655,15 +655,51 @@ func sanitizeGlobalName(name string) string {
 }
 
 func normalizeGlobalServer(repoPath string, server globalMCPServer, home string) globalMCPServer {
-	server.Command = expandHomePrefix(server.Command, home)
+	server.Command = relocateCheckoutPath(repoPath, expandHomePrefix(server.Command, home))
 	for i, arg := range server.Args {
-		server.Args[i] = expandHomePrefix(arg, home)
+		server.Args[i] = relocateCheckoutPath(repoPath, expandHomePrefix(arg, home))
+	}
+	server.Env = cloneStringMap(server.Env)
+	for key, value := range server.Env {
+		server.Env[key] = relocateCheckoutPath(repoPath, value)
 	}
 	server.CWD = normalizeGlobalCWD(repoPath, server.CWD, home)
+	server.CWD = relocateCheckoutPath(repoPath, server.CWD)
 	if server.CWD == "" && server.Command != "" && !isRemoteTransport(server) {
 		server.CWD = repoPath
 	}
 	return server
+}
+
+// Relocate only a missing, whole path under the same workspace/repo in a
+// different user's checkout. Never rewrite shell fragments, URLs, live paths,
+// unrelated repositories, or a local counterpart that escapes through a link.
+func relocateCheckoutPath(repoPath, value string) string {
+	if !filepath.IsAbs(value) || filepath.Clean(value) != value {
+		return value
+	}
+	if _, err := os.Lstat(value); !os.IsNotExist(err) {
+		return value
+	}
+	parts := strings.Split(strings.TrimPrefix(value, string(filepath.Separator)), string(filepath.Separator))
+	if len(parts) < 4 || (parts[0] != "home" && parts[0] != "Users") || parts[1] == "" ||
+		parts[2] != filepath.Base(filepath.Dir(repoPath)) || parts[3] != filepath.Base(repoPath) {
+		return value
+	}
+	candidate := filepath.Join(append([]string{repoPath}, parts[4:]...)...)
+	realRepo, err := filepath.EvalSymlinks(repoPath)
+	if err != nil {
+		return value
+	}
+	realCandidate, err := filepath.EvalSymlinks(candidate)
+	if err != nil {
+		return value
+	}
+	rel, err := filepath.Rel(realRepo, realCandidate)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return value
+	}
+	return candidate
 }
 
 func normalizeGlobalCWD(repoPath, cwd, home string) string {

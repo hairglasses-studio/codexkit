@@ -67,7 +67,14 @@ done < <(git ls-files -s | awk '$1 ~ /^120000/ {print $4}')
 
 echo "== gitleaks =="
 if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks detect --source . --no-git --redact
+  # Reviewed Windows API symbol/type names in this exact generated SQLite blob.
+  # Any vendor change disables these line-specific exceptions for fresh review.
+  vendor_symbols=vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go
+  if [[ -f "$vendor_symbols" ]] && [[ "$(git hash-object "$vendor_symbols")" == 546f7190b673302df64c0297c5b05a0362f6faf8 ]]; then
+    gitleaks detect --source . --no-git --redact --gitleaks-ignore-path docs/public-boundary-vendor-symbols.gitleaksignore
+  else
+    gitleaks detect --source . --no-git --redact
+  fi
 else
   echo "gitleaks not installed; skipping local secret scan"
 fi

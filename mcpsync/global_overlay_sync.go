@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -185,7 +186,21 @@ func renderClaudeOverlay(path, project string, projection GlobalProjection) ([]b
 	projects := objectValue(base, "projects")
 	projectObj := objectValue(projects, project)
 	existing := objectValue(projectObj, "mcpServers")
-	projectObj["mcpServers"] = mergeProviderServers(existing, providerEntries(projection, "claude"), "studio_")
+	entries := append([]ProviderProjectionEntry(nil), providerEntries(projection, "claude")...)
+	for i := range entries {
+		server := &entries[i].Server
+		if server.CWD == "" || server.Command == "" || server.URL != "" {
+			continue
+		}
+		// Claude's native JSON importer discards cwd. Preserve it through argv,
+		// without shell interpolation; Codex/Gemini retain their native cwd field.
+		if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+			return nil, fmt.Errorf("Claude stdio cwd projection requires a supported POSIX host")
+		}
+		server.Args = append([]string{"-C", server.CWD, "--", server.Command}, server.Args...)
+		server.Command, server.CWD = "/usr/bin/env", ""
+	}
+	projectObj["mcpServers"] = mergeProviderServers(existing, entries, "studio_")
 	projects[project] = projectObj
 	base["projects"] = projects
 	return marshalJSONFile(base)
