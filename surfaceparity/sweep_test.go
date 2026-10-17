@@ -112,3 +112,30 @@ func TestSyncNeverWritesThroughClaudeMDSymlink(t *testing.T) {
 		t.Fatalf("sync wrote through the CLAUDE.md symlink; AGENTS.md is now:\n%s", got)
 	}
 }
+
+func TestGeneratedInstructionsRequireLocalGateAndPR(t *testing.T) {
+	got := generateCanonicalAgentsMD("repo", "Go")
+	for _, required := range []string{"Land through a PR", "scoped local gate", "hg-land", "Never push directly"} {
+		if !strings.Contains(got, required) {
+			t.Fatalf("missing landing constraint: %s", required)
+		}
+	}
+	if strings.Contains(got, "Direct verified pushes") {
+		t.Fatal("retired main-push grant remains")
+	}
+}
+
+func TestUnavailableRepoIsExplicitlyIncomplete(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "workspace/manifest.json"), `{"version":1,"repos":[{"name":"absent","scope":"active_first_party","language":"Go"}]}`)
+	r, err := RunSweep(SweepOptions{WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Complete || r.ManifestRepos != 1 || len(r.UnavailableRepos) != 1 || r.TotalRepos != 0 {
+		t.Fatalf("missing source silently green: %+v", r)
+	}
+	if !strings.Contains(r.Markdown(), "Coverage complete**: false") {
+		t.Fatal("markdown omits incomplete coverage")
+	}
+}

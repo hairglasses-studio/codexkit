@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hairglasses-studio/codexkit/harnessmanifest"
 	"github.com/hairglasses-studio/codexkit/harnessplan"
+	"github.com/hairglasses-studio/codexkit/internal/harnessfs"
 	"github.com/hairglasses-studio/codexkit/sourceref"
 )
 
@@ -35,6 +37,22 @@ type harnessRenderFixture struct {
 }
 
 func newHarnessRenderFixture(t *testing.T, mode harnessmanifest.ProjectionMode) harnessRenderFixture {
+	t.Helper()
+	fixture := newHarnessRenderFixtureUnchecked(t, mode)
+	root, err := harnessfs.Open(fixture.sourceRoot)
+	if errors.Is(err, harnessfs.ErrUnsupported) {
+		t.Skip("descriptor-relative render capability is unsupported on this platform; fail-closed behavior tested separately")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := root.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return fixture
+}
+
+func newHarnessRenderFixtureUnchecked(t *testing.T, mode harnessmanifest.ProjectionMode) harnessRenderFixture {
 	t.Helper()
 	work := t.TempDir()
 	sourceRoot := filepath.Join(work, "source")
@@ -183,6 +201,22 @@ func newHarnessRenderFixture(t *testing.T, mode harnessmanifest.ProjectionMode) 
 		args: args, sourceRoot: sourceRoot, sourcePath: sourcePath, manifestPath: manifestPath,
 		objectID: objectID, renderedPath: renderedPath, planSHA256: envelope.PlanSHA256, expectedBytes: projectedBytes,
 		manifest: manifest, inventory: inventory, plan: plan, now: now, maxAge: maxAge, gitSHA: gitSHA, verifierIDs: verifierIDs,
+	}
+}
+
+func TestHarnessRenderFailsClosedOnUnsupportedPlatform(t *testing.T) {
+	fixture := newHarnessRenderFixtureUnchecked(t, harnessmanifest.ProjectionCopy)
+	root, err := harnessfs.Open(fixture.sourceRoot)
+	if err == nil {
+		_ = root.Close()
+		t.Skip("filesystem capability available; covered by positive render tests")
+	}
+	if !errors.Is(err, harnessfs.ErrUnsupported) {
+		t.Fatal(err)
+	}
+	_, _, err = executeHarnessRender(fixture.args)
+	if !errors.Is(err, harnessfs.ErrUnsupported) {
+		t.Fatalf("unsupported capability was not preserved: %v", err)
 	}
 }
 

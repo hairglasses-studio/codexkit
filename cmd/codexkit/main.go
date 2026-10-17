@@ -101,6 +101,8 @@ Commands:
   skills diff <repo>            Show what skill sync would change
   skills check <repo>           Fail when managed skill mirrors drift
   skills list <repo>            List skills from surface.yaml
+  skills resources <src> <dst> [--apply --expected-plan=SHA256]
+                                Plan or add missing support-directory links
   mcp sync [repo|--all]         Sync .mcp.json to .codex/config.toml
   mcp diff [repo|--all]         Show what MCP sync would change
   mcp check [repo|--all]        Fail when the generated MCP block drifts
@@ -420,6 +422,30 @@ func runSkills(args []string) {
 	}
 
 	cmd := args[0]
+	if cmd == "resources" {
+		if len(args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: codexkit skills resources ABS_SOURCE_SKILL ABS_TARGET_SKILL [--apply --expected-plan=SHA256]")
+			os.Exit(2)
+		}
+		apply, expected := false, ""
+		for _, arg := range args[3:] {
+			switch {
+			case arg == "--apply":
+				apply = true
+			case strings.HasPrefix(arg, "--expected-plan="):
+				expected = strings.TrimPrefix(arg, "--expected-plan=")
+			default:
+				fmt.Fprintf(os.Stderr, "unknown resource flag: %s\n", arg)
+				os.Exit(2)
+			}
+		}
+		report := skillsync.SyncResources(args[1], args[2], apply, expected)
+		printJSON(report)
+		if len(report.Errors) != 0 {
+			os.Exit(1)
+		}
+		return
+	}
 	repoPath := ""
 	quietWarnings := os.Getenv("CODEXKIT_QUIET_WARNINGS") == "1"
 	validatorMode := skillsync.ValidatorAuto

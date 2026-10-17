@@ -426,22 +426,30 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 	// every output before writing any skill so one invalid alias cannot leave a
 	// partially applied surface or overwrite the canonical source through it.
 	var targets []string
+	resourceSources := map[string]string{}
+	addTarget := func(target, canonical string) {
+		targets = append(targets, target)
+		resourceSources[target] = filepath.Join(absRepoPath, ".agents", "skills", canonical)
+	}
 	for _, skill := range surface.Skills {
 		if skill.ClaudeIncludeCanonical {
-			targets = append(targets, filepath.Join(absRepoPath, ".claude", "skills", skill.Name, "SKILL.md"))
+			addTarget(filepath.Join(absRepoPath, ".claude", "skills", skill.Name, "SKILL.md"), skill.Name)
 		}
 		for _, alias := range skill.ClaudeAliases {
-			targets = append(targets, filepath.Join(absRepoPath, ".claude", "skills", alias.Name, "SKILL.md"))
+			addTarget(filepath.Join(absRepoPath, ".claude", "skills", alias.Name, "SKILL.md"), skill.Name)
 		}
 		if normalized := normalizedSkillName(skill.Name); normalized != skill.Name {
-			targets = append(targets, filepath.Join(absRepoPath, ".claude", "skills", normalized, "SKILL.md"))
+			addTarget(filepath.Join(absRepoPath, ".claude", "skills", normalized, "SKILL.md"), skill.Name)
 		}
 		if skill.ExportPlugin {
-			targets = append(targets, filepath.Join(absRepoPath, "plugins", surface.PluginRoot, "skills", skill.Name, "SKILL.md"))
+			addTarget(filepath.Join(absRepoPath, "plugins", surface.PluginRoot, "skills", skill.Name, "SKILL.md"), skill.Name)
 		}
 	}
 	for _, target := range targets {
 		if err := validateProjectionTarget(target); err != nil {
+			report.Errors = append(report.Errors, err.Error())
+		}
+		if _, err := resourceLinks(resourceSources[target], filepath.Dir(target)); err != nil {
 			report.Errors = append(report.Errors, err.Error())
 		}
 	}
@@ -496,6 +504,7 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 				rendered := renderSkill(skill.Name, projection.Description, skill.Name, projection, surface.Version >= 2, fmt.Sprintf("Compatibility mirror of the canonical `%s` skill.", skill.Name))
 				target := filepath.Join(absRepoPath, ".claude", "skills", skill.Name, "SKILL.md")
 				syncContent(&report, mode, canonicalPath, target, rendered, "Claude skill")
+				syncProjectedResources(&report, mode, canonicalDir, filepath.Dir(target))
 			}
 		}
 
@@ -522,6 +531,7 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 			rendered := renderSkill(alias.Name, alias.Description, skill.Name, projection, surface.Version >= 2, fmt.Sprintf("Compatibility alias for the canonical `%s` skill.", skill.Name))
 			target := filepath.Join(absRepoPath, ".claude", "skills", alias.Name, "SKILL.md")
 			syncContent(&report, mode, canonicalPath, target, rendered, "Claude skill")
+			syncProjectedResources(&report, mode, canonicalDir, filepath.Dir(target))
 		}
 
 		if skill.ExportPlugin {
@@ -531,6 +541,7 @@ func run(repoPath string, mode syncMode, opts Options) SyncReport {
 				rendered := renderSkill(skill.Name, projection.Description, skill.Name, projection, surface.Version >= 2, "")
 				target := filepath.Join(absRepoPath, "plugins", surface.PluginRoot, "skills", skill.Name, "SKILL.md")
 				syncContent(&report, mode, canonicalPath, target, rendered, "plugin skill")
+				syncProjectedResources(&report, mode, canonicalDir, filepath.Dir(target))
 			}
 		}
 	}

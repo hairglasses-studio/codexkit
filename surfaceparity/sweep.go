@@ -29,9 +29,10 @@ func RunSweep(opts SweepOptions) (*SweepReport, error) {
 	}
 
 	report := &SweepReport{
-		Timestamp:     time.Now(),
-		WorkspaceRoot: root,
-		Repos:         make(map[string]*RepoSurfaceState),
+		Timestamp:        time.Now(),
+		WorkspaceRoot:    root,
+		Repos:            make(map[string]*RepoSurfaceState),
+		UnavailableRepos: make(map[string]string),
 	}
 
 	globalMapByHash := make(map[string][]string)
@@ -40,9 +41,11 @@ func RunSweep(opts SweepOptions) (*SweepReport, error) {
 		if opts.ScopeFilter != "" && repo.Scope != opts.ScopeFilter {
 			continue
 		}
+		report.ManifestRepos++
 
 		repoPath := workspace.RepoPath(root, repo)
-		if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+		if info, err := os.Stat(repoPath); err != nil || !info.IsDir() {
+			report.UnavailableRepos[repo.Name] = repoPath
 			continue
 		}
 
@@ -100,6 +103,7 @@ func RunSweep(opts SweepOptions) (*SweepReport, error) {
 	}
 
 	report.TotalRepos = len(report.Repos)
+	report.Complete = len(report.UnavailableRepos) == 0
 
 	for hash, paths := range globalMapByHash {
 		if len(paths) > 1 {
@@ -323,7 +327,7 @@ func generateCanonicalAgentsMD(repoName, language string) string {
 	b.WriteString(fmt.Sprintf("Repository `%s` (%s component) managed by Hairglasses Studio fleet.\n\n", repoName, language))
 	b.WriteString("## Fleet Invariants\n\n")
 	b.WriteString("1. **Explicit staging only**: Never `git add -A` or `git add .` anywhere under the fleet tree. Stage explicit paths only.\n")
-	b.WriteString("2. **Pushes to origin/main**: Direct verified pushes to `origin/main` are authorized across fleet repositories.\n")
+	b.WriteString("2. **Land through a PR**: Run the required scoped local gate, then use `hg-land` with its gate log. Never push directly to `origin/main`, force-push, or land another session's commits.\n")
 	b.WriteString("3. **Socket unlinking hazard**: Never run `make ci` or bare `unittest discover` in `scripts/`.\n")
 	b.WriteString("4. **Zero secret leakage**: Never write unmasked secrets, private keys, or tokens to disk, transcripts, or reports.\n")
 	b.WriteString("5. **AG2 Isolation & Cleanroom Demarcation (Hazard #10)**: StashApp and MEGA services, mounts, databases, and caches are strictly isolated to AG2 (`archglasses-2`); completely banned on AG1 and macbook. Claude delegates StashApp/MEGA tasks to AGY subagents.\n")
@@ -347,6 +351,7 @@ func (r *SweepReport) Markdown() string {
 	b.WriteString(fmt.Sprintf("- **Generated**: %s\n", r.Timestamp.Format(time.RFC3339)))
 	b.WriteString(fmt.Sprintf("- **Workspace Root**: `%s`\n", r.WorkspaceRoot))
 	b.WriteString(fmt.Sprintf("- **Total Repositories**: %d\n", r.TotalRepos))
+	b.WriteString(fmt.Sprintf("- **Manifest entries**: %d; **Unavailable**: %d; **Coverage complete**: %t\n", r.ManifestRepos, len(r.UnavailableRepos), r.Complete))
 	b.WriteString(fmt.Sprintf("- **Compliant Repositories**: %d (%.1f%%)\n", r.CompliantRepos, float64(r.CompliantRepos)/float64(max(r.TotalRepos, 1))*100.0))
 	b.WriteString(fmt.Sprintf("- **Drifted Repositories**: %d\n\n", r.DriftedRepos))
 

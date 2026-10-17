@@ -12,16 +12,19 @@ type SweepOptions struct {
 }
 
 type SweepReport struct {
-	Timestamp      time.Time                    `json:"timestamp"`
-	WorkspaceRoot  string                       `json:"workspace_root"`
-	TotalRepos     int                          `json:"total_repos"`
-	CompliantRepos int                          `json:"compliant_repos"`
-	DriftedRepos   int                          `json:"drifted_repos"`
-	Summary        SweepSummary                 `json:"summary"`
-	Repos          map[string]*RepoSurfaceState `json:"repos"`
-	DuplicateLibs  []DuplicateLibraryGroup      `json:"duplicate_libraries,omitempty"`
-	BespokeScripts []BespokeScriptEntry         `json:"bespoke_scripts,omitempty"`
-	SyncActions    []string                     `json:"sync_actions,omitempty"`
+	Timestamp        time.Time                    `json:"timestamp"`
+	WorkspaceRoot    string                       `json:"workspace_root"`
+	TotalRepos       int                          `json:"total_repos"`
+	ManifestRepos    int                          `json:"manifest_repos"`
+	UnavailableRepos map[string]string            `json:"unavailable_repos,omitempty"`
+	Complete         bool                         `json:"complete"`
+	CompliantRepos   int                          `json:"compliant_repos"`
+	DriftedRepos     int                          `json:"drifted_repos"`
+	Summary          SweepSummary                 `json:"summary"`
+	Repos            map[string]*RepoSurfaceState `json:"repos"`
+	DuplicateLibs    []DuplicateLibraryGroup      `json:"duplicate_libraries,omitempty"`
+	BespokeScripts   []BespokeScriptEntry         `json:"bespoke_scripts,omitempty"`
+	SyncActions      []string                     `json:"sync_actions,omitempty"`
 }
 
 type SweepSummary struct {

@@ -137,7 +137,7 @@ func executeHarnessRender(args []string) (harnessRenderSummary, bool, error) {
 	}
 	root, err := harnessfs.Open(rootPath)
 	if err != nil {
-		return harnessRenderSummary{}, parsed.jsonOutput, fmt.Errorf("source root is not a safe contained directory")
+		return harnessRenderSummary{}, parsed.jsonOutput, fmt.Errorf("source root is not a safe contained directory: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 
