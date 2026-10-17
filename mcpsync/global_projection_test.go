@@ -1,8 +1,11 @@
 package mcpsync
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -307,5 +310,54 @@ func TestRelocateCheckoutPaths(t *testing.T) {
 	}
 	if got := relocateCheckoutPath(repo, foreign+"/escape"); got != foreign+"/escape" {
 		t.Fatal("accepted escaping link")
+	}
+}
+
+func TestClaudeOverlayPreservesCWDThroughNativeArgv(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("POSIX launcher qualification")
+	}
+	cwd := filepath.Join(t.TempDir(), "cwd ' $literal")
+	if err := os.Mkdir(cwd, 0700); err != nil {
+		t.Fatal(err)
+	}
+	projection := GlobalProjection{Providers: []ProviderProjection{{Provider: "claude", Entries: []ProviderProjectionEntry{{Name: "studio_probe", Server: ProviderServer{Command: "/bin/pwd", CWD: cwd}}}}}}
+	data, err := renderClaudeOverlay(filepath.Join(t.TempDir(), "missing.json"), cwd, projection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var obj struct {
+		Projects map[string]struct {
+			MCPServers map[string]struct {
+				Command string
+				Args    []string
+				CWD     string
+			}
+		}
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		t.Fatal(err)
+	}
+	server := obj.Projects[cwd].MCPServers["studio_probe"]
+	if server.CWD != "" || server.Command != "/usr/bin/env" {
+		t.Fatalf("invalid native Claude shape: %+v", server)
+	}
+	out, err := exec.Command(server.Command, server.Args...).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual, err := filepath.EvalSymlinks(strings.TrimSpace(string(out)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actual != expected {
+		t.Fatalf("cwd = %q, want %q", actual, expected)
+	}
+	if projection.Providers[0].Entries[0].Server.Command != "/bin/pwd" {
+		t.Fatal("mutated input projection")
 	}
 }

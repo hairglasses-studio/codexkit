@@ -15,3 +15,10 @@ Review provider-specific opt-ins and destination scopes. Repo-local Codex MCP
 configuration remains authoritative unless a profile explicitly opts into its
 global projection. A saved configuration is separate from native discovery,
 connection health and invocation evidence.
+
+Claude's native JSON importer discards a `cwd` field. On macOS and Linux,
+Claude projections preserve stdio working directories with `/usr/bin/env -C`
+and a literal argument vector, without shell interpolation. The unsupported
+host case refuses projection instead of silently changing the working directory.
+Codex and Gemini retain their native `cwd` configuration. Native import readback
+and a real directory-change canary verify these separately from path presence.
