@@ -271,3 +271,41 @@ func providerEntryByName(projection GlobalProjection, providerName, entryName st
 	}
 	return nil
 }
+
+func TestRelocateCheckoutPaths(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(root, "studio", "app")
+	launch := filepath.Join(repo, "scripts", "launch")
+	if err := os.MkdirAll(filepath.Dir(launch), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(launch, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	foreign := "/home/absent-user/studio/app"
+	got := normalizeGlobalServer(repo, globalMCPServer{Command: foreign + "/scripts/launch", CWD: foreign,
+		Args: []string{foreign + "/scripts/launch", "exec " + foreign + "/scripts/launch"},
+		Env:  map[string]string{"ROOT": foreign, "GOWORK": "off"}}, root)
+	if got.Command != launch || got.CWD != repo || got.Args[0] != launch || got.Env["ROOT"] != repo {
+		t.Fatalf("checkout was not relocated: %+v", got)
+	}
+	if got.Args[1] != "exec "+foreign+"/scripts/launch" || got.Env["GOWORK"] != "off" {
+		t.Fatal("rewrote non-path values")
+	}
+	for _, value := range []string{foreign + "/missing", "/home/absent-user/other/app/scripts/launch",
+		"/home/absent-user/studio/other/scripts/launch", "/home/absent-user/studio/app/../app/scripts/launch", launch} {
+		if got := relocateCheckoutPath(repo, value); got != value {
+			t.Fatalf("rewrote %q as %q", value, got)
+		}
+	}
+	outside := filepath.Join(root, "outside")
+	if err := os.WriteFile(outside, []byte("outside"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(repo, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if got := relocateCheckoutPath(repo, foreign+"/escape"); got != foreign+"/escape" {
+		t.Fatal("accepted escaping link")
+	}
+}
