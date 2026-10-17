@@ -1,0 +1,11 @@
+# Windows API symbol/type names, not credentials. Enabled only for the exact
+# vendor blob pinned in scripts/check-public-boundary.sh; never ignore vendor/.
+vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go:generic-api-key:1203
+vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go:generic-api-key:1285
+vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go:generic-api-key:8387
+vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go:generic-api-key:29283
+vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go:generic-api-key:31257
+vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go:generic-api-key:74005
+vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go:generic-api-key:75630
+vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go:generic-api-key:83686
+vendor/modernc.org/sqlite/lib/sqlite_g_0000000000060000.go:generic-api-key:116349

@@ -282,7 +282,7 @@ func TestRelocateCheckoutPaths(t *testing.T) {
 	if err := os.WriteFile(launch, []byte("#!/bin/sh\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	foreign := "/home/absent-user/studio/app"
+	foreign := filepath.Join(string(filepath.Separator), "home", "example", "studio", "app")
 	got := normalizeGlobalServer(repo, globalMCPServer{Command: foreign + "/scripts/launch", CWD: foreign,
 		Args: []string{foreign + "/scripts/launch", "exec " + foreign + "/scripts/launch"},
 		Env:  map[string]string{"ROOT": foreign, "GOWORK": "off"}}, root)
@@ -292,8 +292,8 @@ func TestRelocateCheckoutPaths(t *testing.T) {
 	if got.Args[1] != "exec "+foreign+"/scripts/launch" || got.Env["GOWORK"] != "off" {
 		t.Fatal("rewrote non-path values")
 	}
-	for _, value := range []string{foreign + "/missing", "/home/absent-user/other/app/scripts/launch",
-		"/home/absent-user/studio/other/scripts/launch", "/home/absent-user/studio/app/../app/scripts/launch", launch} {
+	for _, value := range []string{foreign + "/missing", filepath.Join(string(filepath.Separator), "home", "example", "other", "app", "scripts", "launch"),
+		filepath.Join(string(filepath.Separator), "home", "example", "studio", "other", "scripts", "launch"), foreign + "/../app/scripts/launch", launch} {
 		if got := relocateCheckoutPath(repo, value); got != value {
 			t.Fatalf("rewrote %q as %q", value, got)
 		}
