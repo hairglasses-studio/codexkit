@@ -130,3 +130,17 @@ Codex builds an instruction chain on startup, traversing from the repository roo
 - [Codex 0.154.0 feature registry](https://github.com/openai/codex/blob/rust-v0.154.0/codex-rs/features/src/lib.rs)
 - [MCP Go SDK v1.7.0 release](https://github.com/modelcontextprotocol/go-sdk/releases/tag/v1.7.0)
 - [MCP Go SDK v1.7.0 server implementation](https://github.com/modelcontextprotocol/go-sdk/blob/v1.7.0/mcp/server.go)
+
+## Codex harness lifecycle platform boundary
+
+The durable harness lifecycle engine is available on Linux and macOS. Both
+backends require an owned target root, no-follow directory traversal, a private
+state store, same-directory atomic stage commits, per-object ownership ledger
+checks, post-commit read-back, append-only receipts, and retained quarantine
+objects for rollback. Darwin uses `openat`/`renameatx_np` with exclusive or swap
+semantics; it fails closed for symlink leaves because the current macOS backend
+does not establish the descriptor-pinned symlink contract. Existing regular
+files that cannot be opened for descriptor pinning are also refused without
+mutation. Unsupported platforms continue to return `ErrUnsupported`. This
+describes source support only; it is not a runtime qualification claim for a
+particular macOS release or filesystem.
