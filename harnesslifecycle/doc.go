@@ -27,7 +27,9 @@
 //
 // The contract half of this package (types, canonical JSON, digests, ledger
 // semantics, journal and receipt construction) is pure: no filesystem, no
-// network, no ambient clock. The apply engine and its state store are Linux
-// only, for the same descriptor-relative containment reasons as
-// internal/harnessfs, and fail closed everywhere else.
+// network, no ambient clock. The apply engine and its state store run on Linux
+// and Darwin through descriptor-relative containment and same-directory atomic
+// renames. Darwin currently treats symlink leaves as unsupported and refuses
+// them during preflight; it never follows or mutates them. Other platforms fail
+// closed.
 package harnesslifecycle

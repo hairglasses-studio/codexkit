@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || darwin
 
 package harnesslifecycle
 
@@ -72,7 +72,7 @@ func CreateStore(statePath string) (*Store, error) {
 	if !filepath.IsAbs(statePath) || filepath.Clean(statePath) != statePath {
 		return nil, fmt.Errorf("%w: state root must be an absolute clean path", ErrInvalidLedger)
 	}
-	if err := os.MkdirAll(statePath, stateRootMode); err != nil {
+	if err := createStateDirectory(statePath, stateRootMode); err != nil {
 		return nil, fmt.Errorf("%w: state root: %v", ErrInvalidLedger, err)
 	}
 	return OpenStore(statePath)

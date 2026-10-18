@@ -1,4 +1,4 @@
-//go:build !linux
+//go:build !linux && !darwin
 
 package harnesslifecycle
 
@@ -10,9 +10,9 @@ import (
 	"github.com/hairglasses-studio/codexkit/harnessrender"
 )
 
-// ApplyOptions is declared on every platform so callers compile everywhere,
-// but only Linux provides the descriptor-relative containment the apply engine
-// requires. Elsewhere every entry point fails closed.
+// ApplyOptions is declared on every platform so callers compile everywhere.
+// Linux and Darwin provide supported descriptor-relative containment; all
+// other platforms fail closed at every lifecycle entry point.
 type ApplyOptions struct {
 	StatePath       string
 	TargetPath      string
