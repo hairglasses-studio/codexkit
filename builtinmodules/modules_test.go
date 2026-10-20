@@ -18,7 +18,7 @@ func TestAllRegistersOneCanonicalModuleSet(t *testing.T) {
 			t.Fatalf("register %s: %v", module.Name(), err)
 		}
 	}
-	for _, name := range []string{"configindex", "researchrefresh", "workspace"} {
+	for _, name := range []string{"configindex", "researchrefresh", "workspace", "rdworkflow"} {
 		if !moduleNames[name] {
 			t.Fatalf("canonical module set is missing %q", name)
 		}
@@ -47,5 +47,11 @@ func TestForMCPExcludesCallerControlledResearchNetworking(t *testing.T) {
 	}
 	if !registry.HasTool("baseline_check") {
 		t.Fatal("production MCP registry lost ordinary built-in tools")
+	}
+	for _, name := range []string{"rd_workflow_plan", "rd_workflow_intake", "rd_workflow_record", "rd_workflow_status"} {
+		definition, ok := registry.GetTool(name)
+		if !ok || definition.ContextHandler == nil || definition.Schema["additionalProperties"] != false {
+			t.Fatalf("production MCP registry lacks bounded context-aware workflow tool %s", name)
+		}
 	}
 }
