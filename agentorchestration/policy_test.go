@@ -201,6 +201,21 @@ func TestPolicyEnforcesIndependentQuotaBuckets(t *testing.T) {
 	}
 }
 
+func TestPolicyRejectsDuplicateActiveTaskIDBeforeRetry(t *testing.T) {
+	now := time.Date(2026, 8, 11, 20, 0, 0, 0, time.UTC)
+	policy := mustPolicy(t, DefaultConfig())
+	input := validInput(now)
+	input.Ledger.Leases = []Lease{activeLease(now, input.Task.ID, input.Task.Scopes.Write)}
+
+	decision := policy.Decide(input)
+	if decision.Admission.Status != AdmissionRejected || !decisionHasReason(decision, ReasonDuplicateActiveTask) {
+		t.Fatalf("active task ID was not rejected for reconciliation: %+v", decision)
+	}
+	if decision.Lease != nil {
+		t.Fatalf("duplicate active task received a second lease candidate: %+v", decision.Lease)
+	}
+}
+
 func TestWriteRequiresFrontierVerifier(t *testing.T) {
 	now := time.Date(2026, 8, 11, 20, 0, 0, 0, time.UTC)
 	policy := mustPolicy(t, DefaultConfig())
