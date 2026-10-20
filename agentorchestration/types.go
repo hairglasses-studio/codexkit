@@ -180,6 +180,7 @@ const (
 	ReasonMissingFrontierVerifier    = "missing_frontier_verifier"
 	ReasonMissingExclusiveOwnership  = "missing_exclusive_ownership"
 	ReasonScopeCollision             = "scope_collision"
+	ReasonDuplicateActiveTask        = "duplicate_active_task"
 	ReasonMissingQuota               = "missing_quota"
 	ReasonStaleQuota                 = "stale_quota"
 	ReasonInvalidQuota               = "invalid_quota"

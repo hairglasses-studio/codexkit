@@ -150,9 +150,18 @@ func (p Policy) Decide(input Input) RoutingDecision {
 	active := ledger.Active(input.Now)
 	decision.Admission.ActiveLeases = len(active)
 	for _, lease := range active {
+		if lease.TaskID == task.ID {
+			decision.Reasons = append(decision.Reasons, reject(
+				ReasonDuplicateActiveTask,
+				"task id already has an active lease; reconcile or release it before retrying",
+			))
+		}
 		if lease.Lane == LaneSpark {
 			decision.Admission.ActiveSparkLeases++
 		}
+	}
+	if hasReject(decision.Reasons) {
+		return finalizeDecision(decision)
 	}
 
 	conflicts, err := ledger.Conflicts(task, input.Now)
