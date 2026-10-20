@@ -11,6 +11,7 @@ import (
 	"github.com/hairglasses-studio/codexkit/mcpsync"
 	"github.com/hairglasses-studio/codexkit/perfaudit"
 	"github.com/hairglasses-studio/codexkit/primitiveindex"
+	"github.com/hairglasses-studio/codexkit/rdworkflow"
 	"github.com/hairglasses-studio/codexkit/reporeadiness"
 	"github.com/hairglasses-studio/codexkit/researchrefresh"
 	"github.com/hairglasses-studio/codexkit/skillsync"
@@ -33,6 +34,7 @@ func All() []codexkit.ToolModule {
 		llmreduction.Module(),
 		perfaudit.Module(),
 		primitiveindex.Module(),
+		rdworkflow.Module(),
 		reporeadiness.Module(),
 		researchrefresh.Module(),
 		sourcecontract.Module(),
@@ -56,6 +58,7 @@ func ForMCP() []codexkit.ToolModule {
 		llmreduction.Module(),
 		perfaudit.Module(),
 		primitiveindex.Module(),
+		rdworkflow.Module(),
 		reporeadiness.Module(),
 		sourcecontract.Module(),
 		surfaceindex.Module(),
