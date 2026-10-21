@@ -102,6 +102,8 @@ func Check(repoPath string) Report {
 	report.addModelPinFreshness(repoPath)
 	report.addMCPSpecTarget(repoPath)
 	report.addConfigDrift(repoPath)
+	report.addCodexVersionPinCheck(repoPath)
+	report.addCodexPolicyDrift(repoPath)
 
 	report.addRemediations(repoPath)
 	report.Total = len(report.Findings)
@@ -276,6 +278,16 @@ func remediationForCheck(repoPath, check string) []Remediation {
 		return []Remediation{{
 			Kind:    "edit",
 			Message: "restore the provider configuration or launcher contract declared in workspace/config-expectations.json",
+		}}
+	case "codex_version_pin":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "reconcile the documented codex-cli version pin across AGENTS.md/README.md/docs/CODEX_COMPATIBILITY.md with the live `codex --version`",
+		}}
+	case "codex_policy_drift":
+		return []Remediation{{
+			Kind:    "edit",
+			Message: "restore ~/.codex/config.toml approval_policy/sandbox_mode to the documented fleet default, or add an explicit '# operator-override: <key>' comment",
 		}}
 	default:
 		return nil
