@@ -1,10 +1,12 @@
 package mcpserver
 
-// compatibilityPayload is deliberately data, not feature detection. It pins
-// the contract codexkit validates and documents for Codex 0.147.0.
+// compatibilityPayload is deliberately data, not feature detection. The
+// feature contract was last reviewed against Codex 0.154.0; the installed CLI
+// was observed reporting 0.163.0 on 2026-10-21.
 func compatibilityPayload() map[string]any {
 	return map[string]any{
-		"codex_version": "0.147.0",
+		"codex_version":                  "0.154.0",
+		"installed_cli_observed_version": "0.163.0",
 		"models": map[string]any{
 			"flagship":        map[string]any{"codex": "gpt-5.6-sol", "api_alias": "gpt-5.6"},
 			"balanced_scans":  "gpt-5.6-terra",

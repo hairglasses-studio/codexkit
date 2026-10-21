@@ -1,6 +1,9 @@
-# Codex 0.154.0 compatibility
+# Codex compatibility: reviewed 0.154.0 contract, installed 0.163.0
 
-This repository targets the following explicit current contract for Codex CLI `0.154.0`:
+The installed CLI reported `codex-cli 0.163.0` on 2026-10-21. The feature and
+protocol contract below was last reviewed against `0.154.0`; newer behavior
+remains unverified until this document is re-audited. The Codex CLI changelog
+lists 0.163.0 on 2026-10-15.
 
 ## Model routes and aliases
 
@@ -126,6 +129,7 @@ Codex builds an instruction chain on startup, traversing from the repository roo
 - [OpenAI latest-model guide](https://developers.openai.com/api/docs/guides/latest-model)
 - [OpenAI Tool Search guide](https://developers.openai.com/api/docs/guides/tools-tool-search)
 - [OpenAI MCP and connectors guide](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)
+- [Codex CLI changelog](https://learn.chatgpt.com/docs/changelog#month-2026-10)
 - [Codex 0.154.0 release](https://github.com/openai/codex/releases/tag/rust-v0.154.0)
 - [Codex 0.154.0 feature registry](https://github.com/openai/codex/blob/rust-v0.154.0/codex-rs/features/src/lib.rs)
 - [MCP Go SDK v1.7.0 release](https://github.com/modelcontextprotocol/go-sdk/releases/tag/v1.7.0)

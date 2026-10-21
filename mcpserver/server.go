@@ -409,7 +409,7 @@ func (s *Server) resourceCatalog() []MCPResourceInfo {
 		{
 			URI:         "codexkit://catalog/compatibility",
 			Name:        "compatibility",
-			Description: "Codex 0.147.0 models, stable features, and MCP protocol status.",
+			Description: "Codex 0.154.0 reviewed compatibility contract, observed 0.163.0 installed CLI, and MCP protocol status.",
 			MimeType:    "application/json",
 		},
 	}

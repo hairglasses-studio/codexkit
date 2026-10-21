@@ -439,12 +439,12 @@ func TestMetaModuleAddsHealthTool(t *testing.T) {
 		t.Fatalf("unexpected health payload %+v", payload)
 	}
 	compat := payload["compatibility"].(map[string]any)
-	if compat["codex_version"] != "0.147.0" {
+	if compat["codex_version"] != "0.154.0" || compat["installed_cli_observed_version"] != "0.163.0" {
 		t.Fatalf("unexpected compatibility payload %+v", compat)
 	}
 }
 
-func TestCompatibilityPayloadPinsCodex0147Contract(t *testing.T) {
+func TestCompatibilityPayloadIncludesStableFeatureContract(t *testing.T) {
 	payload := compatibilityPayload()
 	features := payload["stable_features"].([]string)
 	wantFeatures := []string{"apps", "goals", "hooks", "multi_agent", "plugins", "skill_search", "tool_suggest"}
