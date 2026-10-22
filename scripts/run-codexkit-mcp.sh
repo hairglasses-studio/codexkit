@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v go >/dev/null 2>&1; then
+  if [[ -x /usr/local/go/bin/go ]]; then
+    export PATH="/usr/local/go/bin:$PATH"
+  fi
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BIN_PATH="${XDG_CACHE_HOME:-$HOME/.cache}/codexkit-mcp/bin/codexkit-mcp"
@@ -33,7 +39,7 @@ fi
 cd "$ROOT"
 if [[ "$needs_build" == true ]]; then
   mkdir -p "$(dirname "$BIN_PATH")"
-  GOWORK="$GOWORK" go build -o "$BIN_PATH" ./cmd/codexkit-mcp
+  GOWORK="$GOWORK" go build -buildvcs=false -o "$BIN_PATH" ./cmd/codexkit-mcp
 fi
 
 exec "$BIN_PATH" "$@"
