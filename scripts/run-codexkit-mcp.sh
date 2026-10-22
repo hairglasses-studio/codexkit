@@ -6,10 +6,15 @@ if ! command -v go >/dev/null 2>&1; then
     export PATH="/usr/local/go/bin:$PATH"
   fi
 fi
+if [[ -d "/usr/local/go/bin" && ":$PATH:" != *":/usr/local/go/bin:"* ]]; then
+  export PATH="/usr/local/go/bin:$PATH"
+fi
+
+USER_HOME="${HOME:-$(getent passwd "$(id -un 2>/dev/null || echo "")" | cut -d: -f6 2>/dev/null || echo "/home/$(id -un 2>/dev/null || echo "")")}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BIN_PATH="${XDG_CACHE_HOME:-$HOME/.cache}/codexkit-mcp/bin/codexkit-mcp"
+BIN_PATH="${XDG_CACHE_HOME:-$USER_HOME/.cache}/codexkit-mcp/bin/codexkit-mcp"
 workspace_root="${CODEXKIT_WORKSPACE_ROOT:-${HAIRGLASSES_STUDIO_ROOT:-}}"
 workspace_go_env=""
 if [[ -n "$workspace_root" ]]; then
@@ -22,8 +27,8 @@ if [[ -n "$workspace_go_env" && -f "$workspace_go_env" ]]; then
   hg_go_apply_env "$ROOT"
 else
   export GOWORK="${GOWORK:-off}"
-  export GOCACHE="${GOCACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/go-build}"
-  fallback_tmp="${XDG_CACHE_HOME:-$HOME/.cache}/codexkit/go-tmp/$(basename "$ROOT")"
+  export GOCACHE="${GOCACHE:-${XDG_CACHE_HOME:-$USER_HOME/.cache}/go-build}"
+  fallback_tmp="${XDG_CACHE_HOME:-$USER_HOME/.cache}/codexkit/go-tmp/$(basename "$ROOT")"
   mkdir -p "$GOCACHE" "$fallback_tmp"
   export GOTMPDIR="${GOTMPDIR:-$fallback_tmp}"
   export TMPDIR="${TMPDIR:-$fallback_tmp}"
