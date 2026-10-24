@@ -189,7 +189,8 @@ prepare_modfile() {
       if [[ -n "$abs" ]]; then
         pre="${line%%=>*}=>"
         post="${line#*=>}"
-        line="$pre${post/"$target"/$abs}"
+        # No ${post/pat/$abs}: with bash >= 5.2 an `&` in $abs would expand to the matched text.
+        line="$pre${post%%"$target"*}$abs${post#*"$target"}"
       fi
     fi
     printf '%s\n' "$line"
@@ -250,13 +251,14 @@ rebuild() { # 0 = cache refreshed; the build lock is held (or unavailable)
   tmp_bin="$BIN_PATH.tmp.$$"
   # Scratch files live in $TMPDIR when that is usable, else in a cache-local dir. With neither there
   # is nothing to build with: an environmental failure, decided before any build and never recorded.
+  # The cache-local dir is tried whenever $TMPDIR is unusable OR mktemp fails in it (full fs, quota).
   tmpd="${TMPDIR:-/tmp}"
-  if [[ ! -d "$tmpd" || ! -w "$tmpd" || ! -x "$tmpd" ]]; then
-    tmpd="$(dirname "$BIN_PATH")/.tmp"
-    mkdir -p "$tmpd" 2>/dev/null || tmpd=""
-  fi
   build_err=""
-  if [[ -n "$tmpd" ]]; then build_err="$(TMPDIR="$tmpd" mktemp 2>/dev/null)" || build_err=""; fi
+  if [[ -d "$tmpd" && -w "$tmpd" && -x "$tmpd" ]]; then build_err="$(TMPDIR="$tmpd" mktemp 2>/dev/null)" || build_err=""; fi
+  if [[ -z "$build_err" ]]; then
+    tmpd="$(dirname "$BIN_PATH")/.tmp"
+    if mkdir -p "$tmpd" 2>/dev/null; then build_err="$(TMPDIR="$tmpd" mktemp 2>/dev/null)" || build_err=""; else tmpd=""; fi
+  fi
   record_failure=true
   if [[ -z "$build_err" ]]; then
     echo "run-codexkit-mcp.sh: no usable temp dir for the build" >&2
