@@ -427,6 +427,15 @@ func TestExecuteHarnessRenderSanitizesMissingAbsolutePaths(t *testing.T) {
 			if strings.Contains(err.Error(), missing) || strings.Contains(err.Error(), filepath.Dir(missing)) {
 				t.Fatalf("error leaked absolute path %q: %v", missing, err)
 			}
+			if test.name == "source root" {
+				if !errors.Is(err, harnessfs.ErrUnsafeRoot) {
+					t.Fatalf("unsafe root classification was not preserved: %v", err)
+				}
+				var opErr *harnessfs.OpError
+				if !errors.As(err, &opErr) || opErr.Path != missing {
+					t.Fatalf("source root cause was not preserved: %v", err)
+				}
+			}
 		})
 	}
 }
