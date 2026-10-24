@@ -84,6 +84,7 @@ source_key() {
 # full disk never pins a stale binary for good).
 FAILED_TTL_MIN="${CODEXKIT_MCP_FAILED_TTL_MIN:-10}"
 have_fallback() { [[ -x "$BIN_PATH" || -x "$CANON_BIN" ]]; }
+build_class="" # env | compile: why the last build for this key failed (see classify_failure)
 decide() {
   local key_unknown=false
   failed_known=false
@@ -116,6 +117,8 @@ decide() {
     [[ -n "$(find "$BIN_PATH.failed-$want_key" -maxdepth 0 -mmin "-$FAILED_TTL_MIN" 2>/dev/null)" ]]; then
     reason=""
     failed_known=true
+    build_class="$(cat "$BIN_PATH.failed-$want_key" 2>/dev/null || true)"
+    [[ "$build_class" == env ]] || build_class=compile
   fi
 }
 
@@ -136,6 +139,7 @@ if command -v timeout >/dev/null 2>&1; then TIMEOUT=(timeout "${CODEXKIT_MCP_BUI
 tmp_bin=""
 build_err=""
 bpid=""
+last_rc=0
 modfile_dir=""
 MODFLAG=()
 # Runs on every exit path except exec: a terminated launcher kills its build and leaves no temp files.
@@ -153,7 +157,8 @@ cleanup() {
 # modfile that points such a replace at $HOME/hairglasses-studio/x when that exists (a no-op otherwise).
 prepare_modfile() {
   local line target dest changed=false
-  local re='^replace[[:space:]].*=>[[:space:]]*(\.\.?/[^[:space:]]+)[[:space:]]*$'
+  # Matches a one-line `replace a => ../x` and a line inside a `replace ( ... )` block alike.
+  local re='=>[[:space:]]*(\.\.?/[^[:space:]]+)[[:space:]]*$'
   modfile_dir="$(mktemp -d)"
   while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" =~ $re ]]; then
@@ -185,17 +190,36 @@ go_build() { # extra go build flags
   local rc=0
   wait "$bpid" || rc=$?
   bpid=""
+  last_rc="$rc"
   return "$rc"
 }
 
-# Per-checkout dirs record their root in a `root` file; one whose recorded root is gone is removed.
-# A dir with no (or an empty) root file is never removed.
+# Why a build failed. "env" (the canonical binary may stand in for a checkout that cannot build): a
+# timeout, no toolchain, an unresolvable replace sibling, network or disk trouble. Everything else,
+# every Go compile or vet error included, is "compile": a real break that must stay visible. When in
+# doubt it is "compile". Output that has an env line AND a file.go:line: error elsewhere is "compile".
+classify_failure() { # rc build-output-file
+  local env_re='replacement directory .* does not exist|no space left on device|disk quota exceeded|dial tcp|no such host|i/o timeout|TLS handshake timeout|toolchain not available|cannot find GOROOT' rest
+  if [[ "$1" == 124 || "$1" == 127 ]]; then echo env; return 0; fi
+  if grep -Eq "$env_re" "$2" 2>/dev/null; then
+    rest="$(grep -Ev "$env_re" "$2" || true)"
+    if grep -Eq '\.go:[0-9]+(:[0-9]+)?:' <<<"$rest"; then echo compile; else echo env; fi
+    return 0
+  fi
+  echo compile
+}
+
+# Per-checkout dirs record their root in a `root` file; one whose recorded root is provably gone is
+# removed: the root's parent exists and is searchable, and the root is absent. Anything else (no root
+# file, unreadable parent, missing parent, an unmounted or flaky mount) keeps the dir.
 prune_wt_dirs() {
-  local d r
+  local d r p
   for d in "$(dirname "$CANON_BIN")"/wt-*/; do
     [[ -s "$d/root" ]] || continue
     r="$(cat "$d/root" 2>/dev/null || true)"
-    if [[ "$r" == /* && ! -e "$r" && ! -L "$r" ]]; then rm -rf -- "${d%/}"; fi
+    [[ "$r" == /* ]] || continue
+    p="$(dirname "$r")"
+    if [[ -d "$p" && -x "$p" && ! -e "$r" && ! -L "$r" ]]; then rm -rf -- "${d%/}"; fi
   done
 }
 
@@ -216,6 +240,7 @@ rebuild() { # 0 = cache refreshed; the build lock is held (or unavailable)
   else
     cat "$build_err" >&2
   fi
+  if [[ "$ok" != true ]]; then build_class="$(classify_failure "$last_rc" "$build_err")"; fi
   if [[ "$ok" == true ]]; then
     # Install: drop the old key, rename the binary over the cache path (running servers keep the old
     # inode), then publish the new key. A key sidecar therefore only ever vouches for a binary that
@@ -230,7 +255,7 @@ rebuild() { # 0 = cache refreshed; the build lock is held (or unavailable)
     fi
   elif [[ -n "$want_key" ]]; then
     rm -f "$BIN_PATH".failed-*
-    : >"$BIN_PATH.failed-$want_key" || true
+    printf '%s\n' "$build_class" >"$BIN_PATH.failed-$want_key" || true
   fi
   rm -f "$tmp_bin" "$build_err"
   tmp_bin=""
@@ -262,23 +287,37 @@ if [[ -n "$reason" ]]; then
     if [[ -n "$reason" ]]; then
       echo "run-codexkit-mcp.sh: rebuilding: $reason" >&2
       if ! rebuild; then
-        if [[ "$build_only" == true ]] || ! have_fallback; then
+        if [[ "$build_only" == true ]]; then
           echo "run-codexkit-mcp.sh: build failed" >&2
           exit 1
+        elif [[ -x "$BIN_PATH" ]]; then
+          echo "run-codexkit-mcp.sh: build failed; serving the existing binary" >&2
+        elif [[ "$build_class" != env || ! -x "$CANON_BIN" ]]; then
+          if [[ "$build_class" == compile && "$BIN_PATH" != "$CANON_BIN" ]]; then
+            echo "run-codexkit-mcp.sh: build failed; this checkout does not compile, not serving the canonical binary" >&2
+          else
+            echo "run-codexkit-mcp.sh: build failed" >&2
+          fi
+          exit 1
         fi
-        echo "run-codexkit-mcp.sh: build failed; serving the existing binary" >&2
       fi
     fi
   fi
   exec 9>&-
 fi
-# A checkout with no usable build of its own (a worktree that cannot build) serves the canonical binary.
-if [[ ! -x "$BIN_PATH" && "$build_only" != true && -x "$CANON_BIN" ]]; then
-  echo "run-codexkit-mcp.sh: no usable build for this checkout; serving the canonical binary $CANON_BIN" >&2
-  BIN_PATH="$CANON_BIN"
-fi
 if [[ "$failed_known" == true ]]; then
-  echo "run-codexkit-mcp.sh: the build for ${want_key:0:12} already failed; serving the existing binary (remove $BIN_PATH.failed-* to retry)" >&2
+  echo "run-codexkit-mcp.sh: the build for ${want_key:0:12} already failed ($build_class); not retrying for ${FAILED_TTL_MIN} min (remove $BIN_PATH.failed-* to retry)" >&2
+fi
+# A checkout with no usable build of its own serves the canonical binary, but only after an
+# environmental failure (or a held lock). A compile error in this checkout's own code stays an error.
+if [[ ! -x "$BIN_PATH" && "$build_only" != true ]]; then
+  if [[ "$build_class" == compile ]]; then
+    echo "run-codexkit-mcp.sh: this checkout does not compile; not serving the canonical binary" >&2
+    exit 1
+  elif [[ -x "$CANON_BIN" ]]; then
+    echo "run-codexkit-mcp.sh: no usable build for this checkout; serving the canonical binary $CANON_BIN" >&2
+    BIN_PATH="$CANON_BIN"
+  fi
 fi
 
 if [[ "$build_only" == true ]]; then

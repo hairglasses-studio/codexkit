@@ -7,7 +7,7 @@
 # case) and failing sha256 tools (fail-closed case).
 #
 # Red controls: the launcher is re-run with one rule disabled at a time (revision rule, dirty key,
-# cross-checkout path). Each mutant must produce the WRONG answer for its case; if it does not,
+# cross-checkout path, prune's proof of absence, the compile/environment split). Each mutant must produce the WRONG answer for its case; if it does not,
 # the fixture cannot tell the rule from the other triggers and the test fails.
 #
 # What these fixtures cannot cover: a large module, a read-only cache dir, macOS (no flock, no
@@ -18,7 +18,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 launcher="$repo_root/scripts/run-codexkit-mcp.sh"
 repo_dir="codexkit"
 tmp_root="$(mktemp -d)"
-trap 'rm -rf "$tmp_root"' EXIT
+trap 'chmod 755 "$tmp_root/locked" 2>/dev/null || true; rm -rf "$tmp_root"' EXIT
 
 passes=0
 failures=0
@@ -42,7 +42,8 @@ cache="$tmp_root/cache"
 bin="$cache/codexkit-mcp/bin/codexkit-mcp"
 run_env=(env -u CODEXKIT_WORKSPACE_ROOT -u HAIRGLASSES_STUDIO_ROOT -u GIT_OPTIONAL_LOCKS HOME="$home" XDG_CACHE_HOME="$cache" GOCACHE="$gocache" GOWORK=off GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null)
 fxgit() { git -C "$fx" -c user.name=selftest -c user.email=selftest@example.com -c commit.gpgsign=false "$@"; }
-setmain() { printf 'package main\n\nfunc main() { _ = %s }\n' "$1" >"$fx/cmd/codexkit-mcp/main.go"; }
+# The server prints "ran" so a test can tell which binary a launch executed.
+setmain() { printf 'package main\n\nimport "os"\n\nfunc main() { _, _ = os.Stdout.WriteString("ran\\n"); _ = %s }\n' "$1" >"$fx/cmd/codexkit-mcp/main.go"; }
 
 new_fixture() { # launcher-to-install
 	rm -rf "$fx" "$cache"
@@ -68,6 +69,31 @@ cached_revision() { go version -m "$bin" | sed -n 's/^[[:space:]]*build[[:space:
 mutate() { # sed-expr out
 	sed "$1" "$launcher" >"$2"
 	if cmp -s "$launcher" "$2"; then bad "mutation '$1' did not apply (launcher text changed?)"; return 1; fi
+}
+
+prune_scenario() { # launcher-to-install; sets act_prune_kept (1 when a dir whose root is unreachable survives)
+	new_fixture "$1"
+	mkdir -p "$(dirname "$bin")/wt-0000lock" "$tmp_root/locked/child"
+	printf '%s\n' "$tmp_root/locked/child" >"$(dirname "$bin")/wt-0000lock/root"
+	chmod 000 "$tmp_root/locked" # the root exists, but a mode-000 parent hides it: test -e says "absent"
+	"${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$fx/scripts/run-codexkit-mcp.sh" </dev/null >/dev/null 2>&1 || true
+	chmod 755 "$tmp_root/locked"
+	act_prune_kept="$(find "$(dirname "$bin")" -maxdepth 1 -name 'wt-0000lock' | wc -l)"
+}
+
+compile_scenario() { # launcher-to-install; sets act_compile_rc act_compile_out act_compile_err
+	new_fixture "$1"
+	setmain 1
+	fxgit commit -q -am ran
+	"${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$fx/scripts/run-codexkit-mcp.sh" </dev/null >/dev/null 2>&1
+	fxgit worktree add -q "$tmp_root/wtc" -b wtc
+	mkdir -p "$tmp_root/wtc/scripts"
+	cp "$1" "$tmp_root/wtc/scripts/run-codexkit-mcp.sh"
+	printf 'package main\n\nfunc main() { broken\n' >"$tmp_root/wtc/cmd/codexkit-mcp/main.go"
+	act_compile_rc=0
+	act_compile_out="$("${run_env[@]}" bash "$tmp_root/wtc/scripts/run-codexkit-mcp.sh" </dev/null 2>"$tmp_root/wtc.err")" || act_compile_rc=$?
+	act_compile_err="$(cat "$tmp_root/wtc.err")"
+	fxgit worktree remove --force "$tmp_root/wtc"
 }
 
 scenarios() { # launcher-to-install; sets act_unstamped act_head act_stale act_dirtykey act_wt
@@ -168,6 +194,7 @@ if [[ "\$1" == build ]]; then
 		shift
 	done
 	head -c 100000 /dev/zero >"\$out"
+	if [[ "\${SHIM_HANG_EXEC:-}" == 1 ]]; then exec sleep 60; fi
 	sleep 60
 fi
 exec "$real_go" "\$@"
@@ -186,6 +213,20 @@ wait "$launcher_pid" 2>/dev/null || true
 expect "SIGTERM mid-build leaves no temp files" 0 "$(find "$(dirname "$bin")" -name '*.tmp.*' | wc -l)"
 expect "SIGTERM mid-build leaves no cache binary" 0 "$(find "$(dirname "$bin")" -name 'codexkit-mcp' | wc -l)"
 build_only "rebuild after the killed build"
+
+# A worktree whose build times out (environmental) serves the canonical binary.
+fxgit worktree add -q "$tmp_root/wtt" -b wtt
+mkdir -p "$tmp_root/wtt/scripts"
+cp "$launcher" "$tmp_root/wtt/scripts/run-codexkit-mcp.sh"
+wtt_rc=0
+wtt_out="$(PATH="$shim_go:$PATH" "${run_env[@]}" SHIM_HANG_EXEC=1 CODEXKIT_MCP_BUILD_TIMEOUT_SEC=1 bash "$tmp_root/wtt/scripts/run-codexkit-mcp.sh" </dev/null 2>"$tmp_root/wtt.err")" || wtt_rc=$?
+expect "worktree build timeout -> canonical binary served (rc)" 0 "$wtt_rc"
+expect "...and the canonical binary ran" "env:||" "$wtt_out"
+case "$(cat "$tmp_root/wtt.err")" in
+*"serving the canonical binary"*) ok "...with a note" ;;
+*) bad "timeout fallback note: $(cat "$tmp_root/wtt.err")" ;;
+esac
+fxgit worktree remove --force "$tmp_root/wtt"
 
 # Negative cache: a failed build is not retried for the same key, and a new key retries.
 setmain 6
@@ -209,22 +250,26 @@ touch -d '20 minutes ago' "$bin.failed-$(fxgit rev-parse HEAD)"
 expect "an expired failure marker (transient failure) retries" rebuild "$(resolve)"
 touch "$bin.failed-$(fxgit rev-parse HEAD)"
 
-# A worktree whose own build fails serves the canonical binary (here: the env probe's successor).
+# A worktree whose own code does not compile is an error, never masked by the canonical binary.
 fxgit worktree add -q "$tmp_root/wt2" -b wt2
 mkdir -p "$tmp_root/wt2/scripts"
 cp "$launcher" "$tmp_root/wt2/scripts/run-codexkit-mcp.sh"
-wt2_run() { "${run_env[@]}" bash "$tmp_root/wt2/scripts/run-codexkit-mcp.sh" </dev/null 2>"$tmp_root/wt2.err" || true; }
-wt2_out="$(wt2_run)"
+wt2_run() { wt2_rc=0; wt2_out="$("${run_env[@]}" bash "$tmp_root/wt2/scripts/run-codexkit-mcp.sh" </dev/null 2>"$tmp_root/wt2.err")" || wt2_rc=$?; }
+wt2_run
+expect "worktree syntax error exits 1" 1 "$wt2_rc"
+expect "...and does not exec the canonical binary" "" "$wt2_out"
 case "$(cat "$tmp_root/wt2.err")" in
-*"serving the canonical binary"*) ok "worktree build fails -> canonical binary served" ;;
-*) bad "worktree fallback: $(cat "$tmp_root/wt2.err")" ;;
+*"main.go"*"does not compile"*) ok "...with the build error on stderr" ;;
+*) bad "worktree compile error output: $(cat "$tmp_root/wt2.err")" ;;
 esac
-expect "...and the canonical binary ran (built from the earlier good tree: no env line)" "" "$wt2_out"
 wt2_dir="$(dirname "$bin")/wt-$(printf '%s' "$(cd "$tmp_root/wt2" && pwd -P)" | sha256sum | cut -c1-8)"
 expect "...the worktree dir records its root" "$(cd "$tmp_root/wt2" && pwd -P)" "$(cat "$wt2_dir/root")"
-wt2_out="$(wt2_run)"
+wt2_marker=("$wt2_dir"/codexkit-mcp.failed-*)
+expect "...and the failure is recorded as a compile failure" compile "$(cat "${wt2_marker[0]}")"
+wt2_run
+expect "worktree repeat launch still exits 1" 1 "$wt2_rc"
 case "$(cat "$tmp_root/wt2.err")" in
-*"already failed"*"canonical binary"* | *"canonical binary"*"already failed"*) ok "worktree: a repeat launch skips the failed build" ;;
+*"already failed (compile)"*) ok "...and skips the known-failed build" ;;
 *) bad "worktree negative cache: $(cat "$tmp_root/wt2.err")" ;;
 esac
 
@@ -244,36 +289,80 @@ expect "prune: dir with no root file stays" 1 "$(find "$(dirname "$bin")" -maxde
 build_only "build after the fix"
 expect "failure marker cleared on success" 0 "$(find "$(dirname "$bin")" -name '*.failed-*' | wc -l)"
 
-# A worktree has no ../dep sibling: the build points the replace at the canonical sibling checkout.
+# A worktree has no ../dep sibling: the build points the replace at the canonical sibling checkout,
+# for a one-line replace and for a `replace ( ... )` block alike.
 dep="$home/hairglasses-studio/dep"
 mkdir -p "$dep"
 printf 'module example.com/dep\n\ngo 1.20\n' >"$dep/go.mod"
 printf 'package dep\n' >"$dep/dep.go"
-printf 'module example.com/fx\n\ngo 1.20\n\nrequire example.com/dep v0.0.0\n\nreplace example.com/dep => ../dep\n' >"$fx/go.mod"
-printf 'package main\n\nimport _ "example.com/dep"\n\nfunc main() {}\n' >"$fx/cmd/codexkit-mcp/main.go"
-fxgit commit -q -am withdep
-build_only "canonical build with a ../dep replace"
-fxgit worktree add -q "$tmp_root/wt3" -b wt3
-mkdir -p "$tmp_root/wt3/scripts"
-cp "$launcher" "$tmp_root/wt3/scripts/run-codexkit-mcp.sh"
-wt3_build() { "${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$tmp_root/wt3/scripts/run-codexkit-mcp.sh" </dev/null 2>&1 | tail -n 3 || true; }
-wt3_out="$(wt3_build)"
-case "$wt3_out" in
-*"binary="*"/wt-"*) ok "worktree builds when ../dep is missing (temp modfile)" ;;
-*) bad "worktree modfile build: $wt3_out" ;;
-esac
-wt3_bin="$(printf '%s\n' "$wt3_out" | sed -n 's/^binary=//p')"
-expect "...and its binary is stamped with the worktree HEAD" "$(git -C "$tmp_root/wt3" rev-parse HEAD)" "$(go version -m "$wt3_bin" | sed -n 's/^[[:space:]]*build[[:space:]]*vcs\.revision=//p')"
-# Control: without the sibling to point at, the same build fails.
-rm -rf "$(dirname "$wt3_bin")"
+printf 'package main\n\nimport (\n\t"os"\n\n\t_ "example.com/dep"\n)\n\nfunc main() { _, _ = os.Stdout.WriteString("ran\\n") }\n' >"$fx/cmd/codexkit-mcp/main.go"
+wt_n=3
+wt_replace_case() { # label go.mod-replace-text
+	printf 'module example.com/fx\n\ngo 1.20\n\nrequire example.com/dep v0.0.0\n\n%s\n' "$2" >"$fx/go.mod"
+	fxgit commit -q -am "withdep $1"
+	build_only "canonical build with a $1 replace"
+	wt_n=$((wt_n + 1))
+	wt="$tmp_root/wt$wt_n"
+	fxgit worktree add -q "$wt" -b "wt$wt_n"
+	mkdir -p "$wt/scripts"
+	cp "$launcher" "$wt/scripts/run-codexkit-mcp.sh"
+	wt_out="$("${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$wt/scripts/run-codexkit-mcp.sh" </dev/null 2>&1 || true)"
+	case "$wt_out" in
+	*"binary="*"/wt-"*) ok "worktree builds when ../dep is missing, $1 replace (temp modfile)" ;;
+	*) bad "worktree modfile build, $1 replace: $wt_out" ;;
+	esac
+	wt_bin="$(printf '%s\n' "$wt_out" | sed -n 's/^binary=//p')"
+	expect "...and its binary is stamped with the worktree HEAD" "$(git -C "$wt" rev-parse HEAD)" "$(go version -m "$wt_bin" | sed -n 's/^[[:space:]]*build[[:space:]]*vcs\.revision=//p')"
+	rm -rf "$(dirname "$wt_bin")"
+}
+wt_replace_case "one-line" 'replace example.com/dep => ../dep'
+wt_replace_case "block" $'replace (\n\texample.com/dep => ../dep\n)'
+
+# Environmental failure (the sibling cannot be found anywhere): the canonical binary stands in, but
+# an explicit build-only still fails. The last worktree from the block case is reused.
 mv "$dep" "$dep.off"
-wt3_out="$(wt3_build)"
-case "$wt3_out" in
-*"build failed"*) ok "red control: worktree build fails when the sibling is missing" ;;
-*) bad "red control: expected a failed build: $wt3_out" ;;
+wt_out="$("${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$wt/scripts/run-codexkit-mcp.sh" </dev/null 2>&1 || true)"
+case "$wt_out" in
+*"build failed"*) ok "build-only in a worktree with no sibling fails" ;;
+*) bad "expected a failed build-only: $wt_out" ;;
+esac
+rm -f "$(dirname "$wt_bin")"/*.failed-*
+wt_rc=0
+wt_out="$("${run_env[@]}" bash "$wt/scripts/run-codexkit-mcp.sh" </dev/null 2>"$tmp_root/wt.err")" || wt_rc=$?
+expect "worktree with a missing sibling exits 0" 0 "$wt_rc"
+expect "...and the canonical binary ran" ran "$wt_out"
+case "$(cat "$tmp_root/wt.err")" in
+*"serving the canonical binary"*) ok "...with a note" ;;
+*) bad "missing-sibling fallback note: $(cat "$tmp_root/wt.err")" ;;
 esac
 mv "$dep.off" "$dep"
-fxgit worktree remove --force "$tmp_root/wt3"
+fxgit worktree remove --force "$wt"
+
+prune_scenario "$launcher"
+expect "prune keeps a dir whose root sits behind an unsearchable (mode 000) parent" 1 "$act_prune_kept"
+compile_scenario "$launcher"
+expect "compile error in a worktree: exit status" 1 "$act_compile_rc"
+expect "compile error in a worktree: the canonical binary is not exec'd" "" "$act_compile_out"
+case "$act_compile_err" in
+*"main.go"*"does not compile"*) ok "compile error in a worktree: build error on stderr" ;;
+*) bad "compile error output: $act_compile_err" ;;
+esac
+
+echo "red control: prune proves absence"
+mutant="$tmp_root/mutant.sh"
+# shellcheck disable=SC2016
+if mutate 's/-d "\$p" && -x "\$p" && //' "$mutant"; then
+	prune_scenario "$mutant"
+	expect "red control: without the parent check the unreachable root's dir is deleted" 0 "$act_prune_kept"
+fi
+
+echo "red control: compile failures are not environmental"
+# shellcheck disable=SC2016
+if mutate 's/build_class="\$(classify_failure "\$last_rc" "\$build_err")"/build_class=env/' "$mutant"; then
+	compile_scenario "$mutant"
+	expect "red control: a compile error is masked by the canonical binary (exit status)" 0 "$act_compile_rc"
+	expect "red control: ...which ran" ran "$act_compile_out"
+fi
 
 echo "red control: revision rule disabled"
 mutant="$tmp_root/mutant.sh"
