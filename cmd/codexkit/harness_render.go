@@ -47,6 +47,17 @@ type harnessRenderArguments struct {
 	jsonOutput         bool
 }
 
+// Keep the cause available to errors.Is/As without printing its local path.
+type harnessRenderSourceRootError struct {
+	err error
+}
+
+func (e *harnessRenderSourceRootError) Error() string {
+	return "source root is not a safe contained directory"
+}
+
+func (e *harnessRenderSourceRootError) Unwrap() error { return e.err }
+
 func executeHarnessRender(args []string) (harnessRenderSummary, bool, error) {
 	parsed, err := parseHarnessRenderArguments(args)
 	if err != nil {
@@ -137,7 +148,7 @@ func executeHarnessRender(args []string) (harnessRenderSummary, bool, error) {
 	}
 	root, err := harnessfs.Open(rootPath)
 	if err != nil {
-		return harnessRenderSummary{}, parsed.jsonOutput, fmt.Errorf("source root is not a safe contained directory: %w", err)
+		return harnessRenderSummary{}, parsed.jsonOutput, &harnessRenderSourceRootError{err: err}
 	}
 	defer func() { _ = root.Close() }()
 

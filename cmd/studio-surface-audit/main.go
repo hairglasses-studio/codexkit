@@ -224,6 +224,9 @@ func collectAudit(workspaceRoot string) (AuditReport, error) {
 		}
 		name := d.Name()
 		if d.IsDir() {
+			if path == workspaceRoot {
+				return nil
+			}
 			if skipDirs[name] {
 				return filepath.SkipDir
 			}
@@ -259,13 +262,15 @@ func collectAudit(workspaceRoot string) (AuditReport, error) {
 		}
 
 		nameLower := strings.ToLower(name)
-		if nameLower == "claude.md" || nameLower == ".claude.json" || strings.Contains(path, "/.claude/") {
+		// Match directory components below the workspace, including top-level providers.
+		surfacePath := "/" + filepath.ToSlash(rel)
+		if nameLower == "claude.md" || nameLower == ".claude.json" || strings.Contains(surfacePath, "/.claude/") {
 			report.LLMSurfaces["claude"] = append(report.LLMSurfaces["claude"], rel)
-		} else if nameLower == "codex.md" || nameLower == "agents.md" || nameLower == ".codex.json" || strings.Contains(path, "/.codex/") {
+		} else if nameLower == "codex.md" || nameLower == "agents.md" || nameLower == ".codex.json" || strings.Contains(surfacePath, "/.codex/") {
 			report.LLMSurfaces["codex"] = append(report.LLMSurfaces["codex"], rel)
-		} else if nameLower == "gemini.md" || nameLower == ".gemini.json" || strings.Contains(path, "/.gemini/") {
+		} else if nameLower == "gemini.md" || nameLower == ".gemini.json" || strings.Contains(surfacePath, "/.gemini/") {
 			report.LLMSurfaces["gemini"] = append(report.LLMSurfaces["gemini"], rel)
-		} else if nameLower == "agy.md" || nameLower == ".agy.json" || strings.Contains(path, "/.agy/") {
+		} else if nameLower == "agy.md" || nameLower == ".agy.json" || strings.Contains(surfacePath, "/.agy/") {
 			report.LLMSurfaces["agy"] = append(report.LLMSurfaces["agy"], rel)
 		}
 
@@ -526,6 +531,9 @@ func checkGofmtCompliance(workspaceRoot string, out ...io.Writer) bool {
 		}
 
 		if d.IsDir() {
+			if path == workspaceRoot {
+				return nil
+			}
 			name := d.Name()
 			if excludedDirs[name] {
 				return filepath.SkipDir

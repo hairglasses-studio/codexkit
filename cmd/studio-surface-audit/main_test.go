@@ -48,6 +48,56 @@ func TestCollectAuditUsesManifestAndPrunesArchiveTrees(t *testing.T) {
 	}
 }
 
+func TestCollectAuditIgnoresWorkspaceAncestors(t *testing.T) {
+	for _, location := range []string{".claude/ws", ".codex/ws", ".gemini/ws", ".agy/ws", "archive/worktrees/ws", "worktrees", "vault", ".cache"} {
+		t.Run(location, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), filepath.FromSlash(location))
+			writeFixture(t, root, "AGENTS.md", "# Workspace\n")
+			writeFixture(t, root, "scripts/run.sh", "#!/bin/sh\n")
+			writeFixture(t, root, "app/.claude/skills/demo/SKILL.md", "# Demo\n")
+			writeFixture(t, root, "app/.claude/worktrees/copy/CLAUDE.md", "# Excluded\n")
+			writeFixture(t, root, "git-cleanup-archives/CLAUDE.md", "# Excluded\n")
+			writeFixture(t, root, "app/imported/AGENTS.md", "# Excluded\n")
+			want := map[string][]string{}
+			for _, provider := range []string{"claude", "codex", "gemini", "agy"} {
+				path := "." + provider + "/settings.json"
+				writeFixture(t, root, path, "{}\n")
+				want[provider] = []string{filepath.FromSlash(path)}
+			}
+			want["claude"] = append(want["claude"], filepath.FromSlash("app/.claude/skills/demo/SKILL.md"))
+			want["codex"] = append(want["codex"], "AGENTS.md")
+
+			report, err := collectAudit(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for provider, paths := range want {
+				if got := report.LLMSurfaces[provider]; !slices.Equal(got, paths) {
+					t.Errorf("%s surfaces = %v, want %v", provider, got, paths)
+				}
+			}
+			if !slices.Equal(report.Scripts, []string{filepath.FromSlash("scripts/run.sh")}) {
+				t.Errorf("Scripts = %v", report.Scripts)
+			}
+		})
+	}
+}
+
+func TestCheckGofmtComplianceDoesNotPruneWorkspaceRoot(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "git-cleanup-archives")
+	writeFixture(t, root, "main.go", "package main\nfunc main(){}\n")
+	var output bytes.Buffer
+	if checkGofmtCompliance(root, &output) {
+		t.Fatalf("workspace root was pruned: %s", output.String())
+	}
+	writeFixture(t, root, "main.go", "package main\n\nfunc main() {}\n")
+	writeFixture(t, root, "git-cleanup-archives/bad.go", "invalid Go\n")
+	output.Reset()
+	if !checkGofmtCompliance(root, &output) {
+		t.Fatalf("descendant archive was not pruned: %s", output.String())
+	}
+}
+
 func TestCheckGofmtComplianceProvesItCanFail(t *testing.T) {
 	root := t.TempDir()
 	writeFixture(t, root, "workspace/manifest.json", `{"version":1,"repos":[{"name":"app","baseline_target":true}]}`)
