@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"context"
 	"os"
 
 	"github.com/hairglasses-studio/codexkit"
@@ -16,6 +17,21 @@ func (m *module) Init() error  { return nil }
 
 func (m *module) Tools() []codexkit.ToolDef {
 	return []codexkit.ToolDef{
+		{
+			Name:        "workspace_manifest_reconcile_aliases",
+			Description: "Preview or apply exact active symlink alias row removals, preserving unrelated manifest fields. Apply requires reviewed expected_sha256.",
+			Annotations: codexkit.ToolAnnotations(false, false, false, true),
+			Schema: map[string]any{
+				"type": "object", "additionalProperties": false, "required": []string{"root", "aliases"},
+				"properties": map[string]any{
+					"root":            map[string]any{"type": "string"},
+					"aliases":         map[string]any{"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": map[string]any{"type": "string"}},
+					"expected_sha256": map[string]any{"type": "string", "pattern": "^[a-f0-9]{64}$"},
+					"apply":           map[string]any{"type": "boolean"},
+				},
+			},
+			ContextHandler: codexkit.TypedContextHandler(func(ctx context.Context, req AliasReconcileRequest) (any, error) { return ReconcileAliases(ctx, req) }),
+		},
 		{
 			Name:        "workspace_manifest_generate",
 			Description: "Generate the canonical workspace manifest from live repos and docs metadata. Defaults to dry-run unless write is true.",
