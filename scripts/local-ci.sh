@@ -12,6 +12,7 @@ echo "==> freeze guard"
 bash scripts/install-freeze-guard.sh
 bash scripts/check-freeze.sh --history
 bash scripts/check-freeze-self-test.sh
+bash scripts/run-codexkit-mcp-self-test.sh
 
 echo "==> parse tracked JSON and TOML"
 python3 - <<'PY'
