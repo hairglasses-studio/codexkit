@@ -122,8 +122,8 @@ fxgit commit -q -am envprobe
 build_only "build the env probe"
 leak="$("${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=0 CODEXKIT_MCP_RESOLVE_ONLY=0 bash "$fx/scripts/run-codexkit-mcp.sh" </dev/null 2>/dev/null || true)"
 expect "=0 mode switches start the server and are not leaked to it" "env:||" "$leak"
-leak="$("${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$fx/scripts/run-codexkit-mcp.sh" </dev/null 2>/dev/null | head -1)"
-expect "BUILD_ONLY=1 prints the binary and starts no server" "binary=$bin" "$leak"
+leak="$("${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$fx/scripts/run-codexkit-mcp.sh" </dev/null 2>/dev/null)"
+expect "BUILD_ONLY=1 prints the binary and starts no server" "binary=$bin" "${leak%%$'\n'*}" # no head in a pipeline: SIGPIPE under pipefail
 
 # Fail closed: a dirty tree whose hash cannot be computed rebuilds; a clean tree needs no hash.
 shim_sha="$tmp_root/shim-sha"
@@ -205,11 +205,75 @@ case "$note" in
 *"already failed"*) ok "known-failed key serves the existing binary with one note" ;;
 *) bad "no negative-cache note: $note" ;;
 esac
+touch -d '20 minutes ago' "$bin.failed-$(fxgit rev-parse HEAD)"
+expect "an expired failure marker (transient failure) retries" rebuild "$(resolve)"
+touch "$bin.failed-$(fxgit rev-parse HEAD)"
+
+# A worktree whose own build fails serves the canonical binary (here: the env probe's successor).
+fxgit worktree add -q "$tmp_root/wt2" -b wt2
+mkdir -p "$tmp_root/wt2/scripts"
+cp "$launcher" "$tmp_root/wt2/scripts/run-codexkit-mcp.sh"
+wt2_run() { "${run_env[@]}" bash "$tmp_root/wt2/scripts/run-codexkit-mcp.sh" </dev/null 2>"$tmp_root/wt2.err" || true; }
+wt2_out="$(wt2_run)"
+case "$(cat "$tmp_root/wt2.err")" in
+*"serving the canonical binary"*) ok "worktree build fails -> canonical binary served" ;;
+*) bad "worktree fallback: $(cat "$tmp_root/wt2.err")" ;;
+esac
+expect "...and the canonical binary ran (built from the earlier good tree: no env line)" "" "$wt2_out"
+wt2_dir="$(dirname "$bin")/wt-$(printf '%s' "$(cd "$tmp_root/wt2" && pwd -P)" | sha256sum | cut -c1-8)"
+expect "...the worktree dir records its root" "$(cd "$tmp_root/wt2" && pwd -P)" "$(cat "$wt2_dir/root")"
+wt2_out="$(wt2_run)"
+case "$(cat "$tmp_root/wt2.err")" in
+*"already failed"*"canonical binary"* | *"canonical binary"*"already failed"*) ok "worktree: a repeat launch skips the failed build" ;;
+*) bad "worktree negative cache: $(cat "$tmp_root/wt2.err")" ;;
+esac
+
+# Pruning: dirs whose recorded root is gone go; live roots and dirs with no root file stay.
+mkdir -p "$(dirname "$bin")/wt-0000dead" "$(dirname "$bin")/wt-0000live" "$(dirname "$bin")/wt-0000none"
+printf '%s\n' "$tmp_root/gone" >"$(dirname "$bin")/wt-0000dead/root"
+printf '%s\n' "$tmp_root" >"$(dirname "$bin")/wt-0000live/root"
+fxgit worktree remove --force "$tmp_root/wt2"
 setmain 7
 fxgit commit -q -am seven
 expect "a new key retries" rebuild "$(resolve)"
+build_only "rebuild prunes"
+expect "prune: dir with a vanished root is removed" 0 "$(find "$(dirname "$bin")" -maxdepth 1 -name 'wt-0000dead' | wc -l)"
+expect "prune: the removed worktree's dir is removed" 0 "$(find "$(dirname "$bin")" -maxdepth 1 -name "$(basename "$wt2_dir")" | wc -l)"
+expect "prune: dir with a live root stays" 1 "$(find "$(dirname "$bin")" -maxdepth 1 -name 'wt-0000live' | wc -l)"
+expect "prune: dir with no root file stays" 1 "$(find "$(dirname "$bin")" -maxdepth 1 -name 'wt-0000none' | wc -l)"
 build_only "build after the fix"
 expect "failure marker cleared on success" 0 "$(find "$(dirname "$bin")" -name '*.failed-*' | wc -l)"
+
+# A worktree has no ../dep sibling: the build points the replace at the canonical sibling checkout.
+dep="$home/hairglasses-studio/dep"
+mkdir -p "$dep"
+printf 'module example.com/dep\n\ngo 1.20\n' >"$dep/go.mod"
+printf 'package dep\n' >"$dep/dep.go"
+printf 'module example.com/fx\n\ngo 1.20\n\nrequire example.com/dep v0.0.0\n\nreplace example.com/dep => ../dep\n' >"$fx/go.mod"
+printf 'package main\n\nimport _ "example.com/dep"\n\nfunc main() {}\n' >"$fx/cmd/codexkit-mcp/main.go"
+fxgit commit -q -am withdep
+build_only "canonical build with a ../dep replace"
+fxgit worktree add -q "$tmp_root/wt3" -b wt3
+mkdir -p "$tmp_root/wt3/scripts"
+cp "$launcher" "$tmp_root/wt3/scripts/run-codexkit-mcp.sh"
+wt3_build() { "${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$tmp_root/wt3/scripts/run-codexkit-mcp.sh" </dev/null 2>&1 | tail -n 3 || true; }
+wt3_out="$(wt3_build)"
+case "$wt3_out" in
+*"binary="*"/wt-"*) ok "worktree builds when ../dep is missing (temp modfile)" ;;
+*) bad "worktree modfile build: $wt3_out" ;;
+esac
+wt3_bin="$(printf '%s\n' "$wt3_out" | sed -n 's/^binary=//p')"
+expect "...and its binary is stamped with the worktree HEAD" "$(git -C "$tmp_root/wt3" rev-parse HEAD)" "$(go version -m "$wt3_bin" | sed -n 's/^[[:space:]]*build[[:space:]]*vcs\.revision=//p')"
+# Control: without the sibling to point at, the same build fails.
+rm -rf "$(dirname "$wt3_bin")"
+mv "$dep" "$dep.off"
+wt3_out="$(wt3_build)"
+case "$wt3_out" in
+*"build failed"*) ok "red control: worktree build fails when the sibling is missing" ;;
+*) bad "red control: expected a failed build: $wt3_out" ;;
+esac
+mv "$dep.off" "$dep"
+fxgit worktree remove --force "$tmp_root/wt3"
 
 echo "red control: revision rule disabled"
 mutant="$tmp_root/mutant.sh"

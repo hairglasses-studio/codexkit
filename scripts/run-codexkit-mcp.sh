@@ -46,6 +46,7 @@ sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum 
 # One cache path per checkout: only the canonical checkout ($HOME/hairglasses-studio/codexkit) uses
 # the shared BIN_PATH; any other ROOT (worktree, clone) gets bin/wt-<hash of its realpath>/<name>,
 # so two checkouts at different HEADs never rebuild over each other's binary.
+CANON_BIN="$BIN_PATH"
 ROOT_REAL="$(cd "$ROOT" && pwd -P)"
 CANON_ROOT="$(cd "$USER_HOME/hairglasses-studio/codexkit" 2>/dev/null && pwd -P || true)"
 if [[ "$ROOT_REAL" != "$CANON_ROOT" ]]; then
@@ -78,7 +79,11 @@ source_key() {
 # Sets want_key/reason: rebuild when the cached binary is missing, has no vcs.revision, was built
 # from another HEAD, or (dirty tree) from other uncommitted inputs. The key sidecar covers dirty
 # trees and -buildvcs=false builds; vcs.modified is not used because Go sets it for any dirty or
-# untracked file, not only Go inputs. A build that already failed for this exact key is not retried.
+# untracked file, not only Go inputs. A build that failed for this exact key within the last
+# FAILED_TTL_MIN minutes is not retried (older markers expire, so a timeout, a network error or a
+# full disk never pins a stale binary for good).
+FAILED_TTL_MIN="${CODEXKIT_MCP_FAILED_TTL_MIN:-10}"
+have_fallback() { [[ -x "$BIN_PATH" || -x "$CANON_BIN" ]]; }
 decide() {
   local key_unknown=false
   failed_known=false
@@ -107,7 +112,8 @@ decide() {
   if [[ -z "$reason" && -n "$(find "$ROOT/cmd" "$ROOT/internal" "$ROOT/go.mod" "$ROOT/go.sum" -type f \( -name '*.go' -o -name 'go.mod' -o -name 'go.sum' \) -newer "$BIN_PATH" -print -quit 2>/dev/null)" ]]; then
     reason="sources are newer than the cached binary"
   fi
-  if [[ -n "$reason" && -n "$want_key" && "$build_only" != true && -x "$BIN_PATH" && -e "$BIN_PATH.failed-$want_key" ]]; then
+  if [[ -n "$reason" && -n "$want_key" && "$build_only" != true ]] && have_fallback &&
+    [[ -n "$(find "$BIN_PATH.failed-$want_key" -maxdepth 0 -mmin "-$FAILED_TTL_MIN" 2>/dev/null)" ]]; then
     reason=""
     failed_known=true
   fi
@@ -130,6 +136,8 @@ if command -v timeout >/dev/null 2>&1; then TIMEOUT=(timeout "${CODEXKIT_MCP_BUI
 tmp_bin=""
 build_err=""
 bpid=""
+modfile_dir=""
+MODFLAG=()
 # Runs on every exit path except exec: a terminated launcher kills its build and leaves no temp files.
 cleanup() {
   if [[ -n "$bpid" ]]; then
@@ -138,6 +146,33 @@ cleanup() {
   fi
   if [[ -n "$tmp_bin" ]]; then rm -f "$tmp_bin" "$BIN_PATH.key.$$"; fi
   if [[ -n "$build_err" ]]; then rm -f "$build_err"; fi
+  if [[ -n "$modfile_dir" ]]; then rm -rf "$modfile_dir"; fi
+}
+
+# A linked worktree has no sibling checkout for a relative `replace ... => ../x`. Build with a temp
+# modfile that points such a replace at $HOME/hairglasses-studio/x when that exists (a no-op otherwise).
+prepare_modfile() {
+  local line target dest changed=false
+  local re='^replace[[:space:]].*=>[[:space:]]*(\.\.?/[^[:space:]]+)[[:space:]]*$'
+  modfile_dir="$(mktemp -d)"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ $re ]]; then
+      target="${BASH_REMATCH[1]}"
+      dest="$USER_HOME/hairglasses-studio/$(basename "$target")"
+      if [[ ! -d "$ROOT/$target" && -d "$dest" ]]; then
+        line="${line/"$target"/$dest}"
+        changed=true
+      fi
+    fi
+    printf '%s\n' "$line"
+  done <"$ROOT/go.mod" >"$modfile_dir/go.mod"
+  if [[ "$changed" == true ]]; then
+    cp "$ROOT/go.sum" "$modfile_dir/go.sum" 2>/dev/null || true
+    MODFLAG=("-modfile=$modfile_dir/go.mod")
+  else
+    rm -rf "$modfile_dir"
+    modfile_dir=""
+  fi
 }
 trap cleanup EXIT
 trap 'exit 143' TERM INT HUP
@@ -145,7 +180,7 @@ trap 'exit 143' TERM INT HUP
 # The build runs in the background so a signal reaches the launcher at once; fd 9 (the build
 # lock) is closed for it, otherwise a stray compiler would keep the lock after we exit.
 go_build() { # extra go build flags
-  ${TIMEOUT[@]+"${TIMEOUT[@]}"} env GOWORK="$GOWORK" go build "$@" -o "$tmp_bin" ./cmd/codexkit-mcp 2>"$build_err" 9>&- &
+  ${TIMEOUT[@]+"${TIMEOUT[@]}"} env GOWORK="$GOWORK" go build ${MODFLAG[@]+"${MODFLAG[@]}"} "$@" -o "$tmp_bin" ./cmd/codexkit-mcp 2>"$build_err" 9>&- &
   bpid=$!
   local rc=0
   wait "$bpid" || rc=$?
@@ -153,8 +188,22 @@ go_build() { # extra go build flags
   return "$rc"
 }
 
+# Per-checkout dirs record their root in a `root` file; one whose recorded root is gone is removed.
+# A dir with no (or an empty) root file is never removed.
+prune_wt_dirs() {
+  local d r
+  for d in "$(dirname "$CANON_BIN")"/wt-*/; do
+    [[ -s "$d/root" ]] || continue
+    r="$(cat "$d/root" 2>/dev/null || true)"
+    if [[ "$r" == /* && ! -e "$r" && ! -L "$r" ]]; then rm -rf -- "${d%/}"; fi
+  done
+}
+
 rebuild() { # 0 = cache refreshed; the build lock is held (or unavailable)
   local ok=false
+  if [[ "$BIN_PATH" != "$CANON_BIN" ]]; then printf '%s\n' "$ROOT_REAL" >"$(dirname "$BIN_PATH")/root" || true; fi
+  prune_wt_dirs
+  prepare_modfile
   tmp_bin="$BIN_PATH.tmp.$$"
   build_err="$(mktemp)"
   # Stamp vcs.revision/vcs.modified (go version -m); drop to -buildvcs=false only when Go cannot read VCS status.
@@ -186,20 +235,25 @@ rebuild() { # 0 = cache refreshed; the build lock is held (or unavailable)
   rm -f "$tmp_bin" "$build_err"
   tmp_bin=""
   build_err=""
+  if [[ -n "$modfile_dir" ]]; then rm -rf "$modfile_dir"; fi
+  modfile_dir=""
+  MODFLAG=()
   [[ "$ok" == true ]]
 }
 
 if [[ -n "$reason" ]]; then
   mkdir -p "$(dirname "$BIN_PATH")" 2>/dev/null || true
   skip_build=false
+  # Without flock (macOS) concurrent launchers may each build: temp files are per pid and the install
+  # is a rename, so that is only wasteful, not unsafe.
   if command -v flock >/dev/null 2>&1 && { exec 9>>"$BIN_PATH.lock"; } 2>/dev/null; then
     if ! flock -n 9; then
-      if [[ -x "$BIN_PATH" && "$build_only" != true ]]; then
+      if have_fallback && [[ "$build_only" != true ]]; then
         echo "run-codexkit-mcp.sh: another launcher is rebuilding; serving the existing binary" >&2
         skip_build=true
       elif ! flock -w "${CODEXKIT_MCP_LOCK_WAIT_SEC:-120}" 9; then
         echo "run-codexkit-mcp.sh: build lock still held after the wait" >&2
-        if [[ -x "$BIN_PATH" ]]; then skip_build=true; fi
+        if have_fallback; then skip_build=true; fi
       fi
     fi
   fi
@@ -208,15 +262,20 @@ if [[ -n "$reason" ]]; then
     if [[ -n "$reason" ]]; then
       echo "run-codexkit-mcp.sh: rebuilding: $reason" >&2
       if ! rebuild; then
-        if [[ "$build_only" == true || ! -x "$BIN_PATH" ]]; then
+        if [[ "$build_only" == true ]] || ! have_fallback; then
           echo "run-codexkit-mcp.sh: build failed" >&2
           exit 1
         fi
-        echo "run-codexkit-mcp.sh: build failed; serving the existing binary $BIN_PATH" >&2
+        echo "run-codexkit-mcp.sh: build failed; serving the existing binary" >&2
       fi
     fi
   fi
   exec 9>&-
+fi
+# A checkout with no usable build of its own (a worktree that cannot build) serves the canonical binary.
+if [[ ! -x "$BIN_PATH" && "$build_only" != true && -x "$CANON_BIN" ]]; then
+  echo "run-codexkit-mcp.sh: no usable build for this checkout; serving the canonical binary $CANON_BIN" >&2
+  BIN_PATH="$CANON_BIN"
 fi
 if [[ "$failed_known" == true ]]; then
   echo "run-codexkit-mcp.sh: the build for ${want_key:0:12} already failed; serving the existing binary (remove $BIN_PATH.failed-* to retry)" >&2
