@@ -71,6 +71,10 @@ mutate() { # sed-expr out
 	if cmp -s "$launcher" "$2"; then bad "mutation '$1' did not apply (launcher text changed?)"; return 1; fi
 }
 
+rm_dir() { # path: remove a scratch dir; an empty, "." or "/" path (an earlier step produced nothing) is skipped, never fatal
+	if [[ -n "${1:-}" && "$1" != . && "$1" != / ]]; then rm -rf "$1"; fi
+}
+
 prune_scenario() { # launcher-to-install; sets act_prune_kept (1 when a dir whose root is unreachable survives)
 	new_fixture "$1"
 	mkdir -p "$(dirname "$bin")/wt-0000lock" "$tmp_root/locked/child"
@@ -138,7 +142,7 @@ env_scenario() { # launcher-to-install; env failures of a worktree that has no b
 	wte_bindir="$(dirname "$("${run_env[@]}" CODEXKIT_MCP_RESOLVE_ONLY=1 bash "$tmp_root/wte/scripts/run-codexkit-mcp.sh" | sed -n 's/^binary=//p')")"
 	# a) unusable $TMPDIR: the build uses a cache-local scratch dir instead
 	act_tmp_a="$("${run_env[@]}" TMPDIR=/nonexistent CODEXKIT_MCP_BUILD_ONLY=1 bash "$tmp_root/wte/scripts/run-codexkit-mcp.sh" </dev/null 2>&1 | tail -n 3 || true)"
-	rm -rf "$wte_bindir"
+	rm_dir "$wte_bindir"
 	# b) no scratch dir anywhere ($TMPDIR unusable and the cache-local .tmp cannot be created)
 	mkdir -p "$wte_bindir"
 	: >"$wte_bindir/.tmp"
@@ -149,20 +153,20 @@ env_scenario() { # launcher-to-install; env failures of a worktree that has no b
 	if [[ -e /nonexistent ]]; then act_tmp_nonexistent=1; fi
 	act_tmp_buildonly_rc=0
 	"${run_env[@]}" TMPDIR=/nonexistent CODEXKIT_MCP_BUILD_ONLY=1 bash "$tmp_root/wte/scripts/run-codexkit-mcp.sh" </dev/null >/dev/null 2>&1 || act_tmp_buildonly_rc=$?
-	rm -rf "$wte_bindir"
+	rm_dir "$wte_bindir"
 	# c) the build is killed by a signal (rc 137, no output) / runs out of memory (rc 1, message)
 	SHIM_BUILD_EXIT=137 PATH="$shim_go:$PATH" wt_launch "$tmp_root/wte"
 	act_kill_rc="$wt_rc" act_kill_out="$wt_out"
-	rm -rf "$wte_bindir"
+	rm_dir "$wte_bindir"
 	SHIM_BUILD_EXIT=1 SHIM_BUILD_MSG="fork/exec /usr/lib/go/pkg/tool/compile: cannot allocate memory" PATH="$shim_go:$PATH" wt_launch "$tmp_root/wte"
 	act_oom_rc="$wt_rc" act_oom_out="$wt_out"
-	rm -rf "$wte_bindir"
+	rm_dir "$wte_bindir"
 	# d) $TMPDIR is a usable directory but mktemp fails in it (full fs, quota): the cache-local dir is used
 	full_tmp="$tmp_root/fulltmp"
 	mkdir -p "$full_tmp"
 	act_full_rc=0
 	act_full_out="$(TMPDIR="$full_tmp" SHIM_MKTEMP_FAIL_DIR="$full_tmp" PATH="$shim_mktemp:$PATH" "${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$tmp_root/wte/scripts/run-codexkit-mcp.sh" </dev/null 2>&1)" || act_full_rc=$?
-	rm -rf "$wte_bindir"
+	rm_dir "$wte_bindir"
 	fxgit worktree remove --force "$tmp_root/wte"
 }
 
@@ -406,7 +410,7 @@ wt_replace_case() { # label go.mod-replace-text
 	esac
 	wt_bin="$(printf '%s\n' "$wt_out" | sed -n 's/^binary=//p')"
 	expect "...and its binary is stamped with the worktree HEAD" "$(git -C "$wt" rev-parse HEAD)" "$(go version -m "$wt_bin" | sed -n 's/^[[:space:]]*build[[:space:]]*vcs\.revision=//p')"
-	rm -rf "$(dirname "$wt_bin")"
+	rm_dir "$(dirname "${wt_bin:-.}")" # wt_bin is empty when the worktree build failed: dirname "" is ".", and rm -rf . aborts the run
 }
 wt_replace_case "one-line" $'replace example.com/dep => ../dep\nreplace example.com/dep2 => ../dep2'
 wt_replace_case "block" $'replace (\n\texample.com/dep => ../dep\n\texample.com/dep2 => ../dep2\n)'
@@ -420,7 +424,7 @@ case "$wt_out" in
 *"build failed"*) ok "build-only in a worktree with no sibling fails" ;;
 *) bad "expected a failed build-only: $wt_out" ;;
 esac
-rm -f "$(dirname "$wt_bin")"/*.failed-*
+if [[ -n "$wt_bin" ]]; then rm -f "$(dirname "$wt_bin")"/*.failed-*; fi
 wt_rc=0
 wt_out="$("${run_env[@]}" bash "$wt/scripts/run-codexkit-mcp.sh" </dev/null 2>"$tmp_root/wt.err")" || wt_rc=$?
 expect "worktree with a missing sibling exits 0" 0 "$wt_rc"
