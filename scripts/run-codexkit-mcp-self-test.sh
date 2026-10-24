@@ -36,7 +36,7 @@ expect() { # name want got
 
 real_go="$(command -v go)"
 gocache="${GOCACHE:-$(go env GOCACHE)}"
-home="$tmp_root/home"
+home="$tmp_root/ho&me" # an `&` in $HOME: bash >= 5.2 expands it in ${var/pat/$repl}
 fx="$home/hairglasses-studio/$repo_dir" # the canonical checkout for HOME=$home
 cache="$tmp_root/cache"
 bin="$cache/codexkit-mcp/bin/codexkit-mcp"
@@ -113,6 +113,21 @@ compile_scenario() { # launcher-to-install; sets act_compile_* (worktree without
 	fxgit worktree remove --force "$tmp_root/wtc"
 }
 
+amp_scenario() { # launcher-to-install; a worktree whose ../dep sibling is rewritten to a path containing "&"
+	launcher_under_test="$1"
+	new_fixture "$1"
+	dep="$home/hairglasses-studio/dep"
+	mkdir -p "$dep"
+	printf 'module example.com/dep\n\ngo 1.20\n' >"$dep/go.mod"
+	printf 'package dep\n' >"$dep/dep.go"
+	printf 'module example.com/fx\n\ngo 1.20\n\nrequire example.com/dep v0.0.0\n\nreplace example.com/dep => ../dep\n' >"$fx/go.mod"
+	printf 'package main\n\nimport _ "example.com/dep"\n\nfunc main() {}\n' >"$fx/cmd/codexkit-mcp/main.go"
+	fxgit commit -q -am amp
+	new_worktree wta
+	act_amp_out="$("${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$tmp_root/wta/scripts/run-codexkit-mcp.sh" </dev/null 2>&1 || true)"
+	fxgit worktree remove --force "$tmp_root/wta"
+}
+
 env_scenario() { # launcher-to-install; env failures of a worktree that has no binary of its own
 	launcher_under_test="$1"
 	new_fixture "$1"
@@ -141,6 +156,12 @@ env_scenario() { # launcher-to-install; env failures of a worktree that has no b
 	rm -rf "$wte_bindir"
 	SHIM_BUILD_EXIT=1 SHIM_BUILD_MSG="fork/exec /usr/lib/go/pkg/tool/compile: cannot allocate memory" PATH="$shim_go:$PATH" wt_launch "$tmp_root/wte"
 	act_oom_rc="$wt_rc" act_oom_out="$wt_out"
+	rm -rf "$wte_bindir"
+	# d) $TMPDIR is a usable directory but mktemp fails in it (full fs, quota): the cache-local dir is used
+	full_tmp="$tmp_root/fulltmp"
+	mkdir -p "$full_tmp"
+	act_full_rc=0
+	act_full_out="$(TMPDIR="$full_tmp" SHIM_MKTEMP_FAIL_DIR="$full_tmp" PATH="$shim_mktemp:$PATH" "${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$tmp_root/wte/scripts/run-codexkit-mcp.sh" </dev/null 2>&1)" || act_full_rc=$?
 	rm -rf "$wte_bindir"
 	fxgit worktree remove --force "$tmp_root/wte"
 }
@@ -253,6 +274,18 @@ fi
 exec "$real_go" "\$@"
 EOF
 chmod +x "$shim_go/go"
+# A mktemp that fails only inside one directory, as a full filesystem or an exhausted quota would.
+shim_mktemp="$tmp_root/shim-mktemp"
+mkdir -p "$shim_mktemp"
+cat >"$shim_mktemp/mktemp" <<EOF
+#!/usr/bin/env bash
+if [[ "\${TMPDIR:-}" == "\${SHIM_MKTEMP_FAIL_DIR:-@none@}" ]]; then
+	echo "mktemp: failed to create file via template: No space left on device" >&2
+	exit 1
+fi
+exec "$(command -v mktemp)" "\$@"
+EOF
+chmod +x "$shim_mktemp/mktemp"
 rm -f "$bin" "$bin.key"
 PATH="$shim_go:$PATH" "${run_env[@]}" CODEXKIT_MCP_BUILD_ONLY=1 bash "$fx/scripts/run-codexkit-mcp.sh" </dev/null >/dev/null 2>&1 &
 launcher_pid=$!
@@ -435,6 +468,35 @@ expect "a build killed by a signal (rc 137, silent) is environmental: canonical 
 expect "...and the canonical binary ran" ran "$act_kill_out"
 expect "an out-of-memory build failure is environmental: canonical served" 0 "$act_oom_rc"
 expect "...and the canonical binary ran" ran "$act_oom_out"
+
+expect "TMPDIR is a directory but mktemp fails in it: the cache-local dir is tried (exit status)" 0 "$act_full_rc"
+case "$act_full_out" in
+*"binary="*"/wt-"*) ok "...and the worktree built" ;;
+*) bad "mktemp-failure fallback: $act_full_out" ;;
+esac
+amp_scenario "$launcher"
+case "$act_amp_out" in
+*"binary="*"/wt-"*) ok "a sibling path containing & is substituted verbatim (HOME has an &)" ;;
+*) bad "& in the sibling path: $act_amp_out" ;;
+esac
+
+echo "red control: mktemp failure in a usable TMPDIR skips the cache-local dir"
+mutant="$tmp_root/mutant.sh"
+# shellcheck disable=SC2016
+if mutate '/The cache-local dir is tried/,/record_failure=true/ s/^  if \[\[ -z "\$build_err" \]\]; then$/  if [[ ! -d "$tmpd" || ! -w "$tmpd" || ! -x "$tmpd" ]]; then/' "$mutant"; then
+	env_scenario "$mutant"
+	expect "red control: the build is not attempted (exit status)" 1 "$act_full_rc"
+fi
+
+echo "red control: & in the sibling path is expanded by the substitution"
+# shellcheck disable=SC2016
+if mutate 's|^        line="\$pre\${post%%"\$target"\*}\$abs\${post#\*"\$target"}"$|        line="$pre${post/"$target"/$abs}"|' "$mutant"; then
+	amp_scenario "$mutant"
+	case "$act_amp_out" in
+	*"replacement directory"*"does not exist"*) ok "red control: with the & expanded, the replace points nowhere and the build fails" ;;
+	*) bad "red control: the & substitution bug went unnoticed: $act_amp_out" ;;
+	esac
+fi
 
 echo "red control: no scratch dir is a compile failure"
 mutant="$tmp_root/mutant.sh"
