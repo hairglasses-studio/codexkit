@@ -44,7 +44,19 @@ fi
 cd "$ROOT"
 if [[ "$needs_build" == true ]]; then
   mkdir -p "$(dirname "$BIN_PATH")"
-  GOWORK="$GOWORK" go build -buildvcs=false -o "$BIN_PATH" ./cmd/codexkit-mcp
+  # Stamp vcs.revision/vcs.modified (go version -m); drop to -buildvcs=false only when Go cannot read VCS status.
+  build_err="$(mktemp)"
+  if GOWORK="$GOWORK" go build -o "$BIN_PATH" ./cmd/codexkit-mcp 2>"$build_err"; then
+    cat "$build_err" >&2
+  elif grep -q 'error obtaining VCS status' "$build_err"; then
+    echo "run-codexkit-mcp.sh: go cannot obtain VCS status here; rebuilding with -buildvcs=false (binary will carry no vcs.revision)" >&2
+    GOWORK="$GOWORK" go build -buildvcs=false -o "$BIN_PATH" ./cmd/codexkit-mcp
+  else
+    cat "$build_err" >&2
+    rm -f "$build_err"
+    exit 1
+  fi
+  rm -f "$build_err"
 fi
 
 exec "$BIN_PATH" "$@"
