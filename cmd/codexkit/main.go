@@ -114,6 +114,8 @@ Commands:
   fleet report [scan_path]      Summary report of fleet health
   workspace check [root] [--overlay <file>]
                                 Validate workspace/manifest.json and go.work
+  workspace reconcile-aliases --root PATH --alias NAME [--expected-sha256 HASH --apply] [--json]
+                                Remove only proven duplicate active symlink rows; dry-run first
   workspace generate-manifest [root] [--write|--json]
                                 Generate workspace/manifest.json from live repos and docs metadata
   workspace runtime-inventory [root] [--json] [--json-out <path>] [--markdown-out <path>] [--policy <path>]
@@ -1298,6 +1300,11 @@ func runWorkspace(args []string) {
 		}
 
 		if !report.Passed {
+			os.Exit(1)
+		}
+	case "reconcile-aliases":
+		if err := runWorkspaceAliasReconcile(args[1:]); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "generate-manifest":
