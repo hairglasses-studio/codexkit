@@ -1,9 +1,9 @@
-# Codex compatibility: reviewed 0.154.0 contract, installed 0.163.0
+# Codex compatibility: reviewed 0.167.0 contract, installed 0.167.0
 
-The installed CLI reported `codex-cli 0.163.0` on 2026-10-21. The feature and
-protocol contract below was last reviewed against `0.154.0`; newer behavior
+The installed CLI reported `codex-cli 0.167.0` on 2026-11-09. The feature and
+protocol contract below was last reviewed against `0.167.0`; newer behavior
 remains unverified until this document is re-audited. The Codex CLI changelog
-lists 0.163.0 on 2026-10-15.
+lists 0.167.0 on 2026-11-06.
 
 ## Model routes and aliases
 
@@ -16,7 +16,7 @@ lists 0.163.0 on 2026-10-15.
 
 ## Reasoning effort controls
 
-Codex 0.154.0 provides granular control over model reasoning effort via configuration:
+Codex 0.167.0 provides granular control over model reasoning effort via configuration:
 
 - `model_reasoning_effort`: Sets the default reasoning depth for turns. Supported levels depend on the model family:
   - Standard models (`gpt-5.6-sol`, `gpt-5.6-luna`, `gpt-5.5`): `low`, `medium`, `high`, `xhigh`, `max`.
@@ -37,7 +37,7 @@ approval_policy = "never"
 
 ## CLI flags and subcommands
 
-Codex 0.154.0 provides rich non-interactive automation, debugging, and review subcommands:
+Codex 0.167.0 provides rich non-interactive automation, debugging, and review subcommands:
 
 ### Core execution flags
 
@@ -76,13 +76,13 @@ Codex 0.154.0 provides rich non-interactive automation, debugging, and review su
   - `debug models`: Outputs the raw model catalog JSON, including token limits, supported reasoning levels, and service tiers.
   - `debug app-server`: Utilities for inspecting and debugging the background app server daemon.
 - `features`: Inspect and manage feature flags (`features list`, `features enable`, `features disable`).
-  - `code_mode`: Supported in 0.154.0 with `code_mode_host` (stable), and `code_mode`, `code_mode_only`, `code_mode_prewarm`, `code_mode_interrupt` under active development.
+  - `code_mode`: Supported in 0.167.0 with `code_mode_host` (stable), and `code_mode`, `code_mode_only`, `code_mode_prewarm`, `code_mode_interrupt` under active development.
 - `doctor`: Inspects binary health, bundled search tools (`rg`), git integration, terminal capabilities, SQLite databases (`state`, `logs`, `goals`, `memories`, `thread_history`), rollout logs, auth status, sandbox state, and network reachability.
 - Session lifecycle: `resume`, `fork`, `apply` (alias `a` for `git apply`), `queue`, `archive`, `unarchive`, and `delete`.
 
 ## Authentication modes
 
-Codex 0.154.0 supports two distinct authentication pathways:
+Codex 0.167.0 supports two distinct authentication pathways:
 
 1. **ChatGPT OAuth / Prolite (`chatgpt`)**:
    - Authenticated via browser OAuth (`codex login`), device authorization (`codex login --device-auth`), or access token piped to stdin (`printenv CODEX_ACCESS_TOKEN | codex login --with-access-token`).
@@ -118,7 +118,7 @@ Codex builds an instruction chain on startup, traversing from the repository roo
 
 ## Discovery, approvals, and MCP status
 
-- `apps`, `goals`, `hooks`, `multi_agent`, `plugins`, `skill_search`, and `tool_suggest` are stable in Codex 0.154.0.
+- `apps`, `goals`, `hooks`, `multi_agent`, `plugins`, `skill_search`, and `tool_suggest` are stable in Codex 0.167.0.
 - Tool Search is available; its legacy feature toggle is a removed compatibility no-op. The client sets `defer_loading` on function namespaces or MCP server definitions.
 - This server actively negotiates MCP `2025-11-25`. Codex's `mcp_2026_07_28` feature remains under development and disabled, so this repo does not claim that preview protocol is active.
 - `tools/list` returns complete JSON Schema object inputs and supports cursor pagination. The `tool_catalog` and `tool_search` tools group compact entries by their registered module namespace; `tool_schema` loads one complete schema. Discovery filters accept no more than 64 `allowed_tools` entries and are not an authorization grant.
@@ -130,8 +130,8 @@ Codex builds an instruction chain on startup, traversing from the repository roo
 - [OpenAI Tool Search guide](https://developers.openai.com/api/docs/guides/tools-tool-search)
 - [OpenAI MCP and connectors guide](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)
 - [Codex CLI changelog](https://learn.chatgpt.com/docs/changelog#month-2026-10)
-- [Codex 0.154.0 release](https://github.com/openai/codex/releases/tag/rust-v0.154.0)
-- [Codex 0.154.0 feature registry](https://github.com/openai/codex/blob/rust-v0.154.0/codex-rs/features/src/lib.rs)
+- [Codex 0.167.0 release](https://github.com/openai/codex/releases/tag/rust-v0.167.0)
+- [Codex 0.167.0 feature registry](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/features/src/lib.rs)
 - [MCP Go SDK v1.7.0 release](https://github.com/modelcontextprotocol/go-sdk/releases/tag/v1.7.0)
 - [MCP Go SDK v1.7.0 server implementation](https://github.com/modelcontextprotocol/go-sdk/blob/v1.7.0/mcp/server.go)
 

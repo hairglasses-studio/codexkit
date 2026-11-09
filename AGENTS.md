@@ -83,7 +83,7 @@ The MCP server (`cmd/codexkit-mcp`) exposes these tools:
 
 - **MCP 2025-11**: stdio transport, complete `tools/list` schemas, cursor pagination, and server discovery via `.well-known/mcp.json`
 - **OpenAI Tool Search**: clients set `defer_loading` on their tool/MCP definition; the server groups compact catalog entries by module and does not invent an MCP deferred-loading capability.
-- **Codex compatibility**: the feature contract in `docs/CODEX_COMPATIBILITY.md` was last reviewed against 0.154.0; the installed CLI reported 0.163.0 on 2026-10-21. Keep the reviewed baseline separate from newer installed-version observations until the newer contract is checked.
+- **Codex compatibility**: the feature contract in `docs/CODEX_COMPATIBILITY.md` was last reviewed against 0.167.0; the installed CLI reported 0.167.0 on 2026-11-09. Keep the reviewed baseline separate from newer installed-version observations until the newer contract is checked.
 - **Agent Skills open standard** (Dec 2025): portable frontmatter validation, hot-reloading (`reload: true`)
 - **Agent2Agent (A2A)**: `.well-known/agent.json` validation
 - **ToolModule interface**: modeled after claudekit's pattern for module aggregation
