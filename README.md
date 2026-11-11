@@ -171,7 +171,7 @@ namespace-aware discovery path. Profile `enabled_tools` lists are bounded, and
 approval policy remains a client/operator decision rather than an authorization
 claim made by catalog metadata.
 
-See [Codex 0.147.0 compatibility](docs/CODEX_COMPATIBILITY.md) for the current
+See [Codex 0.167.0 compatibility](docs/CODEX_COMPATIBILITY.md) for the current
 model routes, stable feature surface, and MCP protocol status.
 
 ## MCP Tools
