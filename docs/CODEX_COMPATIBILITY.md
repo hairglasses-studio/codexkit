@@ -76,7 +76,7 @@ Codex 0.167.0 provides rich non-interactive automation, debugging, and review su
   - `debug models`: Outputs the raw model catalog JSON, including token limits, supported reasoning levels, and service tiers.
   - `debug app-server`: Utilities for inspecting and debugging the background app server daemon.
 - `features`: Inspect and manage feature flags (`features list`, `features enable`, `features disable`).
-  - `code_mode`: Supported in 0.167.0 with `code_mode_host` (stable), and `code_mode`, `code_mode_only`, `code_mode_prewarm`, `code_mode_interrupt` under active development.
+  - `code_mode`: Supported in 0.167.0 with `code_mode_host` and `code_mode_interrupt` (stable), and `code_mode`, `code_mode_only`, `code_mode_prewarm` under active development (`codex features list`, codex-cli 0.167.0, 2026-11-10).
 - `doctor`: Inspects binary health, bundled search tools (`rg`), git integration, terminal capabilities, SQLite databases (`state`, `logs`, `goals`, `memories`, `thread_history`), rollout logs, auth status, sandbox state, and network reachability.
 - Session lifecycle: `resume`, `fork`, `apply` (alias `a` for `git apply`), `queue`, `archive`, `unarchive`, and `delete`.
 
