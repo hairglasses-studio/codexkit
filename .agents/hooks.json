@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/hooks/pre-tool-guard.sh",
-            "timeout": 5
+            "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || echo ..)\"; if [ -x \"$root/scripts/hooks/pre-tool-guard.sh\" ]; then exec \"$root/scripts/hooks/pre-tool-guard.sh\"; elif [ -x \"$root/scripts/dev/agy-hook.sh\" ]; then exec \"$root/scripts/dev/agy-hook.sh\" pre-tool; elif [ -x \"$root/scripts/agy-hook.sh\" ]; then exec \"$root/scripts/agy-hook.sh\" PreToolUse; elif [ -x \"$root/bin/agy-hook-eval\" ]; then exec \"$root/bin/agy-hook-eval\"; elif [ -x \"$root/hooks/pre-tool-guard.sh\" ]; then exec \"$root/hooks/pre-tool-guard.sh\"; else echo \"{\\\"decision\\\":\\\"deny\\\",\\\"reason\\\":\\\"PreToolUse guard unavailable\\\"}\"; fi'",
+            "timeout": 15
           }
         ]
       }
@@ -18,8 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/hooks/post-tool-audit.sh",
-            "timeout": 5
+            "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || echo ..)\"; if [ -x \"$root/scripts/hooks/post-tool-audit.sh\" ]; then exec \"$root/scripts/hooks/post-tool-audit.sh\"; elif [ -x \"$root/scripts/dev/agy-hook.sh\" ]; then exec \"$root/scripts/dev/agy-hook.sh\" post-tool; elif [ -x \"$root/scripts/agy-hook.sh\" ]; then exec \"$root/scripts/agy-hook.sh\" PostToolUse; else echo \"{}\"; fi'",
+            "timeout": 15
           }
         ]
       }
@@ -27,21 +27,21 @@
     "PreInvocation": [
       {
         "type": "command",
-        "command": "./scripts/hooks/pre-invocation.sh",
+        "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || echo ..)\"; if [ -x \"$root/scripts/hooks/pre-invocation.sh\" ]; then exec \"$root/scripts/hooks/pre-invocation.sh\"; elif [ -x \"$root/scripts/agy-hook.sh\" ]; then exec \"$root/scripts/agy-hook.sh\" PreInvocation; else echo \"{\\\"injectSteps\\\":[]}\"; fi'",
         "timeout": 5
       }
     ],
     "PostInvocation": [
       {
         "type": "command",
-        "command": "./scripts/hooks/post-invocation.sh",
+        "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || echo ..)\"; if [ -x \"$root/scripts/hooks/post-invocation.sh\" ]; then exec \"$root/scripts/hooks/post-invocation.sh\"; elif [ -x \"$root/scripts/agy-hook.sh\" ]; then exec \"$root/scripts/agy-hook.sh\" PostInvocation; else echo \"{\\\"injectSteps\\\":[]}\"; fi'",
         "timeout": 5
       }
     ],
     "Stop": [
       {
         "type": "command",
-        "command": "./scripts/hooks/stop-guard.sh",
+        "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || echo ..)\"; if [ -x \"$root/scripts/hooks/stop-guard.sh\" ]; then exec \"$root/scripts/hooks/stop-guard.sh\"; elif [ -x \"$root/scripts/agy-hook.sh\" ]; then exec \"$root/scripts/agy-hook.sh\" Stop; else echo \"{\\\"decision\\\":\\\"continue\\\",\\\"status\\\":\\\"UNKNOWN\\\",\\\"reason\\\":\\\"Stop guard unavailable\\\"}\"; fi'",
         "timeout": 5
       }
     ]
