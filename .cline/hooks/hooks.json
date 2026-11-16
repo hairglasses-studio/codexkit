@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "description": "Declarative Cline hook contract for cline-harness — 15-stage lifecycle hook pipeline with fail-closed security gating.",
+  "hooks": [
+    {
+      "stage": "session_start",
+      "adapter": "cline/hooks/session_start_adapter.sh",
+      "mode": "async",
+      "failureMode": "fail_open",
+      "timeoutMs": 5000
+    },
+    {
+      "stage": "tool_call_before",
+      "adapter": "cline/hooks/PreToolUse.sh",
+      "mode": "blocking",
+      "failureMode": "fail_closed",
+      "timeoutMs": 10000
+    },
+    {
+      "stage": "tool_call_after",
+      "adapter": "cline/hooks/tool_call_after_adapter.sh",
+      "mode": "async",
+      "failureMode": "fail_open",
+      "timeoutMs": 5000
+    },
+    {
+      "stage": "turn_end",
+      "adapter": "cline/hooks/finops_telemetry_adapter.sh",
+      "mode": "async",
+      "failureMode": "fail_open",
+      "timeoutMs": 5000
+    },
+    {
+      "stage": "run_end",
+      "adapter": "cline/hooks/run_end_adapter.sh",
+      "mode": "async",
+      "failureMode": "fail_open",
+      "timeoutMs": 5000
+    },
+    {
+      "stage": "turn_end",
+      "adapter": "cline/hooks/operator_keepalive_hook.sh",
+      "mode": "async",
+      "failureMode": "fail_open",
+      "timeoutMs": 5000
+    },
+    {
+      "stage": "session_shutdown",
+      "adapter": "cline/hooks/session_shutdown_adapter.sh",
+      "mode": "async",
+      "failureMode": "fail_open",
+      "timeoutMs": 5000
+    },
+    {
+      "stage": "error",
+      "adapter": "cline/hooks/error_adapter.sh",
+      "mode": "async",
+      "failureMode": "fail_open",
+      "timeoutMs": 5000
+    }
+  ]
+}
