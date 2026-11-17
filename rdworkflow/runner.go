@@ -137,19 +137,19 @@ func appendApply(args []string, apply bool) []string {
 }
 
 type cappedBuffer struct {
-	bytes.Buffer
+	buf      bytes.Buffer
 	limit    int
 	exceeded bool
 	cancel   context.CancelFunc
 }
 
 func (b *cappedBuffer) Write(p []byte) (int, error) {
-	if len(p) > b.limit-b.Len() {
+	if len(p) > b.limit-b.buf.Len() {
 		b.exceeded = true
 		b.cancel()
 		return 0, errors.New("output-limit")
 	}
-	return b.Buffer.Write(p)
+	return b.buf.Write(p)
 }
 
 func execute(parent context.Context, backend string, args []string, apply bool) map[string]any {
@@ -180,7 +180,7 @@ func executeBounded(parent context.Context, backend string, args []string, apply
 	if err != nil && (!errors.As(err, &exit) || exit.ExitCode() != 3) {
 		return unknown("backend-unavailable-or-failed", apply)
 	}
-	decoder := json.NewDecoder(bytes.NewReader(stdout.Bytes()))
+	decoder := json.NewDecoder(bytes.NewReader(stdout.buf.Bytes()))
 	decoder.UseNumber()
 	var result map[string]any
 	if decoder.Decode(&result) != nil || result == nil {
