@@ -179,6 +179,67 @@ func TestCheckRuntimeInventoryFailsArtifactDrift(t *testing.T) {
 	}
 }
 
+func TestBuildRuntimeInventoryFiltersWorktreesAndArchivedRepos(t *testing.T) {
+	root := t.TempDir()
+	writeRuntimeTestFile(t, root, "workspace/manifest.json", `{
+  "version": 1,
+  "repos": [
+    {"name": "app", "category": "application", "scope": "active_first_party", "language": "Go", "baseline_target": true, "go_work_member": false, "lifecycle": "active"},
+    {"name": "mesmer", "category": "application", "scope": "active_operator", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "archived"}
+  ]
+}`)
+	writeRuntimeTestFile(t, root, "workspace/mcp-global-policy.json", `{
+  "version": 1,
+  "defaults": {"include_root": false, "ready_only": false},
+  "manifest": {
+    "use_workspace_manifest": true,
+    "allow_unlisted_repos": false,
+    "exclude_scopes": ["compatibility_only"]
+  }
+}`)
+	writeRuntimeExecutable(t, root, "app/run-mcp.sh")
+	writeRuntimeTestFile(t, root, "app/.mcp.json", `{"mcpServers":{"app":{"command":"./run-mcp.sh"}}}`)
+	writeRuntimeExecutable(t, root, "mesmer/run-mcp.sh")
+	writeRuntimeTestFile(t, root, "mesmer/.mcp.json", `{"mcpServers":{"mesmer":{"command":"./run-mcp.sh"}}}`)
+	writeRuntimeExecutable(t, root, "app-wt-123/run-mcp.sh")
+	writeRuntimeTestFile(t, root, "app-wt-123/.mcp.json", `{"mcpServers":{"app":{"command":"./run-mcp.sh"}}}`)
+	writeRuntimeExecutable(t, root, ".wt-agy-1/run-mcp.sh")
+	writeRuntimeTestFile(t, root, ".wt-agy-1/.mcp.json", `{"mcpServers":{"app":{"command":"./run-mcp.sh"}}}`)
+	writeRuntimeExecutable(t, root, ".hg-anchor-edit-1/run-mcp.sh")
+	writeRuntimeTestFile(t, root, ".hg-anchor-edit-1/.mcp.json", `{"mcpServers":{"app":{"command":"./run-mcp.sh"}}}`)
+	writeRuntimeTestFile(t, root, "relocated-clone/.git", "gitdir: /tmp/app/.git/worktrees/relocated-clone\n")
+	writeRuntimeExecutable(t, root, "relocated-clone/run-mcp.sh")
+	writeRuntimeTestFile(t, root, "relocated-clone/.mcp.json", `{"mcpServers":{"app":{"command":"./run-mcp.sh"}}}`)
+
+	inventory, err := BuildRuntimeInventory(RuntimeInventoryOptions{
+		WorkspaceRoot: root,
+		GeneratedAt:   "2026-05-08T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inventory.Servers) != 1 || inventory.Servers[0].SourceRepo != "app" {
+		t.Fatalf("Servers = %+v, want only app", inventory.Servers)
+	}
+	if len(inventory.Skipped) != 1 || inventory.Skipped[0].SourceRepo != "mesmer" {
+		t.Fatalf("Skipped = %+v, want only archived mesmer", inventory.Skipped)
+	}
+	if !strings.Contains(inventory.Skipped[0].Reason, `repo lifecycle "archived" excluded by policy`) {
+		t.Fatalf("mesmer skip reason = %q", inventory.Skipped[0].Reason)
+	}
+
+	report, err := CheckRuntimeInventory(RuntimeInventoryCheckOptions{
+		WorkspaceRoot: root,
+		SkipArtifacts: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Passed {
+		t.Fatalf("check failed: %+v", report.Findings)
+	}
+}
+
 func setupRuntimeInventoryWorkspace(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

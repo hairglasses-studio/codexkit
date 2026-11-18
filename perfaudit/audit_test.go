@@ -162,6 +162,12 @@ func TestAudit_SkipsRuntimeArchiveAndDependencyTrees(t *testing.T) {
 		"vendor/example/.agents/skills/dependency/SKILL.md",
 		"data/runtime/.agents/skills/generated/SKILL.md",
 		".codex-worktrees/run/.agents/skills/copy/SKILL.md",
+		".claude/worktrees/wt1/.agents/skills/copy/SKILL.md",
+		".ouro/.agents/skills/copy/SKILL.md",
+		"optoinvest/.agents/skills/copy/SKILL.md",
+		"sub-wt-1/.agents/skills/copy/SKILL.md",
+		".wt-1/.agents/skills/copy/SKILL.md",
+		".hg-anchor-edit-1/.agents/skills/copy/SKILL.md",
 	} {
 		writeFile(t, repoPath, rel, strings.Repeat("X", 17000))
 	}
@@ -243,6 +249,30 @@ func TestMarkdownIncludesPriorityTable(t *testing.T) {
 	}
 	if !strings.Contains(markdown, "`active-repo`") {
 		t.Fatal("expected repo name in markdown output")
+	}
+}
+
+func TestAudit_IncludesActiveScopeRepos(t *testing.T) {
+	root := t.TempDir()
+	writeWorkspaceManifest(t, root, map[string]any{
+		"version": 1,
+		"repos": []map[string]any{
+			{
+				"name":            "active-svc",
+				"category":        "standalone-mcp",
+				"scope":           "active",
+				"language":        "Go",
+				"baseline_target": false,
+				"go_work_member":  false,
+				"lifecycle":       "active",
+			},
+		},
+	})
+	writeFile(t, filepath.Join(root, "active-svc"), ".codex/config.toml", `approval_policy = "on-request"`+"\n")
+
+	report := Audit(root, Options{})
+	if len(report.Repos) != 1 || report.Repos[0].RepoName != "active-svc" {
+		t.Fatalf("expected active-svc with scope=active, got %+v", report.Repos)
 	}
 }
 

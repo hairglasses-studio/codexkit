@@ -25,24 +25,31 @@ const (
 )
 
 var ignoredDirNames = map[string]bool{
-	".cache":        true,
-	".git":          true,
-	".mypy_cache":   true,
-	".pytest_cache": true,
-	".ruff_cache":   true,
-	".terraform":    true,
-	".tools":        true,
-	".venv":         true,
-	"__pycache__":   true,
-	"bin":           true,
-	"build":         true,
-	"coverage":      true,
-	"dist":          true,
-	"htmlcov":       true,
-	"node_modules":  true,
-	"target":        true,
-	"vendor":        true,
-	"venv":          true,
+	".archive":         true,
+	".cache":           true,
+	".codex-worktrees": true,
+	".git":             true,
+	".graveyard":       true,
+	".mypy_cache":      true,
+	".ouro":            true,
+	".pytest_cache":    true,
+	".ruff_cache":      true,
+	".scratch":         true,
+	".terraform":       true,
+	".tools":           true,
+	".venv":            true,
+	".worktrees":       true,
+	"__pycache__":      true,
+	"bin":              true,
+	"build":            true,
+	"coverage":         true,
+	"dist":             true,
+	"htmlcov":          true,
+	"node_modules":     true,
+	"optoinvest":       true,
+	"target":           true,
+	"vendor":           true,
+	"venv":             true,
 }
 
 // Options controls audit scope.
@@ -306,12 +313,34 @@ func Audit(root string, opts Options) (Report, error) {
 	return report, nil
 }
 
+func isActiveScope(scope string) bool {
+	return scope == "active" || scope == "active_operator" || scope == "active_first_party"
+}
+
+func isGitWorktreeDir(dir string) bool {
+	gitPath := filepath.Join(dir, ".git")
+	info, err := os.Lstat(gitPath)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	data, err := os.ReadFile(gitPath)
+	if err != nil {
+		return false
+	}
+	line := strings.TrimSpace(string(data))
+	if !strings.HasPrefix(line, "gitdir:") {
+		return false
+	}
+	target := filepath.ToSlash(strings.TrimSpace(strings.TrimPrefix(line, "gitdir:")))
+	return strings.Contains(target, "/.git/worktrees/") || strings.Contains(target, "/worktrees/")
+}
+
 func selectRepos(root string, opts Options) ([]repoInput, []string, error) {
 	manifest, err := workspace.LoadManifest(root)
 	if err == nil {
 		repos := make([]repoInput, 0, len(manifest.Repos))
 		for _, repo := range manifest.Repos {
-			if !opts.AllScopes && repo.Scope != "active_operator" && repo.Scope != "active_first_party" {
+			if !opts.AllScopes && !isActiveScope(repo.Scope) {
 				continue
 			}
 			repoPath := workspace.RepoPath(root, repo)
@@ -355,10 +384,13 @@ func discoverGitRepos(root string) ([]repoInput, error) {
 	}
 	repos := make([]repoInput, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || shouldSkipDir(entry.Name(), entry.Name()) {
 			continue
 		}
 		repoPath := filepath.Join(root, entry.Name())
+		if isGitWorktreeDir(repoPath) {
+			continue
+		}
 		if info, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil && info.IsDir() {
 			repos = append(repos, repoInput{
 				Name:      entry.Name(),
@@ -402,7 +434,7 @@ func auditRepo(repo repoInput, now time.Time) (RepoReport, []string) {
 		}
 
 		if entry.IsDir() {
-			if shouldSkipDir(rel, entry.Name()) {
+			if shouldSkipDir(rel, entry.Name()) || isGitWorktreeDir(path) {
 				return filepath.SkipDir
 			}
 			if skillName, ok := rootSourceSkillDir(rel); ok {
@@ -553,10 +585,13 @@ func discoverExtraRoadmaps(root string, repos []repoInput, now time.Time) []Road
 	}
 	var roadmaps []RoadmapFile
 	for _, entry := range entries {
-		if !entry.IsDir() || selected[entry.Name()] || ignoredDirNames[entry.Name()] {
+		if !entry.IsDir() || selected[entry.Name()] || shouldSkipDir(entry.Name(), entry.Name()) {
 			continue
 		}
 		repoPath := filepath.Join(root, entry.Name())
+		if isGitWorktreeDir(repoPath) {
+			continue
+		}
 		roadmap := readRoadmap(entry.Name(), repoPath, now)
 		if roadmap != nil {
 			roadmaps = append(roadmaps, *roadmap)
@@ -611,21 +646,41 @@ func addShellFile(report *RepoReport, rel string, data []byte) {
 	}
 }
 
+func isTransientDirName(name string) bool {
+	return ignoredDirNames[name] ||
+		strings.HasPrefix(name, "s2f_") ||
+		strings.HasPrefix(name, ".wt-") ||
+		strings.HasPrefix(name, ".hg-anchor-edit-") ||
+		strings.Contains(name, "-wt-")
+}
+
+func hasRelPathPrefix(rel, prefix string) bool {
+	return rel == prefix ||
+		strings.HasPrefix(rel, prefix+"/") ||
+		strings.HasSuffix(rel, "/"+prefix) ||
+		strings.Contains(rel, "/"+prefix+"/")
+}
+
 func shouldSkipDir(rel, name string) bool {
-	if ignoredDirNames[name] {
+	rel = filepath.ToSlash(strings.TrimSuffix(rel, "/"))
+	if rel == "." {
+		return false
+	}
+	if isTransientDirName(name) {
 		return true
 	}
-	if strings.HasPrefix(name, "s2f_") {
-		return true
+	for _, seg := range strings.Split(rel, "/") {
+		if seg != "" && isTransientDirName(seg) {
+			return true
+		}
 	}
-	return strings.HasPrefix(rel, ".claude/worktrees/") ||
-		strings.HasPrefix(rel, ".ralph/worktrees/") ||
-		strings.HasPrefix(rel, ".ralph/probe/") ||
+	return hasRelPathPrefix(rel, ".claude/worktrees") ||
+		hasRelPathPrefix(rel, ".ralph/worktrees") ||
+		hasRelPathPrefix(rel, ".ralph/probe") ||
+		rel == "agent-parity" ||
 		strings.HasPrefix(rel, "agent-parity/") ||
-		strings.HasPrefix(rel, "docs/agent-parity/") ||
-		strings.Contains(rel, "/.claude/worktrees/") ||
-		strings.Contains(rel, "/.ralph/worktrees/") ||
-		strings.Contains(rel, "/.ralph/probe/")
+		rel == "docs/agent-parity" ||
+		strings.HasPrefix(rel, "docs/agent-parity/")
 }
 
 func rootSourceSkillDir(rel string) (string, bool) {

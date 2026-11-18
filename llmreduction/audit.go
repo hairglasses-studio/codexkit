@@ -91,7 +91,7 @@ func includeRepo(scope string, allScopes bool) bool {
 	if allScopes {
 		return true
 	}
-	return scope == "active_operator" || scope == "active_first_party"
+	return scope == "active" || scope == "active_operator" || scope == "active_first_party"
 }
 
 // BuildDebtAudit builds a weighted LLM traversability-debt ranking.

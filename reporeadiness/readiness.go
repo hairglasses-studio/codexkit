@@ -158,7 +158,7 @@ func Score(root string, opts Options) (Report, error) {
 
 	excludedCompatibilityOnly := 0
 	for _, repo := range manifest.Repos {
-		if !opts.AllScopes && repo.Scope != "active_operator" && repo.Scope != "active_first_party" {
+		if !opts.AllScopes && repo.Scope != "active" && repo.Scope != "active_operator" && repo.Scope != "active_first_party" {
 			if repo.Scope == "compatibility_only" {
 				excludedCompatibilityOnly++
 			}

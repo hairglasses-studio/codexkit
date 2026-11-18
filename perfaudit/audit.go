@@ -33,14 +33,17 @@ const (
 )
 
 var ignoredDirNames = map[string]bool{
+	".archive":             true,
 	".git":                 true,
 	".cache":               true,
 	".codex-worktrees":     true,
 	".data":                true,
 	".graveyard":           true,
 	".mypy_cache":          true,
+	".ouro":                true,
 	".pytest_cache":        true,
 	".ruff_cache":          true,
+	".scratch":             true,
 	".tools":               true,
 	".venv":                true,
 	".worktrees":           true,
@@ -54,6 +57,7 @@ var ignoredDirNames = map[string]bool{
 	"htmlcov":              true,
 	"imported":             true,
 	"node_modules":         true,
+	"optoinvest":           true,
 	"vault":                true,
 	"vendor":               true,
 	"venv":                 true,
@@ -206,7 +210,7 @@ func selectedRepos(manifest workspace.Manifest, opts Options) []workspace.Repo {
 	}
 	repos := make([]workspace.Repo, 0, len(manifest.Repos))
 	for _, repo := range manifest.Repos {
-		if repo.Scope == "active_operator" || repo.Scope == "active_first_party" {
+		if repo.Scope == "active" || repo.Scope == "active_operator" || repo.Scope == "active_first_party" {
 			repos = append(repos, repo)
 		}
 	}
@@ -411,7 +415,7 @@ func shouldSkipDir(repoPath, path, name string) bool {
 	if ignoredDirNames[name] {
 		return true
 	}
-	if strings.HasPrefix(name, "s2f_") {
+	if strings.HasPrefix(name, "s2f_") || strings.HasPrefix(name, ".wt-") || strings.HasPrefix(name, ".hg-anchor-edit-") || strings.Contains(name, "-wt-") {
 		return true
 	}
 	rel, err := filepath.Rel(repoPath, path)
@@ -419,11 +423,28 @@ func shouldSkipDir(repoPath, path, name string) bool {
 		return false
 	}
 	rel = filepath.ToSlash(rel)
-	return strings.HasPrefix(rel, ".claude/worktrees/") ||
+	if rel == "." {
+		return false
+	}
+	for _, seg := range strings.Split(rel, "/") {
+		if ignoredDirNames[seg] || strings.HasPrefix(seg, "s2f_") || strings.HasPrefix(seg, ".wt-") || strings.HasPrefix(seg, ".hg-anchor-edit-") || strings.Contains(seg, "-wt-") {
+			return true
+		}
+	}
+	return rel == ".claude/worktrees" ||
+		strings.HasPrefix(rel, ".claude/worktrees/") ||
+		strings.Contains(rel, "/.claude/worktrees") ||
+		rel == ".ralph/worktrees" ||
 		strings.HasPrefix(rel, ".ralph/worktrees/") ||
+		strings.Contains(rel, "/.ralph/worktrees") ||
+		rel == ".ralph/probe" ||
 		strings.HasPrefix(rel, ".ralph/probe/") ||
+		strings.Contains(rel, "/.ralph/probe") ||
+		rel == "agent-parity" ||
 		strings.HasPrefix(rel, "agent-parity/") ||
+		rel == "docs/agent-parity" ||
 		strings.HasPrefix(rel, "docs/agent-parity/") ||
+		rel == ".github/docs" ||
 		strings.HasPrefix(rel, ".github/docs/")
 }
 

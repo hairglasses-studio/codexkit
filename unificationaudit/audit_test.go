@@ -566,3 +566,93 @@ func writeUnificationFile(t *testing.T, root, rel, content string) {
 		t.Fatal(err)
 	}
 }
+
+func TestShouldSkipDirSkipsEmployerOuroAndWorktrees(t *testing.T) {
+	skipCases := []struct {
+		rel  string
+		name string
+	}{
+		{"optoinvest", "optoinvest"},
+		{"optoinvest/repo", "repo"},
+		{".ouro", ".ouro"},
+		{"sub/.ouro", ".ouro"},
+		{".claude/worktrees", "worktrees"},
+		{".claude/worktrees/wt1", "wt1"},
+		{"app/.claude/worktrees", "worktrees"},
+		{"app-wt-123", "app-wt-123"},
+		{".wt-temp", ".wt-temp"},
+		{".hg-anchor-edit-abc", ".hg-anchor-edit-abc"},
+	}
+	for _, tc := range skipCases {
+		if !shouldSkipDir(tc.rel, tc.name) {
+			t.Fatalf("shouldSkipDir(%q, %q) = false, want true", tc.rel, tc.name)
+		}
+	}
+	keepCases := []struct {
+		rel  string
+		name string
+	}{
+		{".", "app"},
+		{"scripts", "scripts"},
+		{".claude/hooks", "hooks"},
+	}
+	for _, tc := range keepCases {
+		if shouldSkipDir(tc.rel, tc.name) {
+			t.Fatalf("shouldSkipDir(%q, %q) = true, want false", tc.rel, tc.name)
+		}
+	}
+}
+
+func TestAuditIncludesActiveScopeAndSkipsEmployerAndWorktrees(t *testing.T) {
+	root := t.TempDir()
+	writeUnificationFile(t, root, "workspace/manifest.json", `{
+  "version": 1,
+  "repos": [
+    {"name": "active-svc", "category": "standalone-mcp", "scope": "active", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "active"},
+    {"name": "op-app", "category": "hub", "scope": "active_operator", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "active"},
+    {"name": "fp-app", "category": "application", "scope": "active_first_party", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "active"},
+    {"name": "compat-app", "category": "application", "scope": "compatibility_only", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "active"}
+  ]
+}`)
+	writeUnificationFile(t, root, "active-svc/scripts/run.sh", "#!/usr/bin/env bash\necho ok\n")
+	writeUnificationFile(t, root, "active-svc/.claude/worktrees/wt1/scripts/ignored.sh", "#!/usr/bin/env bash\necho skip\n")
+	writeUnificationFile(t, root, "active-svc/.ouro/scripts/ignored.sh", "#!/usr/bin/env bash\necho skip\n")
+	writeUnificationFile(t, root, "active-svc/optoinvest/scripts/ignored.sh", "#!/usr/bin/env bash\necho skip\n")
+	writeUnificationFile(t, root, "active-svc/sub-wt-1/scripts/ignored.sh", "#!/usr/bin/env bash\necho skip\n")
+	writeUnificationFile(t, root, "active-svc/.wt-1/scripts/ignored.sh", "#!/usr/bin/env bash\necho skip\n")
+	writeUnificationFile(t, root, "active-svc/.hg-anchor-edit-1/scripts/ignored.sh", "#!/usr/bin/env bash\necho skip\n")
+	writeUnificationFile(t, root, "op-app/README.md", "# Op\n")
+	writeUnificationFile(t, root, "fp-app/README.md", "# FP\n")
+	writeUnificationFile(t, root, "compat-app/scripts/ignored.sh", "#!/usr/bin/env bash\necho skip\n")
+	writeUnificationFile(t, root, "optoinvest/ROADMAP.md", "# Secret\n")
+	writeUnificationFile(t, root, ".ouro/ROADMAP.md", "# Ouro\n")
+	writeUnificationFile(t, root, "op-app-wt-1/ROADMAP.md", "# WT\n")
+	writeUnificationFile(t, root, ".wt-2/ROADMAP.md", "# WT2\n")
+	writeUnificationFile(t, root, ".hg-anchor-edit-2/ROADMAP.md", "# WT3\n")
+	writeUnificationFile(t, root, "extra/ROADMAP.md", "# Extra\n")
+
+	report, err := Audit(root, Options{GeneratedAt: "2026-05-10T00:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.ReposScanned != 3 {
+		t.Fatalf("ReposScanned = %d, want 3", report.Summary.ReposScanned)
+	}
+	byName := map[string]RepoReport{}
+	for _, repo := range report.Repos {
+		byName[repo.RepoName] = repo
+	}
+	if _, ok := byName["compat-app"]; ok {
+		t.Fatal("compatibility_only repo should not be scanned when AllScopes is false")
+	}
+	activeRepo, ok := byName["active-svc"]
+	if !ok {
+		t.Fatalf("expected scope=active repo active-svc to be included: %+v", report.Repos)
+	}
+	if activeRepo.ShellFiles != 1 {
+		t.Fatalf("active-svc ShellFiles = %d, want 1", activeRepo.ShellFiles)
+	}
+	if len(report.ExtraRoadmaps) != 1 || report.ExtraRoadmaps[0].RepoName != "extra" {
+		t.Fatalf("ExtraRoadmaps = %+v, want only extra", report.ExtraRoadmaps)
+	}
+}

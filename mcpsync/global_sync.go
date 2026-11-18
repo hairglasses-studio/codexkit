@@ -130,15 +130,18 @@ type globalManifest struct {
 }
 
 type globalManifestRepo struct {
-	Name     string `json:"name"`
-	Category string `json:"category"`
-	Scope    string `json:"scope"`
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	Category  string `json:"category"`
+	Scope     string `json:"scope"`
+	Lifecycle string `json:"lifecycle"`
 }
 
 type globalRepoMeta struct {
-	Listed   bool
-	Category string
-	Scope    string
+	Listed    bool
+	Category  string
+	Scope     string
+	Lifecycle string
 }
 
 type workspaceSource struct {
@@ -194,7 +197,7 @@ func SyncGlobal(workspaceRoot, configPath, policyPath string, dryRun bool) Globa
 
 	manifestPath := DefaultGlobalManifestPath(workspaceRoot)
 	report.ManifestPath = manifestPath
-	manifestMeta, manifestLoaded, err := loadGlobalManifest(manifestPath)
+	manifestMeta, pathAliases, manifestLoaded, err := loadGlobalManifest(manifestPath)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report
@@ -214,7 +217,7 @@ func SyncGlobal(workspaceRoot, configPath, policyPath string, dryRun bool) Globa
 		delete(reservedSet, name)
 	}
 
-	candidates, skipped, err := collectGlobalCandidates(workspaceRoot, reservedSet, policy, manifestMeta)
+	candidates, skipped, err := collectGlobalCandidates(workspaceRoot, reservedSet, policy, manifestMeta, pathAliases)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report
@@ -320,31 +323,39 @@ func defaultGlobalPolicy() globalPolicy {
 	}
 }
 
-func loadGlobalManifest(path string) (map[string]globalRepoMeta, bool, error) {
+func loadGlobalManifest(path string) (map[string]globalRepoMeta, map[string]string, bool, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return map[string]globalRepoMeta{}, false, nil
+			return map[string]globalRepoMeta{}, map[string]string{}, false, nil
 		}
-		return nil, false, fmt.Errorf("reading workspace manifest %s: %w", path, err)
+		return nil, nil, false, fmt.Errorf("reading workspace manifest %s: %w", path, err)
 	}
 	var manifest globalManifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, false, fmt.Errorf("parsing workspace manifest %s: %w", path, err)
+		return nil, nil, false, fmt.Errorf("parsing workspace manifest %s: %w", path, err)
 	}
 	meta := make(map[string]globalRepoMeta, len(manifest.Repos))
+	pathAliases := make(map[string]string)
 	for _, repo := range manifest.Repos {
 		meta[repo.Name] = globalRepoMeta{
-			Listed:   true,
-			Category: repo.Category,
-			Scope:    repo.Scope,
+			Listed:    true,
+			Category:  repo.Category,
+			Scope:     repo.Scope,
+			Lifecycle: repo.Lifecycle,
+		}
+		if repo.Path != "" {
+			cleanPath := filepath.ToSlash(filepath.Clean(repo.Path))
+			if cleanPath != "." && !strings.Contains(cleanPath, "/") && cleanPath != repo.Name {
+				pathAliases[cleanPath] = repo.Name
+			}
 		}
 	}
-	return meta, true, nil
+	return meta, pathAliases, true, nil
 }
 
-func collectGlobalCandidates(workspaceRoot string, reserved map[string]struct{}, policy globalPolicy, manifestMeta map[string]globalRepoMeta) ([]globalCandidate, []GlobalSkippedServerInfo, error) {
-	sources, err := discoverWorkspaceSources(workspaceRoot)
+func collectGlobalCandidates(workspaceRoot string, reserved map[string]struct{}, policy globalPolicy, manifestMeta map[string]globalRepoMeta, pathAliases map[string]string) ([]globalCandidate, []GlobalSkippedServerInfo, error) {
+	sources, err := discoverWorkspaceSources(workspaceRoot, pathAliases)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -445,7 +456,39 @@ func collectGlobalCandidates(workspaceRoot string, reserved map[string]struct{},
 	return candidates, skipped, nil
 }
 
-func discoverWorkspaceSources(workspaceRoot string) ([]workspaceSource, error) {
+func shouldSkipWorkspaceSourceDir(workspaceRoot, name string) bool {
+	switch name {
+	case "optoinvest", ".ouro", ".worktrees", ".codex-worktrees", ".graveyard", ".archive", ".scratch":
+		return true
+	}
+	if strings.HasPrefix(name, ".wt-") ||
+		strings.HasPrefix(name, "wt-") ||
+		strings.HasPrefix(name, ".hg-anchor-edit-") ||
+		strings.Contains(name, "-wt-") {
+		return true
+	}
+	return isGitWorktreeDir(filepath.Join(workspaceRoot, name))
+}
+
+func isGitWorktreeDir(dir string) bool {
+	gitPath := filepath.Join(dir, ".git")
+	info, err := os.Lstat(gitPath)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	data, err := os.ReadFile(gitPath)
+	if err != nil {
+		return false
+	}
+	line := strings.TrimSpace(string(data))
+	if !strings.HasPrefix(line, "gitdir:") {
+		return false
+	}
+	target := filepath.ToSlash(strings.TrimSpace(strings.TrimPrefix(line, "gitdir:")))
+	return strings.Contains(target, "/.git/worktrees/") || strings.Contains(target, "/worktrees/")
+}
+
+func discoverWorkspaceSources(workspaceRoot string, pathAliases map[string]string) ([]workspaceSource, error) {
 	sources := make([]workspaceSource, 0, 16)
 	rootMCP := filepath.Join(workspaceRoot, ".mcp.json")
 	if _, err := os.Stat(rootMCP); err == nil {
@@ -460,8 +503,19 @@ func discoverWorkspaceSources(workspaceRoot string) ([]workspaceSource, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read workspace root: %w", err)
 	}
+	seenRepos := make(map[string]bool, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() {
+			continue
+		}
+		if shouldSkipWorkspaceSourceDir(workspaceRoot, entry.Name()) {
+			continue
+		}
+		repoName := entry.Name()
+		if canonical, ok := pathAliases[repoName]; ok && !seenRepos[canonical] {
+			repoName = canonical
+		}
+		if seenRepos[repoName] {
 			continue
 		}
 		repoPath := filepath.Join(workspaceRoot, entry.Name())
@@ -469,8 +523,9 @@ func discoverWorkspaceSources(workspaceRoot string) ([]workspaceSource, error) {
 		if _, err := os.Stat(mcpPath); err != nil {
 			continue
 		}
+		seenRepos[repoName] = true
 		sources = append(sources, workspaceSource{
-			RepoName: entry.Name(),
+			RepoName: repoName,
 			RepoPath: repoPath,
 			MCPPath:  mcpPath,
 		})
@@ -503,6 +558,9 @@ func repoAllowed(source workspaceSource, workspaceRoot string, meta globalRepoMe
 			return true, ""
 		}
 		return false, "repo not present in workspace manifest"
+	}
+	if meta.Lifecycle == "archived" {
+		return false, fmt.Sprintf("repo lifecycle %q excluded by policy", meta.Lifecycle)
 	}
 	if len(policy.Manifest.IncludeScopes) > 0 && !matchesOne(meta.Scope, policy.Manifest.IncludeScopes) {
 		return false, fmt.Sprintf("repo scope %q not in include_scopes", meta.Scope)

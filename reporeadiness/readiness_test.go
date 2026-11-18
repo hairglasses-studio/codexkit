@@ -111,3 +111,28 @@ func TestCompactAndDetailPagination(t *testing.T) {
 		t.Fatalf("expected repo2 with total 3; got: %+v", detail)
 	}
 }
+
+func TestScoreIncludesActiveScopeWhenAllScopesFalse(t *testing.T) {
+	root := t.TempDir()
+	writeReadinessFile(t, root, "workspace/manifest.json", `{
+  "version": 1,
+  "repos": [
+    {"name": "svc", "category": "standalone-mcp", "scope": "active", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "active"},
+    {"name": "compat", "category": "emerging", "scope": "compatibility_only", "language": "Go", "baseline_target": false, "go_work_member": false, "lifecycle": "maintenance-only"}
+  ]
+}`)
+	writeReadinessFile(t, root, "svc/README.md", "# Svc\n")
+	initGitRepo(t, filepath.Join(root, "svc"))
+	writeReadinessFile(t, root, "compat/README.md", "# Compat\n")
+
+	report, err := Score(root, Options{AllScopes: false, GeneratedAt: "2026-05-11T00:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Repos) != 1 || report.Repos[0].RepoName != "svc" {
+		t.Fatalf("Repos = %+v, want only svc", report.Repos)
+	}
+	if report.Summary.ExcludedCompatibilityOnly != 1 {
+		t.Fatalf("ExcludedCompatibilityOnly = %d, want 1", report.Summary.ExcludedCompatibilityOnly)
+	}
+}
