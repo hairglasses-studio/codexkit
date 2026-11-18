@@ -195,6 +195,64 @@ func TestWorkspaceRootAndHostPrefixes(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRootNonCorruptedManifest(t *testing.T) {
+	opts := Options{
+		WorkspaceRoot: "/srv/workspace",
+	}
+	raw := "workspace/manifest.json"
+	norm := NormalizeWithOptions(raw, opts)
+	if norm.Canonical != "workspace/manifest.json" {
+		t.Fatalf("expected workspace/manifest.json not corrupted, got %s", norm.Canonical)
+	}
+}
+
+func TestKnownReposPreWorktreeDetection(t *testing.T) {
+	opts := Options{
+		KnownRepos: []string{"codexkit"},
+	}
+	raw := "codexkit/.claude/worktrees/lane-1/pkg/a.go"
+	norm := NormalizeWithOptions(raw, opts)
+	if norm.Repo != "codexkit" {
+		t.Fatalf("expected repo codexkit, got %s", norm.Repo)
+	}
+	if norm.Canonical != "pkg/a.go" {
+		t.Fatalf("expected canonical pkg/a.go, got %s", norm.Canonical)
+	}
+	if norm.Provider != ProviderClaude {
+		t.Fatalf("expected provider claude, got %s", norm.Provider)
+	}
+}
+
+func TestCanonicalAddressParity(t *testing.T) {
+	if CanonicalAddress("ag1") != "archglasses" {
+		t.Fatalf("expected ag1 -> archglasses, got %s", CanonicalAddress("ag1"))
+	}
+	if CanonicalAddress("archglasses") != "archglasses" {
+		t.Fatalf("expected archglasses -> archglasses, got %s", CanonicalAddress("archglasses"))
+	}
+	if CanonicalAddress("archglasses-1") != "archglasses" {
+		t.Fatalf("expected archglasses-1 -> archglasses, got %s", CanonicalAddress("archglasses-1"))
+	}
+	if CanonicalAddress("claude:ag1-abc") != "claude:archglasses-abc" {
+		t.Fatalf("expected claude:ag1-abc -> claude:archglasses-abc, got %s", CanonicalAddress("claude:ag1-abc"))
+	}
+	if CanonicalAddress("claude:archglasses-abc") != "claude:archglasses-abc" {
+		t.Fatalf("expected claude:archglasses-abc -> claude:archglasses-abc, got %s", CanonicalAddress("claude:archglasses-abc"))
+	}
+	if CanonicalAddress("claude:archglasses-1-abc") != "claude:archglasses-abc" {
+		t.Fatalf("expected claude:archglasses-1-abc -> claude:archglasses-abc, got %s", CanonicalAddress("claude:archglasses-1-abc"))
+	}
+	if CanonicalAddress("ag2") != "archglasses-2" {
+		t.Fatalf("expected ag2 -> archglasses-2, got %s", CanonicalAddress("ag2"))
+	}
+	if CanonicalAddress("claude:ag4-session") != "claude:archglasses-4-session" {
+		t.Fatalf("expected claude:ag4-session -> claude:archglasses-4-session, got %s", CanonicalAddress("claude:ag4-session"))
+	}
+	if CanonicalAddress("claude:archglasses-4-session") != "claude:archglasses-4-session" {
+		t.Fatalf("expected claude:archglasses-4-session -> claude:archglasses-4-session, got %s", CanonicalAddress("claude:archglasses-4-session"))
+	}
+}
+
 func TestPhysicalLocations(t *testing.T) {
 	opts := Options{RepoHint: "codexkit"}
 
@@ -229,7 +287,7 @@ func TestPhysicalLocations(t *testing.T) {
 		ID:      "claim-phys-2",
 		Session: "session-b",
 		Agent:   "agent-b",
-		Paths:   []string{"archglasses-1:/opt/bin/tool"},
+		Paths:   []string{"archglasses:/opt/bin/tool"},
 	}
 	claimDiffHost := Claim{
 		ID:      "claim-phys-3",
@@ -237,10 +295,21 @@ func TestPhysicalLocations(t *testing.T) {
 		Agent:   "agent-c",
 		Paths:   []string{"AG4:/opt/bin/tool"},
 	}
+	claimRoot := Claim{
+		ID:      "claim-phys-root",
+		Session: "session-r",
+		Agent:   "agent-r",
+		Paths:   []string{"AG1:/"},
+	}
 
 	conflictsSame := CheckConflicts(claimA, []Claim{claimB}, opts)
 	if len(conflictsSame) != 1 {
-		t.Fatalf("expected conflict between AG1 and archglasses-1 physical paths")
+		t.Fatalf("expected conflict between AG1 and archglasses physical paths")
+	}
+
+	conflictsRoot := CheckConflicts(claimRoot, []Claim{claimB}, opts)
+	if len(conflictsRoot) != 1 {
+		t.Fatalf("expected root / physical conflict to overlap /opt/bin/tool")
 	}
 
 	conflictsDiff := CheckConflicts(claimA, []Claim{claimDiffHost}, opts)
@@ -280,6 +349,13 @@ func TestRepoLabelScoping(t *testing.T) {
 		Repo:    "",
 		Paths:   []string{"claimnorm/w17_worktree_path_norm.go"},
 	}
+	claim5DiffOrg := Claim{
+		ID:      "claim-5",
+		Session: "session-5",
+		Agent:   "agent-5",
+		Repo:    "other-org/codexkit",
+		Paths:   []string{"claimnorm/w17_worktree_path_norm.go"},
+	}
 
 	conflictsDiff := CheckConflicts(claim1, []Claim{claim2DiffRepo}, opts)
 	if len(conflictsDiff) != 0 {
@@ -294,6 +370,30 @@ func TestRepoLabelScoping(t *testing.T) {
 	conflictsUnlabeled := CheckConflicts(claim1, []Claim{claim4Unlabeled}, opts)
 	if len(conflictsUnlabeled) != 1 {
 		t.Fatalf("expected unlabeled claim to not be suppressed")
+	}
+
+	conflictsDiffOrgs := CheckConflicts(claim3SameRepoOrg, []Claim{claim5DiffOrg}, opts)
+	if len(conflictsDiffOrgs) != 0 {
+		t.Fatalf("expected example-org/codexkit vs other-org/codexkit to be suppressed, got %d conflicts", len(conflictsDiffOrgs))
+	}
+
+	optsWithHint := Options{RepoHint: "codexkit"}
+	conflictsHintDiff := CheckConflicts(claim1, []Claim{claim2DiffRepo}, optsWithHint)
+	if len(conflictsHintDiff) != 0 {
+		t.Fatalf("expected repo label mismatch to suppress conflict even with Options.RepoHint set")
+	}
+
+	if RepoLabelsMatch("org1/codexkit", "org2/codexkit") {
+		t.Fatalf("org1/codexkit must not match org2/codexkit")
+	}
+	if RepoLabelsMatch("org-a/codexkit", "org-b/codexkit") {
+		t.Fatalf("org-a/codexkit must not match org-b/codexkit")
+	}
+	if !RepoLabelsMatch("codexkit", "example-org/codexkit") {
+		t.Fatalf("codexkit must match example-org/codexkit")
+	}
+	if !RepoLabelsMatch("example-org/codexkit", "codexkit") {
+		t.Fatalf("example-org/codexkit must match codexkit")
 	}
 }
 

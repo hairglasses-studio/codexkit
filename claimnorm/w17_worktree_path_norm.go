@@ -91,11 +91,8 @@ var (
 	reGeneric7 = regexp.MustCompile(`^\.wt-([^/]+)/(.+)$`)
 	reGeneric8 = regexp.MustCompile(`^([a-zA-Z0-9_\.\-]+)-wt-([^/]+)/(.+)$`)
 
-	reCanonAddr1 = regexp.MustCompile(`(?i)^([a-z0-9_-]+):ag([1-6])[-:](.*)$`)
-	reCanonAddr2 = regexp.MustCompile(`(?i)^ag([1-6])[-:](.*)$`)
-	reCanonAddr3 = regexp.MustCompile(`(?i)^ag([1-6])$`)
-	reCanonAddr4 = regexp.MustCompile(`(?i)^archglasses$`)
-	reCanonAddr5 = regexp.MustCompile(`(?i)^([a-z0-9_-]+):archglasses:?([1-6])[-:](.*)$`)
+	reSchemeHostId = regexp.MustCompile(`(?i)^([a-z0-9_-]+):(?:archglasses[-:]?([1-6])|ag([1-6])|archglasses)[-:](.*)$`)
+	reHostId       = regexp.MustCompile(`(?i)^(?:archglasses[-:]?([1-6])|ag([1-6])|archglasses)[-:](.*)$`)
 )
 
 func extractHostPrefix(raw string) (string, string) {
@@ -319,12 +316,8 @@ func RepoLabelsMatch(a, b string) bool {
 	if na == nb {
 		return true
 	}
-	baseA := path.Base(na)
-	baseB := path.Base(nb)
-	if baseA != "." && baseA != "/" && baseA != "" && baseB != "." && baseB != "/" && baseB != "" {
-		if baseA == nb || na == baseB || (strings.Contains(na, "/") && strings.Contains(nb, "/") && baseA == baseB) {
-			return true
-		}
+	if strings.HasSuffix(na, "/"+nb) || strings.HasSuffix(nb, "/"+na) {
+		return true
 	}
 	return false
 }
@@ -425,12 +418,36 @@ func NormalizeWithOptions(raw string, opts Options) NormalizedPath {
 		}
 	}
 
+	pBefore := p
 	stripRes := InspectWorktreePath(p)
 	if stripRes.Stripped {
 		res.WorktreeStripped = true
 		res.Provider = stripRes.Provider
 		res.WorktreeLane = stripRes.Lane
 		p = stripRes.Path
+
+		if res.Repo == "" {
+			for _, cand := range opts.KnownRepos {
+				if cand == "" {
+					continue
+				}
+				normCand := NormalizeRepoKey(cand)
+				if normCand == "" {
+					continue
+				}
+				candBase := path.Base(normCand)
+				prefix := normCand + "/"
+				prefixBase := candBase + "/"
+				if strings.HasPrefix(pBefore, prefix) || strings.HasPrefix(pBefore, prefixBase) {
+					res.Repo = normCand
+					break
+				}
+				if strings.Contains(pBefore, "/"+prefix) || strings.Contains(pBefore, "/"+prefixBase) {
+					res.Repo = normCand
+					break
+				}
+			}
+		}
 	}
 
 	if opts.WorkspaceRoot != "" {
@@ -440,12 +457,9 @@ func NormalizeWithOptions(raw string, opts Options) NormalizedPath {
 		}
 	}
 
-	candidates := make([]string, 0, 2+len(opts.KnownRepos))
+	candidates := make([]string, 0, 1+len(opts.KnownRepos))
 	if opts.RepoHint != "" {
 		candidates = append(candidates, opts.RepoHint)
-	}
-	if opts.WorkspaceRoot != "" {
-		candidates = append(candidates, path.Base(opts.WorkspaceRoot))
 	}
 	candidates = append(candidates, opts.KnownRepos...)
 
@@ -487,7 +501,7 @@ func NormalizeWithOptions(raw string, opts Options) NormalizedPath {
 
 	if matchedRepo != "" {
 		res.Repo = matchedRepo
-	} else if opts.RepoHint != "" {
+	} else if res.Repo == "" && opts.RepoHint != "" {
 		res.Repo = NormalizeRepoKey(opts.RepoHint)
 	}
 
@@ -517,33 +531,95 @@ func PathsOverlap(a, b string) bool {
 	return false
 }
 
+func CanonicalHost(h string) string {
+	s := strings.ToLower(strings.TrimSpace(h))
+	switch s {
+	case "ag1", "archglasses", "archglasses-1", "archglasses1":
+		return "archglasses"
+	case "ag2", "archglasses-2", "archglasses2":
+		return "archglasses-2"
+	case "ag3", "archglasses-3", "archglasses3":
+		return "archglasses-3"
+	case "ag4", "archglasses-4", "archglasses4":
+		return "archglasses-4"
+	case "ag5", "archglasses-5", "archglasses5":
+		return "archglasses-5"
+	case "ag6", "archglasses-6", "archglasses6":
+		return "archglasses-6"
+	}
+	return s
+}
+
+func resolveHostString(n string) string {
+	if n == "" || n == "1" {
+		return "archglasses"
+	}
+	return "archglasses-" + n
+}
+
 func CanonicalAddress(addr string) string {
 	s := strings.TrimSpace(addr)
 	if s == "" {
 		return ""
 	}
-
-	if m := reCanonAddr1.FindStringSubmatch(s); len(m) == 4 {
-		return strings.ToLower(m[1] + ":archglasses-" + m[2] + "-" + m[3])
-	}
-	if m := reCanonAddr5.FindStringSubmatch(s); len(m) == 4 {
-		return strings.ToLower(m[1] + ":archglasses-" + m[2] + "-" + m[3])
-	}
-	if m := reCanonAddr2.FindStringSubmatch(s); len(m) == 3 {
-		return strings.ToLower("archglasses-" + m[1] + "-" + m[2])
-	}
-	if m := reCanonAddr3.FindStringSubmatch(s); len(m) == 2 {
-		return "archglasses-" + m[1]
-	}
-	if reCanonAddr4.MatchString(s) {
-		return "archglasses-1"
-	}
-
 	ls := strings.ToLower(s)
-	if ls == "archglasses" {
-		return "archglasses-1"
+
+	if canon := CanonicalHost(ls); canon != ls {
+		return canon
 	}
+	if ls == "archglasses" || ls == "ag1" || ls == "archglasses-1" || ls == "archglasses1" {
+		return "archglasses"
+	}
+
+	if m := reSchemeHostId.FindStringSubmatch(ls); len(m) == 5 {
+		scheme := m[1]
+		n := m[2]
+		if n == "" {
+			n = m[3]
+		}
+		rest := m[4]
+		return scheme + ":" + resolveHostString(n) + "-" + rest
+	}
+
+	if m := reHostId.FindStringSubmatch(ls); len(m) == 4 {
+		n := m[1]
+		if n == "" {
+			n = m[2]
+		}
+		rest := m[3]
+		return resolveHostString(n) + "-" + rest
+	}
+
 	return ls
+}
+
+func physicalPathFromCanonical(canon string) string {
+	if idx := strings.Index(canon, ":"); idx != -1 {
+		canon = canon[idx+1:]
+	}
+	canon = strings.TrimSpace(canon)
+	canon = strings.ReplaceAll(canon, "\\", "/")
+	return canon
+}
+
+func physicalPathsOverlap(normA, normB NormalizedPath) bool {
+	hostA := CanonicalAddress(normA.Host)
+	hostB := CanonicalAddress(normB.Host)
+	if hostA != hostB {
+		return false
+	}
+	pA := physicalPathFromCanonical(normA.Canonical)
+	pB := physicalPathFromCanonical(normB.Canonical)
+
+	if pA == "" || pB == "" {
+		return false
+	}
+	cleanA := path.Clean(pA)
+	cleanB := path.Clean(pB)
+	if cleanA == "/" || cleanA == "." || cleanA == "*" || cleanB == "/" || cleanB == "." || cleanB == "*" {
+		return true
+	}
+	return PathsOverlap(cleanA, cleanB)
 }
 
 func isSelfClaim(incoming, existing Claim) bool {
@@ -567,23 +643,31 @@ func CheckConflicts(incoming Claim, existing []Claim, opts Options) []Conflict {
 			continue
 		}
 
+		incOpts := opts
+		if incoming.Repo != "" {
+			incOpts.RepoHint = incoming.Repo
+		}
+
 		for _, incPath := range incoming.Paths {
-			normInc := NormalizeWithOptions(incPath, opts)
-			if normInc.Repo == "" && incoming.Repo != "" {
+			normInc := NormalizeWithOptions(incPath, incOpts)
+			if incoming.Repo != "" {
 				normInc.Repo = NormalizeRepoKey(incoming.Repo)
 			}
 
+			exOpts := opts
+			if exClaim.Repo != "" {
+				exOpts.RepoHint = exClaim.Repo
+			}
+
 			for _, exPath := range exClaim.Paths {
-				normEx := NormalizeWithOptions(exPath, opts)
-				if normEx.Repo == "" && exClaim.Repo != "" {
+				normEx := NormalizeWithOptions(exPath, exOpts)
+				if exClaim.Repo != "" {
 					normEx.Repo = NormalizeRepoKey(exClaim.Repo)
 				}
 
 				if normInc.Physical || normEx.Physical {
 					if normInc.Physical && normEx.Physical {
-						hostInc := CanonicalAddress(normInc.Host)
-						hostEx := CanonicalAddress(normEx.Host)
-						if hostInc == hostEx && PathsOverlap(normInc.Canonical, normEx.Canonical) {
+						if physicalPathsOverlap(normInc, normEx) {
 							conflicts = append(conflicts, Conflict{
 								IncomingPath:       incPath,
 								ExistingClaim:      exClaim,
