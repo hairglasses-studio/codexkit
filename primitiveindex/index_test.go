@@ -150,6 +150,74 @@ func TestBuildExcludesArchiveAndVendorPaths(t *testing.T) {
 	}
 }
 
+func TestShouldSkipDirExcludesEmployerOuroAndWorktrees(t *testing.T) {
+	skipCases := []string{
+		"optoinvest",
+		"optoinvest/repo",
+		"app/optoinvest",
+		".ouro",
+		".ouro/skills",
+		"app/.ouro",
+		".claude/worktrees",
+		".claude/worktrees/wt1",
+		"app/.claude/worktrees",
+		"app/.claude/worktrees/wt1",
+		"codexkit-wt-123",
+		"app-wt-abc/sub",
+		".wt-agy-123",
+		"dir/.wt-agy-123",
+		".hg-anchor-edit-abc",
+		"dir/.hg-anchor-edit-abc",
+	}
+	for _, rel := range skipCases {
+		if !shouldSkipDir(rel) {
+			t.Fatalf("shouldSkipDir(%q) = false, want true", rel)
+		}
+	}
+	keepCases := []string{
+		".",
+		"app",
+		"app/.claude",
+		"app/.claude/hooks",
+		"app/.codex/agents",
+		"docs/fleet",
+		"codexkit",
+	}
+	for _, rel := range keepCases {
+		if shouldSkipDir(rel) {
+			t.Fatalf("shouldSkipDir(%q) = true, want false", rel)
+		}
+	}
+}
+
+func TestBuildSkipsEmployerOuroAndWorktreesWhileIndexingActive(t *testing.T) {
+	root := t.TempDir()
+	writePrimitiveTestManifest(t, root)
+	writePrimitiveTestFile(t, root, "optoinvest/employer/.mcp.json", `{"mcpServers":{}}`)
+	writePrimitiveTestFile(t, root, ".ouro/legacy/.claude/settings.json", `{}`)
+	writePrimitiveTestFile(t, root, "app/.ouro/cached/.mcp.json", `{"mcpServers":{}}`)
+	writePrimitiveTestFile(t, root, "app/.claude/worktrees/wt1/.mcp.json", `{"mcpServers":{}}`)
+	writePrimitiveTestFile(t, root, "app-wt-123/.codex/agents/wt.toml", "name = \"wt\"\n")
+	writePrimitiveTestFile(t, root, ".wt-temp/.mcp.json", `{"mcpServers":{}}`)
+	writePrimitiveTestFile(t, root, ".hg-anchor-edit-abc/.mcp.json", `{"mcpServers":{}}`)
+	writePrimitiveTestFile(t, root, "relocated-wt/.git", "gitdir: /tmp/app/.git/worktrees/relocated-wt\n")
+	writePrimitiveTestFile(t, root, "relocated-wt/.mcp.json", `{"mcpServers":{}}`)
+	writePrimitiveTestFile(t, root, "app/.codex/agents/reviewer.toml", "name = \"reviewer\"\n")
+
+	index, err := Build(Options{WorkspaceRoot: root, GeneratedAt: "2026-05-09T00:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, primitive := range index.Primitives {
+		if primitive.Path != "app/.codex/agents/reviewer.toml" {
+			t.Fatalf("unexpected non-active primitive indexed: %+v", primitive)
+		}
+	}
+	if !hasPrimitive(index, "codex_agent", "pass", "app/.codex/agents/reviewer.toml") {
+		t.Fatalf("expected active codex agent primitive: %+v", index.Primitives)
+	}
+}
+
 func TestCheckPassesWithWrittenArtifacts(t *testing.T) {
 	root := t.TempDir()
 	writePrimitiveTestManifest(t, root)

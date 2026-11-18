@@ -30,6 +30,7 @@ func TestIncludeRepo(t *testing.T) {
 		allScopes bool
 		want      bool
 	}{
+		{"active", false, true},
 		{"active_operator", false, true},
 		{"active_first_party", false, true},
 		{"passive", false, false},

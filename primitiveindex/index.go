@@ -144,7 +144,7 @@ func Build(opts Options) (Index, error) {
 		}
 		rel := relPath(root, path)
 		if entry.IsDir() {
-			if shouldSkipDir(rel) {
+			if shouldSkipDir(rel) || (rel != "." && isGitWorktreeDir(path)) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -693,54 +693,82 @@ func summarize(primitives []Primitive) Summary {
 	return summary
 }
 
-func shouldSkipDir(rel string) bool {
-	if rel == "." {
+func isGitWorktreeDir(dir string) bool {
+	gitPath := filepath.Join(dir, ".git")
+	info, err := os.Lstat(gitPath)
+	if err != nil || !info.Mode().IsRegular() {
 		return false
 	}
-	base := pathBase(rel)
-	switch base {
-	case ".git", ".tools", "node_modules", ".venv", "vendor", "third_party", ".graveyard", ".codex-worktrees", ".scratch":
+	data, err := os.ReadFile(gitPath)
+	if err != nil {
+		return false
+	}
+	line := strings.TrimSpace(string(data))
+	if !strings.HasPrefix(line, "gitdir:") {
+		return false
+	}
+	target := filepath.ToSlash(strings.TrimSpace(strings.TrimPrefix(line, "gitdir:")))
+	return strings.Contains(target, "/.git/worktrees/") || strings.Contains(target, "/worktrees/")
+}
+
+func isSkippedSegment(seg string) bool {
+	switch seg {
+	case ".git", ".tools", "node_modules", ".venv", "vendor", "third_party", ".graveyard", ".codex-worktrees", ".worktrees", ".archive", ".scratch", "optoinvest", ".ouro":
 		return true
 	}
-	if strings.HasPrefix(base, "s2f_") {
-		return true
+	return strings.HasPrefix(seg, "s2f_") ||
+		strings.HasPrefix(seg, ".wt-") ||
+		strings.HasPrefix(seg, ".hg-anchor-edit-") ||
+		strings.Contains(seg, "-wt-")
+}
+
+func hasRelPathSegmentPrefix(rel, prefix string) bool {
+	return rel == prefix ||
+		strings.HasPrefix(rel, prefix+"/") ||
+		strings.HasSuffix(rel, "/"+prefix) ||
+		strings.Contains(rel, "/"+prefix+"/")
+}
+
+func shouldSkipDir(rel string) bool {
+	rel = filepath.ToSlash(strings.TrimSuffix(rel, "/"))
+	if rel == "" || rel == "." {
+		return false
+	}
+	for _, seg := range strings.Split(rel, "/") {
+		if isSkippedSegment(seg) {
+			return true
+		}
 	}
 	return rel == "vault" ||
+		strings.HasPrefix(rel, "vault/") ||
 		rel == ".config" ||
+		strings.HasPrefix(rel, ".config/") ||
 		rel == "docs/_site" ||
-		strings.Contains(rel, "/data/appdata") ||
+		strings.HasPrefix(rel, "docs/_site/") ||
 		rel == "docs/repo-claude" ||
+		strings.HasPrefix(rel, "docs/repo-claude/") ||
 		rel == "docs/research" ||
+		strings.HasPrefix(rel, "docs/research/") ||
 		rel == "docs/agent-parity" ||
 		strings.HasPrefix(rel, "docs/agent-parity/") ||
+		rel == "agent-parity" ||
 		strings.HasPrefix(rel, "agent-parity/") ||
-		strings.HasPrefix(rel, ".ralph/probe/") ||
-		strings.Contains(rel, "/.ralph/probe/") ||
-		strings.Contains(rel, "/.ralph/worktrees")
+		hasRelPathSegmentPrefix(rel, ".claude/worktrees") ||
+		hasRelPathSegmentPrefix(rel, ".ralph/probe") ||
+		hasRelPathSegmentPrefix(rel, ".ralph/worktrees") ||
+		rel == "data/appdata" ||
+		strings.HasPrefix(rel, "data/appdata/") ||
+		strings.Contains(rel, "/data/appdata")
 }
 
 func shouldSkipFile(rel string) bool {
-	return strings.Contains(rel, "/node_modules/") ||
-		strings.Contains(rel, "/.tools/") ||
-		strings.Contains(rel, "/.venv/") ||
-		strings.Contains(rel, "/third_party/") ||
-		strings.Contains(rel, "/.claude/worktrees/") ||
-		strings.Contains(rel, "/.codex-worktrees/") ||
-		strings.Contains(rel, "/.scratch/") ||
-		strings.HasPrefix(rel, "vault/") ||
-		strings.HasPrefix(rel, ".config/") ||
-		strings.HasPrefix(rel, ".graveyard/") ||
-		strings.HasPrefix(rel, "docs/_site/") ||
-		strings.Contains(rel, "/data/appdata/") ||
-		strings.HasPrefix(rel, "docs/repo-claude/") ||
-		strings.HasPrefix(rel, "docs/research/") ||
-		strings.HasPrefix(rel, "docs/agent-parity/") ||
-		strings.HasPrefix(rel, "agent-parity/") ||
-		strings.HasPrefix(rel, "s2f_") ||
-		strings.Contains(rel, "/s2f_") ||
-		strings.HasPrefix(rel, ".ralph/probe/") ||
-		strings.Contains(rel, "/.ralph/probe/") ||
-		strings.Contains(rel, "/.ralph/worktrees/")
+	rel = filepath.ToSlash(rel)
+	for i := 0; i < len(rel); i++ {
+		if rel[i] == '/' && shouldSkipDir(rel[:i]) {
+			return true
+		}
+	}
+	return false
 }
 
 func isClaudeSettings(rel string) bool {

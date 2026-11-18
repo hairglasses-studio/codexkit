@@ -581,6 +581,7 @@ func unexpectedRuntimeSkipped(skipped []RuntimeSkippedServer, allowList []string
 
 func runtimeSkippedAllowedByReason(skipped RuntimeSkippedServer) bool {
 	return strings.Contains(skipped.Reason, `repo scope "compatibility_only" excluded by policy`) ||
+		strings.Contains(skipped.Reason, `repo lifecycle "archived" excluded by policy`) ||
 		strings.Contains(skipped.Reason, "server not ready: remote transport; command not validated")
 }
 
