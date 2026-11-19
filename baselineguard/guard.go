@@ -308,12 +308,32 @@ func (r *Report) addRequiredFiles(repoPath string) {
 func (r *Report) addRetiredProviderMirrors(repoPath string) {
 	for _, name := range RetiredProviderMirrors {
 		path := filepath.Join(repoPath, name)
-		if _, err := os.Lstat(path); err == nil {
+		if info, err := os.Lstat(path); err == nil {
+			if name == "GEMINI.md" && isThinGeminiCompatibilityMirror(path, info) {
+				r.add("retired_provider_mirror", true, "thin compatibility mirror: GEMINI.md")
+				continue
+			}
 			r.add("retired_provider_mirror", false, fmt.Sprintf("retired provider mirror present — remove it: %s", name))
 		} else {
 			r.add("retired_provider_mirror", true, fmt.Sprintf("absent: %s", name))
 		}
 	}
+}
+
+func isThinGeminiCompatibilityMirror(path string, info os.FileInfo) bool {
+	if !info.Mode().IsRegular() {
+		return false
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	normalized := strings.ReplaceAll(string(data), "\r\n", "\n")
+	trimmed := strings.TrimSuffix(normalized, "\n")
+	if len(strings.Split(trimmed, "\n")) > 40 {
+		return false
+	}
+	return canonicalClaudeRe.Match(data) || canonicalAgentsRe.Match(data)
 }
 
 func (r *Report) addCanonicalPatterns(repoPath string) {
