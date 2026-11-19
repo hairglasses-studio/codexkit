@@ -51,6 +51,7 @@ type request struct {
 	ProgressID  string `json:"progress_id"`
 	Result      string `json:"result"`
 	PlanID      string `json:"plan_id"`
+	SendState   string `json:"send_state"`
 	Receipt     string `json:"receipt"`
 	Inbox       string `json:"inbox"`
 }
@@ -86,6 +87,9 @@ func (m *module) Tools() []codexkit.ToolDef {
 			identifier("plan_id")
 			artifact("receipt")
 			required = []string{"plan_id", "receipt"}
+		case "status":
+			identifier("plan_id")
+			properties["send_state"] = map[string]any{"type": "string", "description": "Optional send_state filter for listed plans."}
 		}
 		schema := map[string]any{"type": "object", "properties": properties, "additionalProperties": false}
 		if len(required) > 0 {

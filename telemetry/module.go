@@ -79,7 +79,17 @@ func (m *module) Tools() []codexkit.ToolDef {
 					"duration_ms": map[string]any{"type": "number", "description": "Duration in milliseconds."},
 					"findings":    map[string]any{"type": "integer", "description": "Number of issues/findings detected."},
 					"error":       map[string]any{"type": "string", "description": "Error message if failed."},
-					"metadata":    map[string]any{"type": "object", "description": "Arbitrary key-value metadata."},
+					"metadata": map[string]any{
+						"type":        "object",
+						"description": "Arbitrary key-value metadata.",
+						"properties": map[string]any{
+							"worker":  map[string]any{"type": "string", "description": "Optional worker identifier."},
+							"iter":    map[string]any{"type": "integer", "description": "Optional iteration counter."},
+							"task_id": map[string]any{"type": "string", "description": "Optional task identifier."},
+							"lane":    map[string]any{"type": "string", "description": "Optional execution lane."},
+							"reason":  map[string]any{"type": "string", "description": "Optional structured reason."},
+						},
+					},
 				},
 				"required": []string{"event_type"},
 			},

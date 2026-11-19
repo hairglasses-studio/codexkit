@@ -24,6 +24,12 @@ type SurfaceCounts struct {
 	ToolDefinitions   []codexkit.ToolDef
 }
 
+type toolCatalogParams struct {
+	Module string `json:"module"`
+	Query  string `json:"query"`
+	Limit  int    `json:"limit"`
+}
+
 type toolSearchParams struct {
 	Query string `json:"query"`
 	Limit int    `json:"limit"`
@@ -31,6 +37,11 @@ type toolSearchParams struct {
 
 type toolSchemaParams struct {
 	Name string `json:"name"`
+}
+
+type serverHealthParams struct {
+	IncludeCompatibility *bool `json:"include_compatibility"`
+	IncludeModules       bool  `json:"include_modules"`
 }
 
 func Module(registry *codexkit.Registry, info ServerInfo, extensions ...SurfaceCounts) codexkit.ToolModule {
@@ -61,12 +72,16 @@ func (m *metaModule) Tools() []codexkit.ToolDef {
 			Description: "List codexkit MCP tools with descriptions, annotations, and deferred-schema status.",
 			Annotations: readOnlyAnnotations(),
 			Schema: map[string]any{
-				"type":       "object",
-				"properties": map[string]any{},
+				"type": "object",
+				"properties": map[string]any{
+					"module": map[string]any{"type": "string", "description": "Optional module namespace filter."},
+					"query":  map[string]any{"type": "string", "description": "Optional case-insensitive filter across tool name, module, and description."},
+					"limit":  map[string]any{"type": "integer", "description": "Optional maximum number of tools to return (0 returns all)."},
+				},
 			},
-			Handler: func(_ map[string]any) (any, error) {
-				return map[string]any{"tools": m.catalogTools(m.allTools())}, nil
-			},
+			Handler: codexkit.TypedHandler(func(params toolCatalogParams) (any, error) {
+				return map[string]any{"tools": m.filteredCatalogTools(params.Module, params.Query, params.Limit)}, nil
+			}),
 		},
 		{
 			Name:        "tool_search",
@@ -112,39 +127,82 @@ func (m *metaModule) Tools() []codexkit.ToolDef {
 			Name:        "server_health",
 			Description: "Report codexkit MCP server health, module coverage, and protocol surface counts.",
 			Annotations: readOnlyAnnotations(),
-			Schema: map[string]any{
-				"type":       "object",
-				"properties": map[string]any{},
-			},
-			Handler: func(_ map[string]any) (any, error) {
-				return m.healthPayload(), nil
-			},
+			Schema:      healthSchema(),
+			Handler: codexkit.TypedHandler(func(params serverHealthParams) (any, error) {
+				return m.healthPayload(params), nil
+			}),
 		},
 		{
 			Name:        "codexkit_server_health",
 			Description: "Compatibility alias for server_health.",
 			Annotations: readOnlyAnnotations(),
-			Schema: map[string]any{
-				"type":       "object",
-				"properties": map[string]any{},
-			},
-			Handler: func(_ map[string]any) (any, error) {
-				return m.healthPayload(), nil
-			},
+			Schema:      healthSchema(),
+			Handler: codexkit.TypedHandler(func(params serverHealthParams) (any, error) {
+				return m.healthPayload(params), nil
+			}),
 		},
 	}
 }
 
-func (m *metaModule) healthPayload() map[string]any {
+func healthSchema() map[string]any {
 	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"include_compatibility": map[string]any{"type": "boolean", "default": true, "description": "Include Codex CLI and MCP protocol compatibility metadata."},
+			"include_modules":       map[string]any{"type": "boolean", "default": false, "description": "Include the sorted list of registered module names."},
+		},
+	}
+}
+
+func (m *metaModule) healthPayload(params serverHealthParams) map[string]any {
+	payload := map[string]any{
 		"server":                  m.info,
 		"module_count":            len(m.registry.ListModules()),
 		"tool_count":              len(m.registry.ListTools()) + m.extra.Tools,
 		"resource_count":          baseResourceCount + m.extra.Resources,
 		"resource_template_count": m.extra.ResourceTemplates,
 		"prompt_count":            codexkitPromptCount + m.extra.Prompts,
-		"compatibility":           compatibilityPayload(),
 	}
+	if params.IncludeCompatibility == nil || *params.IncludeCompatibility {
+		payload["compatibility"] = compatibilityPayload()
+	}
+	if params.IncludeModules {
+		modules := append([]string(nil), m.registry.ListModules()...)
+		sort.Strings(modules)
+		payload["modules"] = modules
+	}
+	return payload
+}
+
+func (m *metaModule) filteredCatalogTools(moduleFilter, query string, limit int) []map[string]any {
+	moduleFilter = strings.TrimSpace(moduleFilter)
+	query = strings.ToLower(strings.TrimSpace(query))
+	var matched []codexkit.ToolDef
+	for _, entry := range m.allRegisteredTools() {
+		if moduleFilter != "" && !strings.EqualFold(entry.Namespace, moduleFilter) {
+			continue
+		}
+		if query != "" {
+			haystack := strings.ToLower(entry.Tool.Name + " " + entry.Namespace + " " + entry.Tool.Description)
+			if !strings.Contains(haystack, query) {
+				continue
+			}
+		}
+		matched = append(matched, entry.Tool)
+	}
+	items := m.catalogTools(matched)
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	return items
+}
+
+func (m *metaModule) allRegisteredTools() []codexkit.RegisteredTool {
+	tools := m.registry.ListRegisteredTools()
+	for _, tool := range m.extra.ToolDefinitions {
+		tools = append(tools, codexkit.RegisteredTool{Namespace: "native", Tool: tool})
+	}
+	return tools
 }
 
 func (m *metaModule) catalogTools(tools []codexkit.ToolDef) []map[string]any {

@@ -97,6 +97,9 @@ func (m *module) invoke(parent context.Context, verb string, input request) map[
 		if input.Apply {
 			return unknown("status-is-read-only", true)
 		}
+		if input.PlanID != "" && !identifier.MatchString(input.PlanID) {
+			return unknown("invalid-plan-id", input.Apply)
+		}
 	default:
 		return unknown("invalid-operation", input.Apply)
 	}
@@ -126,7 +129,37 @@ func (m *module) invoke(parent context.Context, verb string, input request) map[
 		}
 		return execute(parent, cfg.backend, appendApply(args, input.Apply), input.Apply)
 	}
-	return execute(parent, cfg.backend, appendApply(args, input.Apply), input.Apply)
+	res := execute(parent, cfg.backend, appendApply(args, input.Apply), input.Apply)
+	if verb == "status" {
+		res = filterStatusResult(res, input.PlanID, strings.TrimSpace(input.SendState))
+	}
+	return res
+}
+
+func filterStatusResult(result map[string]any, planID, sendState string) map[string]any {
+	if planID == "" && sendState == "" {
+		return result
+	}
+	rawPlans, ok := result["plans"].([]any)
+	if !ok {
+		return result
+	}
+	filtered := make([]any, 0, len(rawPlans))
+	for _, entry := range rawPlans {
+		planMap, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		if planID != "" && planMap["plan_id"] != planID {
+			continue
+		}
+		if sendState != "" && planMap["send_state"] != sendState {
+			continue
+		}
+		filtered = append(filtered, planMap)
+	}
+	result["plans"] = filtered
+	return result
 }
 
 func appendApply(args []string, apply bool) []string {

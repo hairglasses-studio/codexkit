@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hairglasses-studio/codexkit"
+	"github.com/hairglasses-studio/codexkit/builtinmodules"
 )
 
 func setupTestServer(t *testing.T) *Server {
@@ -534,4 +535,136 @@ func TestPing_FramedTransport(t *testing.T) {
 	if len(result) != 0 {
 		t.Fatalf("expected empty ping result, got %+v", result)
 	}
+}
+
+func TestToolCatalogAndServerHealthFilters(t *testing.T) {
+	reg := codexkit.NewRegistry()
+	if err := reg.Register(&testModule{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Register(Module(reg, ServerInfo{Name: "codexkit-test", Version: "0.2.0"})); err != nil {
+		t.Fatal(err)
+	}
+	s := New(reg, ServerInfo{Name: "codexkit-test", Version: "0.2.0"})
+
+	decodeTextResult := func(resp JSONRPCResponse) map[string]any {
+		t.Helper()
+		if resp.Error != nil {
+			t.Fatalf("unexpected RPC error: %+v", resp.Error)
+		}
+		content := resp.Result.(map[string]any)["content"].([]any)
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(content[0].(map[string]any)["text"].(string)), &payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+
+	allCatalog := decodeTextResult(sendRequest(t, s, "tools/call", 20, map[string]any{
+		"name":      "tool_catalog",
+		"arguments": map[string]any{},
+	}))
+	if len(allCatalog["tools"].([]any)) != 6 {
+		t.Fatalf("expected 6 catalog tools, got %+v", allCatalog)
+	}
+
+	modCatalog := decodeTextResult(sendRequest(t, s, "tools/call", 21, map[string]any{
+		"name":      "tool_catalog",
+		"arguments": map[string]any{"module": "test"},
+	}))
+	modTools := modCatalog["tools"].([]any)
+	if len(modTools) != 1 || modTools[0].(map[string]any)["name"] != "test_echo" {
+		t.Fatalf("expected only test_echo for module=test, got %+v", modCatalog)
+	}
+
+	qCatalog := decodeTextResult(sendRequest(t, s, "tools/call", 22, map[string]any{
+		"name":      "tool_catalog",
+		"arguments": map[string]any{"module": "codexkit", "query": "health", "limit": 1},
+	}))
+	if len(qCatalog["tools"].([]any)) != 1 {
+		t.Fatalf("expected limit=1 on health query, got %+v", qCatalog)
+	}
+
+	defaultHealth := decodeTextResult(sendRequest(t, s, "tools/call", 23, map[string]any{
+		"name":      "server_health",
+		"arguments": map[string]any{},
+	}))
+	if defaultHealth["compatibility"] == nil {
+		t.Fatalf("expected compatibility by default, got %+v", defaultHealth)
+	}
+	if _, hasModules := defaultHealth["modules"]; hasModules {
+		t.Fatalf("modules should be omitted by default, got %+v", defaultHealth)
+	}
+
+	filteredHealth := decodeTextResult(sendRequest(t, s, "tools/call", 24, map[string]any{
+		"name":      "codexkit_server_health",
+		"arguments": map[string]any{"include_compatibility": false, "include_modules": true},
+	}))
+	if _, hasCompat := filteredHealth["compatibility"]; hasCompat {
+		t.Fatalf("compatibility should be omitted when false, got %+v", filteredHealth)
+	}
+	if len(filteredHealth["modules"].([]any)) != 2 {
+		t.Fatalf("expected 2 modules when include_modules=true, got %+v", filteredHealth)
+	}
+}
+
+func TestAllBuiltinSchemasValid(t *testing.T) {
+	reg := codexkit.NewRegistry()
+	for _, mod := range builtinmodules.All() {
+		if err := reg.Register(mod); err != nil {
+			t.Fatalf("register %s: %v", mod.Name(), err)
+		}
+	}
+	if err := reg.Register(Module(reg, ServerInfo{Name: "codexkit", Version: "0.2.0"})); err != nil {
+		t.Fatalf("register meta module: %v", err)
+	}
+
+	allDefs := reg.ListTools()
+	if len(allDefs) == 0 {
+		t.Fatal("expected registered tool definitions")
+	}
+	for _, def := range allDefs {
+		if violations := validateSchemaNode(def.Schema, def.Name+".inputSchema"); len(violations) > 0 {
+			t.Fatalf("schema violations for %s: %v", def.Name, violations)
+		}
+	}
+
+	mutant := validateSchemaNode(map[string]any{"type": "object", "properties": map[string]any{}}, "mutant")
+	if len(mutant) == 0 {
+		t.Fatal("validator must reject object schema with empty properties")
+	}
+}
+
+func validateSchemaNode(node map[string]any, path string) []string {
+	var issues []string
+	if node == nil {
+		return []string{path + ": nil schema"}
+	}
+	if node["type"] == "object" {
+		props, ok := node["properties"].(map[string]any)
+		if !ok || len(props) == 0 {
+			issues = append(issues, path+": OBJECT_MISSING_PROPERTIES")
+		} else {
+			if reqs, ok := node["required"].([]string); ok {
+				for _, req := range reqs {
+					if _, exists := props[req]; !exists {
+						issues = append(issues, path+": REQUIRED_NOT_IN_PROPERTIES:"+req)
+					}
+				}
+			}
+			for key, child := range props {
+				if childMap, ok := child.(map[string]any); ok {
+					issues = append(issues, validateSchemaNode(childMap, path+"."+key)...)
+				}
+			}
+		}
+	}
+	if node["type"] == "array" {
+		if items, ok := node["items"].(map[string]any); !ok {
+			issues = append(issues, path+": ARRAY_MISSING_ITEMS")
+		} else {
+			issues = append(issues, validateSchemaNode(items, path+".items")...)
+		}
+	}
+	return issues
 }
