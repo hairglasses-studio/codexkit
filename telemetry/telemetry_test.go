@@ -392,3 +392,60 @@ func TestSQLiteStoreConcurrentWrites(t *testing.T) {
 		t.Fatalf("expected %d events, got %d", expected, len(all))
 	}
 }
+
+func TestRecordToolMetadataSchemaAndCustomKeys(t *testing.T) {
+	dir := t.TempDir()
+	store := filepath.Join(dir, "telemetry.jsonl")
+
+	tools := Module().Tools()
+	recordTool := tools[0]
+	if recordTool.Name != "telemetry_record" {
+		t.Fatalf("expected telemetry_record first, got %s", recordTool.Name)
+	}
+	props, _ := recordTool.Schema["properties"].(map[string]any)
+	metaSchema, ok := props["metadata"].(map[string]any)
+	if !ok || metaSchema["type"] != "object" {
+		t.Fatalf("expected object metadata schema, got %+v", props["metadata"])
+	}
+	metaProps, ok := metaSchema["properties"].(map[string]any)
+	if !ok || len(metaProps) == 0 {
+		t.Fatalf("expected non-empty metadata.properties, got %+v", metaSchema)
+	}
+	for _, key := range []string{"worker", "iter", "task_id", "lane", "reason"} {
+		if _, exists := metaProps[key]; !exists {
+			t.Fatalf("missing metadata property %q in %+v", key, metaProps)
+		}
+	}
+	if _, forbidden := metaSchema["additionalProperties"]; forbidden {
+		t.Fatalf("metadata schema must allow custom keys, got %+v", metaSchema)
+	}
+
+	if _, err := recordTool.Handler(map[string]any{
+		"store_path": store,
+		"repo":       "codexkit",
+	}); err == nil {
+		t.Fatal("expected error when event_type is omitted")
+	}
+
+	if _, err := recordTool.Handler(map[string]any{
+		"store_path": store,
+		"event_type": "routing",
+		"repo":       "codexkit",
+		"metadata": map[string]any{
+			"worker":     "w1",
+			"iter":       2,
+			"task_id":    "L-codexkit-zero-advisory",
+			"custom_key": "custom_value",
+		},
+	}); err != nil {
+		t.Fatalf("telemetry_record with documented and custom metadata failed: %v", err)
+	}
+
+	events, err := Query(store, Filter{EventType: "routing"})
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	if len(events) != 1 || events[0].Metadata["worker"] != "w1" || events[0].Metadata["custom_key"] != "custom_value" {
+		t.Fatalf("unexpected persisted metadata: %+v", events)
+	}
+}

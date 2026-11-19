@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -157,5 +158,76 @@ func TestSDKToolAnnotationsPreserveSafetyHints(t *testing.T) {
 	}
 	if !annotations.IdempotentHint || annotations.OpenWorldHint == nil || *annotations.OpenWorldHint {
 		t.Fatalf("unexpected behavior annotations: %#v", annotations)
+	}
+}
+
+func TestSDKServerMetaFiltersAndNonEmptySchemas(t *testing.T) {
+	ctx := context.Background()
+	registry := codexkit.NewRegistry()
+	if err := registry.Register(&testModule{}); err != nil {
+		t.Fatal(err)
+	}
+	info := ServerInfo{Name: "codexkit-test", Version: "0.2.0"}
+	if err := registry.Register(Module(registry, info)); err != nil {
+		t.Fatal(err)
+	}
+
+	server := NewSDKServer(registry, info)
+	client := mcp.NewClient(&mcp.Implementation{Name: "schema-client", Version: "0.1.0"}, nil)
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	for tool, err := range clientSession.Tools(ctx, nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var schema map[string]any
+		if err := json.Unmarshal(raw, &schema); err != nil {
+			t.Fatal(err)
+		}
+		if issues := validateSchemaNode(schema, tool.Name); len(issues) > 0 {
+			t.Fatalf("SDK tool %s failed schema validation: %v", tool.Name, issues)
+		}
+	}
+
+	catCall, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "tool_catalog",
+		Arguments: map[string]any{"module": "codexkit", "query": "health", "limit": 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catStructured, _ := catCall.StructuredContent.(map[string]any)
+	catTools, _ := catStructured["tools"].([]any)
+	if len(catTools) != 1 {
+		t.Fatalf("expected 1 filtered tool over SDK, got %#v", catCall.StructuredContent)
+	}
+
+	healthCall, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "server_health",
+		Arguments: map[string]any{"include_compatibility": false, "include_modules": true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	healthStructured, _ := healthCall.StructuredContent.(map[string]any)
+	if _, hasCompat := healthStructured["compatibility"]; hasCompat {
+		t.Fatalf("expected compatibility omitted when false, got %#v", healthStructured)
+	}
+	if healthStructured["modules"] == nil {
+		t.Fatalf("expected modules when include_modules=true, got %#v", healthStructured)
 	}
 }

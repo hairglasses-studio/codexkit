@@ -35,6 +35,16 @@ func TestMain(m *testing.M) {
 			fmt.Fprint(os.Stderr, strings.Repeat("x", maxStderrBytes+1))
 		case "hang":
 			time.Sleep(time.Minute)
+		case "status-plans":
+			json.NewEncoder(os.Stdout).Encode(map[string]any{
+				"state":       "ok",
+				"workflow_id": "wf-test",
+				"args":        os.Args[1:],
+				"plans": []map[string]any{
+					{"plan_id": "plan-1", "send_state": "sent", "public_ref": "ref-1"},
+					{"plan_id": "plan-2", "send_state": "reserved", "public_ref": "ref-2"},
+				},
+			})
 		default:
 			args := os.Args[1:]
 			artifacts := map[string]string{}
@@ -183,6 +193,58 @@ func TestServerConfigurationCapturedAtModuleConstruction(t *testing.T) {
 	t.Setenv("CODEXKIT_RD_WORKFLOW_CONFIG", "changed")
 	if m.config.binding != filepath.Join(root, "configured.json") || m.config.pool != filepath.Join(root, "pool") {
 		t.Fatal(m.config)
+	}
+}
+
+func TestStatusSchemaAndFiltering(t *testing.T) {
+	m := fixture(t)
+	t.Setenv("CODEXKIT_RD_TEST_CHILD", "status-plans")
+
+	var statusTool codexkit.ToolDef
+	for _, tool := range m.Tools() {
+		if tool.Name == "rd_workflow_status" {
+			statusTool = tool
+			break
+		}
+	}
+	props, _ := statusTool.Schema["properties"].(map[string]any)
+	if len(props) == 0 || props["plan_id"] == nil || props["send_state"] == nil {
+		t.Fatalf("unexpected rd_workflow_status schema properties: %+v", statusTool.Schema)
+	}
+	if _, err := statusTool.ContextHandler(context.Background(), map[string]any{"apply": true}); err == nil {
+		t.Fatal("expected unknown parameter error for apply on rd_workflow_status")
+	}
+
+	all := call(t, m, "rd_workflow_status", map[string]any{})
+	allPlans, _ := all["plans"].([]any)
+	if len(allPlans) != 2 {
+		t.Fatalf("expected 2 unfiltered plans, got %+v", all)
+	}
+	wantArgv := []string{"--config", m.config.binding, "--state-dir", m.config.stateDir, "status"}
+	if !reflect.DeepEqual(argsFrom(t, all), wantArgv) {
+		t.Fatalf("unexpected status argv: %+v", all["args"])
+	}
+
+	byID := call(t, m, "rd_workflow_status", map[string]any{"plan_id": "plan-2"})
+	byIDPlans, _ := byID["plans"].([]any)
+	if len(byIDPlans) != 1 || byIDPlans[0].(map[string]any)["plan_id"] != "plan-2" {
+		t.Fatalf("expected plan-2 filter result, got %+v", byID)
+	}
+
+	byState := call(t, m, "rd_workflow_status", map[string]any{"send_state": "sent"})
+	byStatePlans, _ := byState["plans"].([]any)
+	if len(byStatePlans) != 1 || byStatePlans[0].(map[string]any)["plan_id"] != "plan-1" {
+		t.Fatalf("expected send_state=sent filter result, got %+v", byState)
+	}
+
+	badID := call(t, m, "rd_workflow_status", map[string]any{"plan_id": "bad id!"})
+	if badID["state"] != "UNKNOWN" || badID["reason"] != "invalid-plan-id" || badID["dispatch_allowed"] != false {
+		t.Fatalf("expected invalid-plan-id fail-closed result, got %+v", badID)
+	}
+
+	readOnly := m.invoke(context.Background(), "status", request{Apply: true})
+	if readOnly["state"] != "UNKNOWN" || readOnly["reason"] != "status-is-read-only" {
+		t.Fatalf("expected status-is-read-only fail-closed result, got %+v", readOnly)
 	}
 }
 
