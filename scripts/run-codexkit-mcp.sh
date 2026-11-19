@@ -15,7 +15,7 @@ USER_HOME="${HOME:-$(getent passwd "$(id -un 2>/dev/null || echo "")" | cut -d: 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BIN_PATH="${XDG_CACHE_HOME:-$USER_HOME/.cache}/codexkit-mcp/bin/codexkit-mcp"
-workspace_root="${CODEXKIT_WORKSPACE_ROOT:-${HAIRGLASSES_STUDIO_ROOT:-}}"
+workspace_root="${CODEXKIT_WORKSPACE_ROOT:-}"
 workspace_go_env=""
 if [[ -n "$workspace_root" ]]; then
   workspace_go_env="$workspace_root/scripts/go-workspace-env.sh"
@@ -43,12 +43,26 @@ unset CODEXKIT_MCP_RESOLVE_ONLY CODEXKIT_MCP_BUILD_ONLY
 
 sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi; }
 
-# One cache path per checkout: only the canonical checkout ($HOME/hairglasses-studio/codexkit) uses
+# One cache path per checkout: only the canonical checkout (${CODEXKIT_ROOT} or main git checkout) uses
 # the shared BIN_PATH; any other ROOT (worktree, clone) gets bin/wt-<hash of its realpath>/<name>,
 # so two checkouts at different HEADs never rebuild over each other's binary.
 CANON_BIN="$BIN_PATH"
 ROOT_REAL="$(cd "$ROOT" && pwd -P)"
-CANON_ROOT="$(cd "$USER_HOME/hairglasses-studio/codexkit" 2>/dev/null && pwd -P || true)"
+canon_default=""
+if [[ -n "${CODEXKIT_ROOT:-}" ]]; then
+  canon_default="$CODEXKIT_ROOT"
+elif [[ -n "$workspace_root" ]]; then
+  canon_default="$workspace_root/$(basename "$ROOT")"
+else
+  git_common_dir="$(env GIT_OPTIONAL_LOCKS=0 git -C "$ROOT" rev-parse --git-common-dir 2>/dev/null || true)"
+  if [[ -n "$git_common_dir" ]]; then
+    [[ "$git_common_dir" == /* ]] || git_common_dir="$ROOT/$git_common_dir"
+    canon_default="$(dirname "$git_common_dir")"
+  else
+    canon_default="$ROOT"
+  fi
+fi
+CANON_ROOT="$(cd "$canon_default" 2>/dev/null && pwd -P || true)"
 if [[ "$ROOT_REAL" != "$CANON_ROOT" ]]; then
   wt_hash="$(printf '%s' "$ROOT_REAL" | sha256 2>/dev/null | cut -c1-8 || true)"
   [[ -n "$wt_hash" ]] || wt_hash="$(printf '%s' "$ROOT_REAL" | cksum | cut -d' ' -f1)"
@@ -165,14 +179,15 @@ relative_replace() { # go.mod-line
 }
 
 # A linked worktree has no sibling checkout for a relative `replace ... => ../x`. When one is missing
-# there but exists under $HOME/hairglasses-studio, build with a temp modfile in which EVERY relative
-# replace is absolute (the existing sibling, else the one under $HOME/hairglasses-studio), so none
+# there but exists in the canonical workspace, build with a temp modfile in which EVERY relative
+# replace is absolute (the existing sibling, else the canonical workspace sibling), so none
 # depends on where the modfile lives. A no-op when no sibling is missing, or no temp dir exists.
 prepare_modfile() {
   local line target abs pre post need=false
+  local ws_dir="${workspace_root:-$(dirname "${CANON_ROOT:-$ROOT_REAL}")}"
   while IFS= read -r line || [[ -n "$line" ]]; do
     target="$(relative_replace "$line")"
-    if [[ -n "$target" && ! -d "$ROOT/$target" && -d "$USER_HOME/hairglasses-studio/$(basename "$target")" ]]; then need=true; fi
+    if [[ -n "$target" && ! -d "$ROOT/$target" && -d "$ws_dir/$(basename "$target")" ]]; then need=true; fi
   done <"$ROOT/go.mod"
   if [[ "$need" != true ]]; then return 0; fi
   modfile_dir="$(TMPDIR="$tmpd" mktemp -d 2>/dev/null)" || modfile_dir=""
@@ -183,8 +198,8 @@ prepare_modfile() {
       abs=""
       if [[ -d "$ROOT/$target" ]]; then
         abs="$(cd "$ROOT/$target" && pwd -P)"
-      elif [[ -d "$USER_HOME/hairglasses-studio/$(basename "$target")" ]]; then
-        abs="$USER_HOME/hairglasses-studio/$(basename "$target")"
+      elif [[ -d "$ws_dir/$(basename "$target")" ]]; then
+        abs="$ws_dir/$(basename "$target")"
       fi
       if [[ -n "$abs" ]]; then
         pre="${line%%=>*}=>"

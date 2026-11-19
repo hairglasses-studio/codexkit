@@ -85,7 +85,7 @@
      its teammates, and respawning gave one 2026-09-18 session three copies of every teammate.
 
 10. **Never `git stash` in a shared checkout**:
-    Every primary checkout under `~/hairglasses-studio/<repo>` is shared with other live sessions.
+    Every primary checkout under `/path/to/workspace/<repo>` is shared with other live sessions.
     `git stash` there takes THEIR uncommitted work, and `git stash pop` reaches for whatever is on
     top of the stack. Measured 2026-09-18: a Cline session ran `stash && rebase && stash pop` in
     `secretstudios-mcp`, and the pop targeted a different session's day-old stash entry and failed.
