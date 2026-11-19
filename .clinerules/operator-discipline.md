@@ -1,9 +1,9 @@
 # Operator Discipline & Multi-Agent Invariants
 
 1. **Commit Attribution Invariant**:
-   Preserve the repository's real author identity. Omit AI author/co-author
-   credits and session attribution from commits and PRs, including
-   `Co-Authored-By: Claude` and `Claude-Session:` trailers. Canonical rule:
+   Preserve the repository's real author identity. Never include AI
+   author/co-author credits or session attribution in commits and PRs:
+   omit `Co-Authored-By: Claude` and `Claude-Session:` trailers. Canonical rule:
    `claude-harness/claude/rules/no-ai-attribution.md` in the sibling harness.
    Record task ownership in the fleet coordination receipts instead.
 
