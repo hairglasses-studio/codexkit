@@ -28,7 +28,7 @@
   run first. Preserve the real author and omit AI credits and session trailers
   as specified in `operator-discipline.md`.
 - Disable pagination (`git --no-pager`) and redirect stdin from `/dev/null`
-  for anything that might prompt. No `wl-copy` / `wl-paste` / `xclip`.
+  for anything that might prompt. Never use `wl-copy` / `wl-paste` / `xclip`.
 - Never inject keystrokes into another session's terminal. `tmux send-keys`
   is routed only through `scripts/fleet_tmux_guard.py`.
 - Batch independent work into one call: `run_commands` takes `commands[]` and

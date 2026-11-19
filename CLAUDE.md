@@ -2,6 +2,8 @@
 
 This repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file. Keep `CLAUDE.md` as a thin compatibility mirror.
 
+@AGENTS.md
+
 <!-- BEGIN GENERATED LANDING POLICY -->
 Use `hg-land --repo <checkout>` (`--no-verify` while the fleet gate switch
 `~/.config/hg/gates-disabled` or `HG_GATES_DISABLED=1` is active; `--local-gate <log>`

@@ -2,6 +2,8 @@
 
 This repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file. Read it before making changes.
 
+@[AGENTS.md](AGENTS.md)
+
 ## Notes
 
 - Use [AGENTS.md](AGENTS.md) for build, test, architecture, and repo-specific conventions.
