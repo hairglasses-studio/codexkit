@@ -1031,3 +1031,69 @@ func TestConfigDrift_AbsentRegistrySkips(t *testing.T) {
 		t.Fatalf("expected absent registry to skip, got %#v", findings)
 	}
 }
+
+func TestCheck_ThinGeminiCompatibilityMirrorPasses(t *testing.T) {
+	t.Run("thin_mirror_passes", func(t *testing.T) {
+		dir := setupCompliantRepo(t)
+		writeFile(t, dir, "GEMINI.md", "# Test — Gemini Instructions\n\nThis repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file. Read it before making changes.\n\n> Canonical instructions: AGENTS.md\n")
+
+		report := Check(dir)
+		if !report.Passed {
+			t.Fatalf("expected PASS for thin GEMINI.md compatibility mirror, got %#v", report.Findings)
+		}
+		found := false
+		for _, f := range report.Findings {
+			if f.Check == "retired_provider_mirror" && f.Passed && f.Message == "thin compatibility mirror: GEMINI.md" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("expected thin compatibility mirror passing finding for GEMINI.md, got %#v", report.Findings)
+		}
+	})
+
+	t.Run("bloated_mirror_fails", func(t *testing.T) {
+		dir := setupCompliantRepo(t)
+		var lines []string
+		lines = append(lines, "# Test — Gemini Instructions", "", "This repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file.", "", "> Canonical instructions: AGENTS.md")
+		for len(lines) < 41 {
+			lines = append(lines, "- extra policy line")
+		}
+		writeFile(t, dir, "GEMINI.md", strings.Join(lines, "\n")+"\n")
+
+		report := Check(dir)
+		if report.Passed {
+			t.Fatal("expected FAIL for >40-line GEMINI.md")
+		}
+		found := false
+		for _, f := range report.Findings {
+			if f.Check == "retired_provider_mirror" && !f.Passed && f.Message == "retired provider mirror present — remove it: GEMINI.md" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("expected retired_provider_mirror failure for bloated GEMINI.md, got %#v", report.Findings)
+		}
+	})
+
+	t.Run("symlink_fails", func(t *testing.T) {
+		dir := setupCompliantRepo(t)
+		if err := os.Symlink("AGENTS.md", filepath.Join(dir, "GEMINI.md")); err != nil {
+			t.Skipf("symlink unsupported: %v", err)
+		}
+
+		report := Check(dir)
+		if report.Passed {
+			t.Fatal("expected FAIL for symlinked GEMINI.md")
+		}
+		found := false
+		for _, f := range report.Findings {
+			if f.Check == "retired_provider_mirror" && !f.Passed && f.Message == "retired provider mirror present — remove it: GEMINI.md" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("expected retired_provider_mirror failure for symlinked GEMINI.md, got %#v", report.Findings)
+		}
+	})
+}

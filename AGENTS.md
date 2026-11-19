@@ -10,7 +10,26 @@ Codex fleet management toolkit — config generation, baseline validation, skill
 - `make test` — run race-enabled Go tests
 - `make baseline` — validate this repo, permitting only the exact unstaged managed-launcher approval overlay
 - `make baseline-strict` — validate with no local overlay exception
-- CI: GitHub Actions `ci / gate` (shared hairglasses-studio workflow); land with `hg-land`.
+- CI & landing: GitHub Actions `ci / gate` (shared hairglasses-studio workflow); land verified changes via branch -> PR -> `claude-harness/bin/hg-land --repo <checkout>` (never push directly to `main`; prefer fast local gates such as `GOWORK=off go vet ./... < /dev/null` and `GOWORK=off go test -race -count=1 ./... < /dev/null`).
+
+## Landing Policy
+
+<!-- BEGIN GENERATED LANDING POLICY -->
+Use `hg-land --repo <checkout>` (`--no-verify` while the fleet gate switch
+`~/.config/hg/gates-disabled` or `HG_GATES_DISABLED=1` is active; `--local-gate <log>`
+under `HG_GATES_DISABLED=0`, or `hg-gate-then-land --require-gate`) to land through a
+pull request. Owned by `claude-harness/.agents/policies/landing.md`.
+
+- While fleet gates are disabled (operator 2026-11-08), `hg-land` lands without a
+  local gate log; when gated, bind the log to `head=<full SHA>` with final `rc=0`.
+- Observe the repository's current remote requirements. Required checks and
+  branch protections remain binding; hosted CI is not assumed required everywhere.
+- Never bypass a failed gate, force-push, or replace unrelated work. Do not use
+  direct pushes to main as a substitute for the configured landing route.
+- Optoinvest repositories remain local-only: no remote publication.
+- Prove landing with the tool receipt and exact remote main SHA. Source updates
+  and runtime/deployment verification are separate claims.
+<!-- END GENERATED LANDING POLICY -->
 
 ## Architecture
 
