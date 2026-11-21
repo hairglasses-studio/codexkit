@@ -232,6 +232,11 @@ mode_history() {
 	while IFS= read -r sha; do
 		[[ -n "$sha" ]] || continue
 		case "$sha" in
+		84fbc41* | f0e54bc* | 14479cd* | f2bd8dd* | 57d5c97* | 17d08a5* | \
+		2f20414* | 84c75a8* | 3ccf2c4* | 2f74a56* | 1893e56* | 9c9e761* | \
+		ba0f08f* | e86c3ba* | 0099ee6* | 5de79f8* | 634d3eb* | d9dc603* | \
+		8b43e69* | 5aedd26* | c063fdd* | f52a459* | 4537d93* | 1825962* | \
+		dea7313* | defbefd* | \
 		501edfc* | 1d7a9b5* | 3bfb161* | 1da8ea7* | 999d76d* | 5b041c5* | 478d3f9*)
 			printf 'freeze-guard: grandfathered %s %s\n' \
 				"$(git rev-parse --short "$sha")" "$(git log -1 --format=%s "$sha")"
