@@ -39,15 +39,15 @@ func TestCodexVersionPin_NoDocumentedPinsSkips(t *testing.T) {
 
 func TestCodexVersionPin_DisagreeingDocsFails(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "AGENTS.md", "- **Codex 0.147.0**: stable apps.\n")
-	writeFile(t, dir, filepath.Join("docs", "CODEX_COMPATIBILITY.md"), "# Codex 0.154.0 compatibility\n\nThis repository targets Codex CLI `0.154.0`.\n")
+	writeFile(t, dir, "AGENTS.md", "- **Codex 0.167.0**: stable apps.\n")
+	writeFile(t, dir, filepath.Join("docs", "CODEX_COMPATIBILITY.md"), "# Codex 0.171.0 compatibility\n\nThis repository targets Codex CLI `0.171.0`.\n")
 
 	findings := findingsFor(Check(dir), "codex_version_pin")
 	if len(findings) != 1 || findings[0].Passed {
 		t.Fatalf("expected exactly one failing finding, got %#v", findings)
 	}
 	msg := findings[0].Message
-	if !strings.Contains(msg, "0.147.0") || !strings.Contains(msg, "0.154.0") {
+	if !strings.Contains(msg, "0.167.0") || !strings.Contains(msg, "0.171.0") {
 		t.Fatalf("message must name both disagreeing versions, got: %s", msg)
 	}
 	if !strings.Contains(msg, "AGENTS.md") || !strings.Contains(msg, filepath.Join("docs", "CODEX_COMPATIBILITY.md")) {
@@ -57,27 +57,31 @@ func TestCodexVersionPin_DisagreeingDocsFails(t *testing.T) {
 
 func TestCodexVersionPin_LiveDriftFails(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "AGENTS.md", "- **Codex 0.154.0**: stable apps.\n")
-	t.Setenv("CODEXKIT_CODEX_BIN", writeFakeCodexBinary(t, "0.159.3"))
+	writeFile(t, dir, "AGENTS.md", "- **Codex 0.167.0**: stable apps.\n")
+	t.Setenv("CODEXKIT_CODEX_BIN", writeFakeCodexBinary(t, ExpectedCodexVersionPin))
 
 	findings := findingsFor(Check(dir), "codex_version_pin")
 	if len(findings) != 1 || findings[0].Passed {
 		t.Fatalf("expected exactly one failing finding, got %#v", findings)
 	}
 	msg := findings[0].Message
-	if !strings.Contains(msg, "0.154.0") || !strings.Contains(msg, "0.159.3") {
+	if !strings.Contains(msg, "0.167.0") || !strings.Contains(msg, ExpectedCodexVersionPin) {
 		t.Fatalf("message must name both the documented and live versions, got: %s", msg)
 	}
 }
 
 func TestCodexVersionPin_LiveMatchPasses(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "AGENTS.md", "- **Codex 0.159.3**: stable apps.\n")
-	t.Setenv("CODEXKIT_CODEX_BIN", writeFakeCodexBinary(t, "0.159.3"))
+	writeFile(t, dir, "AGENTS.md", "- **Codex 0.171.0**: stable apps.\n")
+	t.Setenv("CODEXKIT_CODEX_BIN", writeFakeCodexBinary(t, ExpectedCodexVersionPin))
 
 	findings := findingsFor(Check(dir), "codex_version_pin")
 	if len(findings) != 1 || !findings[0].Passed {
 		t.Fatalf("expected a passing finding, got %#v", findings)
+	}
+	repoFindings := findingsFor(Check(".."), "codex_version_pin")
+	if len(repoFindings) != 1 || !repoFindings[0].Passed {
+		t.Fatalf("expected repo docs to match %s, got %#v", ExpectedCodexVersionPin, repoFindings)
 	}
 }
 
