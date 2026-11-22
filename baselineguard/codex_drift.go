@@ -54,7 +54,10 @@ var codexCLIVersionLineRe = regexp.MustCompile(`(?m)^codex-cli (\d+\.\d+\.\d+)\s
 
 // codexVersionProbeTimeout bounds the live `codex --version` probe so a
 // hung or misbehaving binary cannot stall the baseline check.
-const codexVersionProbeTimeout = 5 * time.Second
+const (
+	ExpectedCodexVersionPin  = "0.171.0"
+	codexVersionProbeTimeout = 5 * time.Second
+)
 
 // codexVersionProbe runs `codex --version` — never `exec`/`review`, which
 // the fleet's non-interactive guard refuses — and parses the live
